@@ -15,7 +15,7 @@ import {
 import { saveBrf, deleteBrf, searchBrfs, type SavedBrf } from "../lib/brfStore";
 import { useUserRole, isKontorschef } from "../lib/userRole";
 import { saveObjekt } from "../lib/objektStore";
-import type { Typ } from "../data/objekt";
+import { slugifyAddr, type Typ } from "../data/objekt";
 
 export const Route = createFileRoute("/objekt/nytt")({
   head: () => ({
@@ -211,7 +211,7 @@ function ObjektsformularPage() {
     setSavedObjMsg(`Sparat: ${entry.adress}`);
     setTimeout(() => {
       setSavedObjMsg(null);
-      navigate({ to: "/objekt" });
+      navigate({ to: "/objekt/$slug", params: { slug: slugifyAddr(entry.adress) } });
     }, 900);
   }
 

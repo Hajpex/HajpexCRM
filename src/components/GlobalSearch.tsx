@@ -1,5 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "@tanstack/react-router";
+import { allObjekt } from "@/lib/objektStore";
+import { slugifyAddr } from "@/data/objekt";
 import {
   CommandDialog,
   CommandInput,
@@ -24,15 +26,19 @@ import {
 } from "lucide-react";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Data — byt ut mot riktiga API-anrop när backend finns
+// Data
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const ALL_OBJECTS = [
-  { addr: "Södragården 9",    area: "Långvik, Forsvik",  status: "Till salu",  slug: "sodragarden-9" },
-  { addr: "Stationsgatan 8B", area: "Centrum, Långvik",  status: "Budgivning", slug: "stationsgatan-8b" },
-  { addr: "Tallbacken 3",     area: "Stenkulla",         status: "Värdering",  slug: "tallbacken-3" },
-  { addr: "Granstigen 18",    area: "Granvik",           status: "Till salu",  slug: "granstigen-18" },
-];
+type ObjektRow = { addr: string; area: string; status: string; slug: string };
+
+function buildObjectList(): ObjektRow[] {
+  return allObjekt().map((o) => ({
+    addr: o.adress,
+    area: o.stad || "",
+    status: o.status,
+    slug: slugifyAddr(o.adress),
+  }));
+}
 
 const ALL_CONTACTS = [
   { name: "Margaretha Lindqvist", role: "Spekulant", objSlug: "stationsgatan-8b" },
@@ -101,16 +107,16 @@ function normalize(s: string) {
 
 interface ParseResult {
   matchedSection: SectionInfo | null;
-  matchedObjects: typeof ALL_OBJECTS;
+  matchedObjects: ObjektRow[];
   matchedContacts: typeof ALL_CONTACTS;
   matchedNav: typeof NAV_ITEMS;
   sectionKey: string | null;
 }
 
-function parseQuery(raw: string): ParseResult {
+function parseQuery(raw: string, objects: ObjektRow[]): ParseResult {
   const q = raw.trim();
   if (!q) {
-    return { matchedSection: null, matchedObjects: ALL_OBJECTS, matchedContacts: [], matchedNav: NAV_ITEMS, sectionKey: null };
+    return { matchedSection: null, matchedObjects: objects, matchedContacts: [], matchedNav: NAV_ITEMS, sectionKey: null };
   }
 
   const tokens = normalize(q).split(/\s+/);
@@ -132,8 +138,8 @@ function parseQuery(raw: string): ParseResult {
   // Match objects: all search tokens must appear somewhere in addr or area
   const matchedObjects =
     searchTokens.length === 0
-      ? ALL_OBJECTS
-      : ALL_OBJECTS.filter((o) => {
+      ? objects
+      : objects.filter((o) => {
           const hay = normalize(o.addr + " " + o.area);
           return searchTokens.every((t) => hay.includes(t));
         });
@@ -173,7 +179,10 @@ export function GlobalSearch({ open, onOpenChange }: GlobalSearchProps) {
     if (!open) setQuery("");
   }, [open]);
 
-  const parsed = useMemo(() => parseQuery(query), [query]);
+  // Build object list fresh each time dialog opens so new objects appear
+  const objects = useMemo(() => buildObjectList(), [open]);
+
+  const parsed = useMemo(() => parseQuery(query, objects), [query, objects]);
 
   function go(to: string) {
     onOpenChange(false);
