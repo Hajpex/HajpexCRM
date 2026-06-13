@@ -6,6 +6,7 @@ import { listObjekt } from "../lib/objektStore";
 import { getObjektNotes, addObjektNote, setObjektBeskrivning, setObjektStatus } from "../lib/objektNotesStore";
 import { listBud, addBud, markeraVinnare, deleteBud, fmtBud, type Bud } from "../lib/budgivningStore";
 import { fmtSweNum, handleNumberInput } from "../lib/formatters";
+import { getDemoSaljare } from "../lib/demoKontakter";
 import { listKontakter, addObjektKoppling } from "../lib/kontaktStore";
 import type { KontaktRelation, Kontakt } from "../lib/kontaktTypes";
 import {
@@ -405,12 +406,32 @@ function BilderCard({ adress, slug }: { adress: string; slug: string }) {
 }
 
 function AktivitetCard() {
+  const { slug } = Route.useParams();
+  const bids = listBud(slug);
+  const spekulanter = listKontakter().filter((k) =>
+    k.objektKopplingar.some((kp) => kp.slug === slug && kp.relation === "spekulant")
+  );
+  const highestBid = bids[0]?.belopp;
   return (
     <Card title="Aktivitet" icon="📈">
-        <div className="flex h-full flex-col items-center justify-center py-10 text-center">
-          <div className="text-sm text-muted-foreground">Inga bud</div>
-          <div className="mt-3 text-sm text-muted-foreground">Spekulant: <span className="font-mono text-2xl text-primary" style={serif}>0</span></div>
+      <div className="divide-y divide-border text-sm">
+        <div className="flex items-center justify-between py-3">
+          <span className="text-muted-foreground">Spekulanter</span>
+          <span className="font-medium text-foreground">{spekulanter.length}</span>
         </div>
+        <div className="flex items-center justify-between py-3">
+          <span className="text-muted-foreground">Antal bud</span>
+          <span className="font-medium text-foreground">{bids.length}</span>
+        </div>
+        {highestBid ? (
+          <div className="flex items-center justify-between py-3">
+            <span className="text-muted-foreground">Högsta bud</span>
+            <span className="font-medium text-primary">{fmtBud(highestBid)}</span>
+          </div>
+        ) : (
+          <div className="py-3 text-center text-xs text-muted-foreground">Inga bud registrerade</div>
+        )}
+      </div>
     </Card>
   );
 }
@@ -1945,10 +1966,12 @@ function TiLikvidBody() {
 /* ---------- Efterarbete tillträde ---------- */
 function TiEfterarbeteBody() {
   const { slug } = Route.useParams();
-  const sellers = [
-    { n: "Anna Svensson", a: "1/2", pnr: "19850101-1234", db: "Nej", tel: "0701-23 45 67", mail: "anna.svensson@example.se", adr: sellerAddress(slug, 0), ks: "Ja" },
-    { n: "Erik Johansson", a: "1/2", pnr: "19900101-5678", db: "Nej", tel: "0708-90 12 34", mail: "erik.johansson@example.se", adr: sellerAddress(slug, 1), ks: "Ja" },
-  ];
+  const demoSaljare = getDemoSaljare(slug);
+  const andel = demoSaljare.length === 1 ? "1/1" : "1/2";
+  const sellers = demoSaljare.map((s, i) => ({
+    n: s.namn, a: andel, pnr: s.pnr, db: "Nej",
+    tel: s.telefon, mail: s.email, adr: sellerAddress(slug, i), ks: "Ja",
+  }));
   const customer = [
     { k: "Underlag kapitalvinst", s: "Ändrad av kund", sCls: "bg-amber-500/20 text-amber-200", u: "2026-06-09 00:24" },
     { k: "Driftskostnader", s: "Granskad & importerad", sCls: "bg-emerald-500/20 text-emerald-200", u: "" },
@@ -3349,8 +3372,9 @@ function BuSettingsModal({ onClose }: { onClose: () => void }) {
               <span>Säljare</span>
               <div className="flex gap-6"><span>📱 Telefonnummer</span><span>✉ E-post</span></div>
             </div>
-            <BuContactRow name="Anna Svensson" tel="0701-23 45 67" email="anna.svensson@example.se" />
-            <BuContactRow name="Erik Johansson" tel="0708-90 12 34" email="erik.johansson@example.se" />
+            {getDemoSaljare(slug).map((s) => (
+              <BuContactRow key={s.telefon} name={s.namn} tel={s.telefon} email={s.email} />
+            ))}
           </div>
         </div>
         <div className="flex justify-end border-t border-border px-5 py-3">
@@ -3887,10 +3911,12 @@ type SaljarePerson = {
 };
 
 function getSaljarePersons(slug: string): SaljarePerson[] {
-  return [
-    { n: "Anna Svensson", a: "1/2", pnr: "19850101-1234", db: "Nej", tel: "0701-23 45 67", mail: "anna.svensson@example.se", adr: sellerAddress(slug, 0), ks: "Ja" },
-    { n: "Erik Johansson", a: "1/2", pnr: "19900101-5678", db: "Nej", tel: "0708-90 12 34", mail: "erik.johansson@example.se", adr: sellerAddress(slug, 1), ks: "Ja" },
-  ];
+  const demo = getDemoSaljare(slug);
+  const andel = demo.length === 1 ? "1/1" : "1/2";
+  return demo.map((s, i) => ({
+    n: s.namn, a: andel, pnr: s.pnr, db: "Nej",
+    tel: s.telefon, mail: s.email, adr: sellerAddress(slug, i), ks: "Ja",
+  }));
 }
 
 const SALJARE_CUSTOMER = [
