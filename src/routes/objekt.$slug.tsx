@@ -3,7 +3,9 @@ import { Fragment, createContext, useContext, useState, useEffect, type ReactNod
 import { AppShell } from "../components/AppShell";
 import { OBJEKT, type Objekt } from "../data/objekt";
 import { listObjekt } from "../lib/objektStore";
-import { getObjektNotes, addObjektNote, setObjektBeskrivning } from "../lib/objektNotesStore";
+import { getObjektNotes, addObjektNote, setObjektBeskrivning, setObjektStatus } from "../lib/objektNotesStore";
+import { listBud, addBud, markeraVinnare, deleteBud, fmtBud, type Bud } from "../lib/budgivningStore";
+import { fmtSweNum, handleNumberInput } from "../lib/formatters";
 import { listKontakter, addObjektKoppling } from "../lib/kontaktStore";
 import type { KontaktRelation, Kontakt } from "../lib/kontaktTypes";
 import {
@@ -68,7 +70,16 @@ function ObjektDetailPage() {
 
   const adress = prettyAddr(slug);
   const o = getObjektBySlug(slug);
+  const [statusOverride, setStatusOverrideState] = useState<string | undefined>(
+    () => getObjektNotes(slug).statusOverride
+  );
+  const currentStatus = statusOverride ?? o?.status;
   const showSavedLayout = editLayout || outerSizes !== null || innerSizes !== null;
+
+  function handleStatusChange(s: string) {
+    setObjektStatus(slug, s);
+    setStatusOverrideState(s);
+  }
 
   return (
     <AppShell>
@@ -105,14 +116,8 @@ function ObjektDetailPage() {
           <div>
             <div className="mb-2 flex items-center gap-3">
               <div className="text-[11px] uppercase tracking-[0.22em] text-primary/80">Objekt</div>
-              {o?.status && (
-                <span className={[
-                  "rounded-full border px-2.5 py-0.5 text-[10px] uppercase tracking-[0.12em]",
-                  o.status === "Till salu" ? "border-primary/40 bg-primary/10 text-primary"
-                  : o.status === "Redo (Kommande)" ? "border-orange-400/40 bg-orange-400/10 text-orange-300"
-                  : o.status === "Såld" ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-400"
-                  : "border-white/10 text-muted-foreground",
-                ].join(" ")}>{o.status}</span>
+              {currentStatus && (
+                <StatusPicker value={currentStatus} onChange={handleStatusChange} />
               )}
             </div>
             <h1 className="text-4xl font-medium leading-tight md:text-5xl" style={serif}>
@@ -158,8 +163,10 @@ function ObjektDetailPage() {
           </div>
         )}
 
-        {/* Body: sidebar + content */}
-        {showSavedLayout ? (
+        {/* Body: spekulanter top-view OR sidebar + content */}
+        {top === "Spekulanter" ? (
+          <SpekulanterTopView slug={slug} />
+        ) : showSavedLayout ? (
           <ResizablePanelGroup
             key={`outer-${layoutKey}`}
             orientation="horizontal"
@@ -183,7 +190,7 @@ function ObjektDetailPage() {
               ) : tab === "Visningar" ? (
                 <VisningarView />
               ) : tab === "Budgivning" ? (
-                <BudgivningView />
+                <BudgivningView slug={slug} />
               ) : tab === "Kontrakt" ? (
                 <KontraktView />
               ) : tab === "Tillträde" ? (
@@ -218,7 +225,7 @@ function ObjektDetailPage() {
               ) : tab === "Visningar" ? (
                 <VisningarView />
               ) : tab === "Budgivning" ? (
-                <BudgivningView />
+                <BudgivningView slug={slug} />
               ) : tab === "Kontrakt" ? (
                 <KontraktView />
               ) : tab === "Tillträde" ? (
@@ -685,6 +692,136 @@ function Placeholder({ tab }: { tab: string }) {
       <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
         Skicka skärmdumpen för fliken <span className="font-medium text-foreground">{tab}</span> så bygger jag layouten.
       </p>
+    </div>
+  );
+}
+
+const STATUS_OPTIONS = [
+  "Till salu", "Redo (Kommande)", "Under intag", "Intaget",
+  "Såld", "Vilande", "Inget uppdrag", "Arkiverad",
+] as const;
+
+function statusColor(s: string) {
+  if (s === "Till salu") return "border-primary/40 bg-primary/10 text-primary";
+  if (s === "Redo (Kommande)") return "border-orange-400/40 bg-orange-400/10 text-orange-500";
+  if (s === "Såld") return "border-emerald-400/30 bg-emerald-400/10 text-emerald-600";
+  if (s === "Vilande" || s === "Inget uppdrag") return "border-muted text-muted-foreground";
+  return "border-border text-muted-foreground";
+}
+
+function StatusPicker({ value, onChange }: { value: string; onChange: (s: string) => void }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className={[
+          "flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[10px] uppercase tracking-[0.12em] transition-colors hover:opacity-80",
+          statusColor(value),
+        ].join(" ")}
+      >
+        {value}
+        <span className="ml-0.5 opacity-60">▾</span>
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div className="absolute left-0 top-full z-50 mt-1 w-44 overflow-hidden rounded-lg border border-border bg-card shadow-xl">
+            {STATUS_OPTIONS.map((s) => (
+              <button
+                key={s}
+                onClick={() => { onChange(s); setOpen(false); }}
+                className={[
+                  "flex w-full items-center gap-2 px-3 py-2 text-left text-xs transition-colors hover:bg-foreground/5",
+                  s === value ? "font-medium text-primary" : "text-foreground",
+                ].join(" ")}
+              >
+                {s === value && <span className="text-primary">✓</span>}
+                {s}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function SpekulanterTopView({ slug }: { slug: string }) {
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [tick, setTick] = useState(0);
+  void tick;
+
+  const spekulanter = listKontakter().filter((k) =>
+    k.objektKopplingar.some((kp) => kp.slug === slug && kp.relation === "spekulant")
+  );
+
+  return (
+    <div className="rounded-xl border border-border bg-card/80 p-6 shadow-[0_20px_50px_-30px_rgba(0,0,0,0.25)] backdrop-blur-sm">
+      <div className="mb-5 flex items-center justify-between">
+        <div>
+          <div className="text-[10px] uppercase tracking-[0.22em] text-primary/70">Spekulanter</div>
+          <div className="mt-0.5 text-sm text-muted-foreground">{spekulanter.length} registrerade</div>
+        </div>
+        <button
+          onClick={() => setDialogOpen(true)}
+          className="rounded-md bg-primary px-3 py-2 text-xs font-medium text-primary-foreground hover:opacity-90"
+        >
+          + Koppla spekulant
+        </button>
+      </div>
+
+      {spekulanter.length === 0 ? (
+        <div className="py-12 text-center text-sm text-muted-foreground">
+          Inga spekulanter kopplade till detta objekt ännu
+        </div>
+      ) : (
+        <div className="overflow-x-auto rounded-md border border-border">
+          <table className="w-full text-sm">
+            <thead className="bg-foreground/[0.04] text-left text-xs uppercase tracking-wider text-muted-foreground">
+              <tr>
+                {["Namn", "Telefon", "E-post", "Kopplad", ""].map((h) => (
+                  <th key={h} className="px-3 py-2 font-medium">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {spekulanter.map((k) => {
+                const koppling = k.objektKopplingar.find((kp) => kp.slug === slug && kp.relation === "spekulant");
+                return (
+                  <tr key={k.id}>
+                    <td className="px-3 py-2.5">
+                      <Link to="/kunder/$id" params={{ id: k.id }} className="font-medium text-foreground hover:text-primary">
+                        {k.fornamn} {k.efternamn}
+                      </Link>
+                    </td>
+                    <td className="px-3 py-2.5 text-muted-foreground">{k.telefon || "—"}</td>
+                    <td className="px-3 py-2.5 text-muted-foreground">{k.epost || "—"}</td>
+                    <td className="px-3 py-2.5 text-[11px] text-muted-foreground">
+                      {koppling ? new Date(koppling.addedAt).toLocaleDateString("sv-SE") : "—"}
+                    </td>
+                    <td className="px-3 py-2.5">
+                      <Link to="/kunder/$id" params={{ id: k.id }}
+                        className="text-[11px] text-primary hover:underline">
+                        Visa profil →
+                      </Link>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {dialogOpen && (
+        <KontaktVäljarDialog
+          slug={slug}
+          relation="spekulant"
+          onClose={() => setDialogOpen(false)}
+          onLinked={() => { setTick((t) => t + 1); setDialogOpen(false); }}
+        />
+      )}
     </div>
   );
 }
@@ -2873,7 +3010,7 @@ function KoEfterarbeteBody() {
    ============================================================ */
 type BuSection = "budgivning" | "boende" | "dokument" | "filer";
 
-function BudgivningView() {
+function BudgivningView({ slug }: { slug: string }) {
   const [open, setOpen] = useState<Record<BuSection, boolean>>({
     budgivning: true, boende: false, dokument: false, filer: false,
   });
@@ -2886,7 +3023,7 @@ function BudgivningView() {
   return (
     <div className="flex flex-col gap-2 pl-2">
       <BuSec id="budgivning" title="Budgivning" open={open.budgivning} onToggle={toggle} done={done.budgivning} onToggleDone={toggleDone} helpLabel="Hjälp - budgivning">
-        <BuBudgivningBody />
+        <BuBudgivningBody slug={slug} />
       </BuSec>
       <BuSec id="boende" title="Boendekostnadskalkyl" open={open.boende} onToggle={toggle} done={done.boende} onToggleDone={toggleDone}>
         <MaBoendeBody />
@@ -2941,8 +3078,26 @@ function BuSec({
 }
 
 /* ---------- Budgivning body ---------- */
-function BuBudgivningBody() {
+function BuBudgivningBody({ slug }: { slug: string }) {
+  const [bids, setBids] = useState<Bud[]>(() => listBud(slug));
+  const [addOpen, setAddOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+
+  function refresh() { setBids(listBud(slug)); }
+
+  function handleMarkVinnare(budId: string) {
+    markeraVinnare(slug, budId);
+    refresh();
+  }
+
+  function handleDelete(budId: string) {
+    if (!window.confirm("Ta bort budet?")) return;
+    deleteBud(slug, budId);
+    refresh();
+  }
+
+  const highestBid = bids[0]?.belopp ?? 0;
+
   return (
     <div className="space-y-6">
       {/* Top action bar */}
@@ -2957,110 +3112,182 @@ function BuBudgivningBody() {
           ✉ Kommunikation
         </button>
       </div>
-      <button className="block w-full rounded-md border border-border bg-background/40 px-4 py-2.5 text-center text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground hover:bg-background/60">
-        ⊘ Inaktivera SMS- och webbud
-      </button>
 
       {/* Budlista */}
       <div>
         <div className="mb-3 flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-foreground">Budlista</h3>
-          <div className="flex gap-2">
-            <BtnGhost>⟳ Uppdatera budgivningslista</BtnGhost>
-            <BtnPrimary>+ Lägg till ett bud</BtnPrimary>
+          <div>
+            <h3 className="text-sm font-semibold text-foreground">Budlista</h3>
+            {bids.length > 0 && (
+              <div className="text-[11px] text-muted-foreground">
+                Högsta bud: <span className="font-medium text-primary">{fmtBud(highestBid)}</span> · {bids.length} bud
+              </div>
+            )}
           </div>
+          <button
+            onClick={() => setAddOpen(true)}
+            className="rounded-md bg-primary px-3 py-2 text-xs font-medium text-primary-foreground hover:opacity-90"
+          >
+            + Lägg till bud
+          </button>
         </div>
         <div className="overflow-x-auto rounded-md border border-border">
-          <table className="w-full min-w-[900px] text-sm">
+          <table className="w-full min-w-[700px] text-sm">
             <thead className="bg-foreground/[0.04] text-left text-xs uppercase tracking-wider text-muted-foreground">
               <tr>
-                {["Alias","Namn","Kontaktnummer","Bud","Publikt","Dolt bud","Status","Datum","Aktivitet"].map((h) => (
+                {["#","Namn","Telefon","Bud","Villkor","Datum","Vinnare",""].map((h) => (
                   <th key={h} className="px-3 py-2 font-medium">{h}</th>
                 ))}
               </tr>
             </thead>
-            <tbody>
-              <tr><td colSpan={9} className="px-3 py-6 text-center text-xs text-muted-foreground">Inga bud ännu</td></tr>
+            <tbody className="divide-y divide-border">
+              {bids.length === 0 ? (
+                <tr><td colSpan={8} className="px-3 py-8 text-center text-sm text-muted-foreground">Inga bud ännu — klicka "+ Lägg till bud" för att registrera det första</td></tr>
+              ) : bids.map((b, i) => (
+                <tr key={b.id} className={b.vinnare ? "bg-emerald-500/5" : ""}>
+                  <td className="px-3 py-2.5 text-muted-foreground">{i + 1}</td>
+                  <td className="px-3 py-2.5 font-medium text-foreground">{b.namn}</td>
+                  <td className="px-3 py-2.5 text-muted-foreground">{b.telefon || "—"}</td>
+                  <td className="px-3 py-2.5 font-mono font-medium text-foreground">{fmtBud(b.belopp)}</td>
+                  <td className="px-3 py-2.5 text-muted-foreground">{b.villkor || "—"}</td>
+                  <td className="px-3 py-2.5 text-muted-foreground text-[11px]">
+                    {new Date(b.tidpunkt).toLocaleString("sv-SE", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                  </td>
+                  <td className="px-3 py-2.5">
+                    {b.vinnare ? (
+                      <span className="rounded bg-emerald-500/15 px-2 py-0.5 text-[11px] font-medium text-emerald-400">✓ Vinnare</span>
+                    ) : (
+                      <button onClick={() => handleMarkVinnare(b.id)} className="text-[11px] text-muted-foreground hover:text-primary">
+                        Markera vinnare
+                      </button>
+                    )}
+                  </td>
+                  <td className="px-3 py-2.5">
+                    <button onClick={() => handleDelete(b.id)} className="text-[11px] text-muted-foreground hover:text-red-400">✕</button>
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
-        <Pager />
       </div>
 
-      {/* Budgivare och Nollbudare */}
-      <div>
-        <div className="mb-3 flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-foreground">Budgivare och "Nollbudare"</h3>
-          <div className="flex gap-2">
-            <BtnGhost>Redigera budgivare</BtnGhost>
-            <BtnPrimary>+ Lägg till budgivare/nollbudare</BtnPrimary>
-          </div>
-        </div>
-        <div className="overflow-x-auto rounded-md border border-border">
-          <table className="w-full min-w-[800px] text-sm">
-            <thead className="bg-foreground/[0.04] text-left text-xs uppercase tracking-wider text-muted-foreground">
-              <tr>
-                {["Namn","Kontaktnummer","E-post","Status","Finansiering","Aktivitet"].map((h) => (
-                  <th key={h} className="px-3 py-2 font-medium">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              <tr><td colSpan={6} className="px-3 py-6 text-center text-xs text-muted-foreground">Inga budgivare</td></tr>
-            </tbody>
-          </table>
-        </div>
-        <Pager />
-      </div>
-
-      {/* Utskrift budgivningslista */}
+      {/* Utskrift */}
       <div>
         <h3 className="mb-3 text-sm font-semibold text-foreground">Utskrift budgivningslista</h3>
         <div className="flex flex-wrap gap-2">
           <BtnPrimary>🖨 Utskrift budgivningslista</BtnPrimary>
-          <BtnPrimary>✎ E-signatur</BtnPrimary>
-          <BtnPrimary>✉ E-post</BtnPrimary>
+          <BtnGhost>✉ E-post</BtnGhost>
         </div>
       </div>
 
-      {/* SMS-lista */}
-      <div>
-        <div className="mb-3 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <h3 className="text-sm font-semibold text-foreground">SMS-lista</h3>
-            <span className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-border text-[10px] text-muted-foreground">?</span>
-          </div>
-          <BtnGhost>⟳ Uppdatera SMS-lista</BtnGhost>
-        </div>
-        <div className="mb-3 flex items-center justify-between gap-4">
-          <input
-            placeholder="Sök"
-            className="w-64 rounded-md border border-border bg-background/40 px-3 py-1.5 text-sm placeholder:text-muted-foreground"
-          />
-          <div className="text-xs text-muted-foreground">
-            <div>L = Levererat</div>
-            <div>V = Väntar på leverans</div>
-            <div>O = Olevererbart</div>
-          </div>
-        </div>
-        <div className="overflow-x-auto rounded-md border border-border">
-          <table className="w-full min-w-[800px] text-sm">
-            <thead className="bg-foreground/[0.04] text-left text-xs uppercase tracking-wider text-muted-foreground">
-              <tr>
-                {["Avsändare/Mottagare","Meddelande","L","V","O","Status","Datum"].map((h) => (
-                  <th key={h} className="px-3 py-2 font-medium">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              <tr><td colSpan={7} className="px-3 py-6 text-center text-xs text-muted-foreground">Inga poster</td></tr>
-            </tbody>
-          </table>
-        </div>
-        <Pager />
-      </div>
-
+      {addOpen && (
+        <LäggTillBudDialog
+          slug={slug}
+          onClose={() => setAddOpen(false)}
+          onSaved={() => { refresh(); setAddOpen(false); }}
+        />
+      )}
       {settingsOpen && <BuSettingsModal onClose={() => setSettingsOpen(false)} />}
+    </div>
+  );
+}
+
+function LäggTillBudDialog({ slug, onClose, onSaved }: { slug: string; onClose: () => void; onSaved: () => void }) {
+  const [namn, setNamn] = useState("");
+  const [telefon, setTelefon] = useState("");
+  const [beloppRaw, setBeloppRaw] = useState("");
+  const [villkor, setVillkor] = useState("");
+  const [kontaktQ, setKontaktQ] = useState("");
+
+  const kontakter = listKontakter();
+  const filtered = kontaktQ.trim().length >= 2
+    ? kontakter.filter((k) => `${k.fornamn} ${k.efternamn} ${k.telefon}`.toLowerCase().includes(kontaktQ.toLowerCase()))
+    : [];
+
+  function fillFromContact(k: Kontakt) {
+    setNamn(`${k.fornamn} ${k.efternamn}`);
+    setTelefon(k.telefon ?? "");
+    setKontaktQ("");
+  }
+
+  function handleSave() {
+    const belopp = parseInt(beloppRaw.replace(/\D/g, ""), 10);
+    if (!namn.trim() || !belopp) return;
+    addBud(slug, { belopp, namn: namn.trim(), telefon, villkor });
+    onSaved();
+  }
+
+  const canSave = namn.trim().length > 0 && parseInt(beloppRaw.replace(/\D/g, ""), 10) > 0;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm"
+      onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="relative w-full max-w-md rounded-2xl border border-white/[0.1] bg-card p-6 shadow-2xl">
+        <button onClick={onClose} className="absolute right-5 top-5 text-xl text-muted-foreground hover:text-foreground">✕</button>
+        <div className="mb-1 text-[11px] uppercase tracking-[0.22em] text-primary/80">Registrera bud</div>
+        <h2 className="mb-5 text-xl font-medium" style={serif}>Nytt bud<span className="text-primary">.</span></h2>
+
+        {/* Optional contact search */}
+        <div className="mb-4">
+          <label className="mb-1.5 block text-xs text-muted-foreground">Hämta från kontakt (valfritt)</label>
+          <div className="relative">
+            <input
+              value={kontaktQ}
+              onChange={(e) => setKontaktQ(e.target.value)}
+              placeholder="Sök kontakt…"
+              className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none"
+            />
+            {filtered.length > 0 && (
+              <div className="absolute left-0 right-0 top-full z-10 mt-1 max-h-40 overflow-y-auto rounded-lg border border-border bg-card shadow-lg">
+                {filtered.map((k) => (
+                  <button key={k.id} onClick={() => fillFromContact(k)}
+                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-primary/5">
+                    <span className="font-medium">{k.fornamn} {k.efternamn}</span>
+                    <span className="text-muted-foreground">{k.telefon}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          <div>
+            <label className="mb-1.5 block text-xs text-muted-foreground">Namn *</label>
+            <input value={namn} onChange={(e) => setNamn(e.target.value)} placeholder="Budgivarens namn"
+              className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none" />
+          </div>
+          <div>
+            <label className="mb-1.5 block text-xs text-muted-foreground">Telefon</label>
+            <input value={telefon} onChange={(e) => setTelefon(e.target.value)} placeholder="070-000 00 00"
+              className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none" />
+          </div>
+          <div>
+            <label className="mb-1.5 block text-xs text-muted-foreground">Bud (SEK) *</label>
+            <input
+              value={fmtSweNum(beloppRaw)}
+              onChange={(e) => handleNumberInput(e, setBeloppRaw)}
+              placeholder="0"
+              inputMode="numeric"
+              className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm font-mono focus:border-primary focus:outline-none"
+            />
+          </div>
+          <div>
+            <label className="mb-1.5 block text-xs text-muted-foreground">Villkor</label>
+            <input value={villkor} onChange={(e) => setVillkor(e.target.value)} placeholder="t.ex. Besiktningsklausul, 60 dagars tillträde"
+              className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none" />
+          </div>
+        </div>
+
+        <div className="mt-5 flex justify-end gap-2">
+          <button onClick={onClose} className="rounded-lg border border-border px-4 py-2 text-sm text-muted-foreground hover:bg-foreground/5">Avbryt</button>
+          <button onClick={handleSave} disabled={!canSave}
+            className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-40">
+            Registrera bud
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

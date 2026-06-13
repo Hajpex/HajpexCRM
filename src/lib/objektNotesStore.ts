@@ -1,7 +1,7 @@
 const KEY = "hajpex.objektNotes.v1";
 
 export type ObjektNote = { id: string; text: string; ts: number; av: string };
-export type ObjektNoteData = { anteckningar: ObjektNote[]; beskrivning: string };
+export type ObjektNoteData = { anteckningar: ObjektNote[]; beskrivning: string; statusOverride?: string };
 
 function read(): Record<string, ObjektNoteData> {
   if (typeof window === "undefined") return {};
@@ -37,5 +37,12 @@ export function setObjektBeskrivning(slug: string, beskrivning: string) {
   const data = read();
   const existing = data[slug] ?? { anteckningar: [], beskrivning: "" };
   data[slug] = { ...existing, beskrivning };
+  write(data);
+}
+
+export function setObjektStatus(slug: string, status: string) {
+  const data = read();
+  const existing = data[slug] ?? { anteckningar: [], beskrivning: "" };
+  data[slug] = { ...existing, statusOverride: status };
   write(data);
 }
