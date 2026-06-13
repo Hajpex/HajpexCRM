@@ -1,7 +1,8 @@
 import { OBJEKT } from "../data/objekt";
 import { listKontakter, saveKontakt, addObjektKoppling, findByTelefon } from "./kontaktStore";
 
-const SEED_KEY = "hajpex.demo.seeded.v3";
+const SEED_KEY = "hajpex.demo.seeded.v4";
+const KONTAKT_KEY = "hajpex.kontakter.v1";
 
 function slugify(addr: string): string {
   return addr.toLowerCase()
@@ -16,7 +17,7 @@ function hash(s: string): number {
 }
 
 function pick<T>(arr: T[], seed: number): T {
-  return arr[seed % arr.length];
+  return arr[Math.abs(seed) % arr.length];
 }
 
 function rndDigits(seed: number, n: number): string {
@@ -105,6 +106,9 @@ export function getDemoSpekulanter(slug: string): DemoPerson[] {
 export function seedDemoKontakter() {
   if (typeof window === "undefined") return;
   if (window.localStorage.getItem(SEED_KEY)) return;
+  // Clear any partial data from previous broken seed runs
+  window.localStorage.removeItem(KONTAKT_KEY);
+  window.localStorage.removeItem("hajpex.demo.seeded.v3");
 
   for (const obj of OBJEKT) {
     const slug = slugify(obj.adress);

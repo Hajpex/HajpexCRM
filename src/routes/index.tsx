@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState, useRef, type ReactNode } from "react";
+import { useState, useRef, useEffect, type ReactNode } from "react";
 import { AppShell } from "../components/AppShell";
 import { OBJEKT } from "../data/objekt";
 import { listObjekt } from "../lib/objektStore";
@@ -45,15 +45,29 @@ function DashboardPage() {
   const dragNode = useRef<HTMLDivElement | null>(null);
 
   const objs = allObjects();
-  const kontakter = listKontakter();
   const activeObjs = objs.filter((o) => ACTIVE_STATUSES.has(o.status));
-
-  /* KPI counts */
-  const totalSpek = kontakter.filter((k) =>
-    k.objektKopplingar.some((kp) => kp.relation === "spekulant")
-  ).length;
-  const totalBud = objs.reduce((acc, o) => acc + listBud(slugifyAddr(o.adress)).length, 0);
   const soldCount = objs.filter((o) => o.status === "Såld").length;
+
+  /* Client-side only data (localStorage not available during SSR) */
+  const [kontakter, setKontakter] = useState<ReturnType<typeof listKontakter>>([]);
+  const [budMap, setBudMap] = useState<BudMap>({});
+  const [totalSpek, setTotalSpek] = useState(0);
+  const [totalBud, setTotalBud] = useState(0);
+
+  useEffect(() => {
+    const ks = listKontakter();
+    const bm: BudMap = {};
+    for (const o of objs) {
+      const slug = slugifyAddr(o.adress);
+      bm[slug] = listBud(slug);
+    }
+    setKontakter(ks);
+    setBudMap(bm);
+    setTotalSpek(ks.filter((k) =>
+      k.objektKopplingar.some((kp) => kp.relation === "spekulant")
+    ).length);
+    setTotalBud(Object.values(bm).reduce((acc, bids) => acc + bids.length, 0));
+  }, []);
 
   const kpis = [
     { label: "Aktiva uppdrag", value: String(activeObjs.length), sub: "pågående objekt" },
@@ -187,7 +201,7 @@ function DashboardPage() {
                   onMoveUp={() => moveWidget(idx, -1)}
                   onMoveDown={() => moveWidget(idx, 1)}
                 >
-                  <WidgetContent id={w.id} objs={objs} activeObjs={activeObjs} kontakter={kontakter} />
+                  <WidgetContent id={w.id} objs={objs} activeObjs={activeObjs} kontakter={kontakter} budMap={budMap} />
                 </WidgetShell>
               </div>
             );
@@ -264,19 +278,22 @@ function WidgetShell({
 
 type ObjRow = (typeof OBJEKT)[number];
 
+type BudMap = Record<string, ReturnType<typeof listBud>>;
+
 function WidgetContent({
-  id, objs, activeObjs, kontakter,
+  id, objs, activeObjs, kontakter, budMap,
 }: {
   id: WidgetId;
   objs: ObjRow[];
   activeObjs: ObjRow[];
   kontakter: ReturnType<typeof listKontakter>;
+  budMap: BudMap;
 }) {
-  if (id === "aktiva-objekt") return <AktivaObjektWidget activeObjs={activeObjs} />;
+  if (id === "aktiva-objekt") return <AktivaObjektWidget activeObjs={activeObjs} kontakter={kontakter} budMap={budMap} />;
   if (id === "pipeline") return <PipelineWidget objs={objs} />;
   if (id === "spekulanter") return <SpekulanterWidget kontakter={kontakter} />;
-  if (id === "budgivning") return <BudgivningWidget objs={objs} />;
-  if (id === "att-gora") return <AttGoraWidget objs={objs} kontakter={kontakter} />;
+  if (id === "budgivning") return <BudgivningWidget budMap={budMap} objs={objs} />;
+  if (id === "att-gora") return <AttGoraWidget objs={objs} kontakter={kontakter} budMap={budMap} />;
   return null;
 }
 
@@ -284,7 +301,7 @@ function WidgetContent({
    WIDGET: AKTIVA OBJEKT
 ══════════════════════════════════════════════════════════════ */
 
-function AktivaObjektWidget({ activeObjs }: { activeObjs: ObjRow[] }) {
+function AktivaObjektWidget({ activeObjs, kontakter, budMap }: { activeObjs: ObjRow[]; kontakter: ReturnType<typeof listKontakter>; budMap: BudMap }) {
   return (
     <DashCard title="Aktiva objekt" eyebrow="Portfölj" action={
       <Link to="/objekt" className="text-[11px] text-primary hover:underline">Visa alla →</Link>
@@ -307,10 +324,10 @@ function AktivaObjektWidget({ activeObjs }: { activeObjs: ObjRow[] }) {
             <tbody>
               {activeObjs.map((o) => {
                 const slug = slugifyAddr(o.adress);
-                const spekCount = listKontakter().filter((k) =>
+                const spekCount = kontakter.filter((k) =>
                   k.objektKopplingar.some((kp) => kp.slug === slug && kp.relation === "spekulant")
                 ).length;
-                const budCount = listBud(slug).length;
+                const budCount = (budMap[slug] ?? []).length;
                 return (
                   <tr key={o.adress} className="border-t border-border">
                     <td className="py-2.5 pr-4">
@@ -451,9 +468,9 @@ function SpekulanterWidget({ kontakter }: { kontakter: ReturnType<typeof listKon
    WIDGET: PÅGÅENDE BUDGIVNING
 ══════════════════════════════════════════════════════════════ */
 
-function BudgivningWidget({ objs }: { objs: ObjRow[] }) {
+function BudgivningWidget({ objs, budMap }: { objs: ObjRow[]; budMap: BudMap }) {
   const withBids = objs
-    .map((o) => ({ o, slug: slugifyAddr(o.adress), bids: listBud(slugifyAddr(o.adress)) }))
+    .map((o) => ({ o, slug: slugifyAddr(o.adress), bids: budMap[slugifyAddr(o.adress)] ?? [] }))
     .filter(({ bids }) => bids.length > 0)
     .sort((a, b) => (b.bids[0]?.belopp ?? 0) - (a.bids[0]?.belopp ?? 0));
 
@@ -501,10 +518,11 @@ function BudgivningWidget({ objs }: { objs: ObjRow[] }) {
 ══════════════════════════════════════════════════════════════ */
 
 function AttGoraWidget({
-  objs, kontakter,
+  objs, kontakter, budMap,
 }: {
   objs: ObjRow[];
   kontakter: ReturnType<typeof listKontakter>;
+  budMap: BudMap;
 }) {
   type Task = { text: string; slug?: string; addr?: string; urgent?: boolean };
   const tasks: Task[] = [];
@@ -524,7 +542,7 @@ function AttGoraWidget({
     if (o.status === "Intaget") {
       tasks.push({ text: `${o.adress} — inväntar annonsering`, slug, addr: o.adress });
     }
-    const bids = listBud(slug);
+    const bids = budMap[slug] ?? [];
     if (bids.length > 0 && !bids.some((b) => b.vinnare) && o.status === "Såld") {
       tasks.push({ text: `${o.adress} — markera vinnande bud`, slug, addr: o.adress, urgent: true });
     }
