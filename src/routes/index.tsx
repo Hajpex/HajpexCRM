@@ -165,6 +165,7 @@ function DashboardPage() {
                           <Link
                             to="/objekt/$slug"
                             params={{ slug: slugifyAddr(o.addr) }}
+                            search={{ tab: undefined, q: undefined }}
                             className="hover:text-primary"
                           >
                             {o.addr}

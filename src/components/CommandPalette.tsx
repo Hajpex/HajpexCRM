@@ -110,7 +110,7 @@ function buildActions(query: string, navigate: ReturnType<typeof useNavigate>): 
       navigate: () => navigate({
         to: "/objekt/$slug",
         params: { slug },
-        search: tab ? { tab: tab as string, q: personToken } : {},
+        search: { tab: tab as string | undefined, q: personToken },
       }),
     });
   }

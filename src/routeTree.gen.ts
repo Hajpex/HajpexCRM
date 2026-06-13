@@ -17,6 +17,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as ObjektIndexRouteImport } from './routes/objekt.index'
 import { Route as ObjektNyttRouteImport } from './routes/objekt.nytt'
 import { Route as ObjektSlugRouteImport } from './routes/objekt.$slug'
+import { Route as KunderIdRouteImport } from './routes/kunder.$id'
 
 const VisningarRoute = VisningarRouteImport.update({
   id: '/visningar',
@@ -58,23 +59,30 @@ const ObjektSlugRoute = ObjektSlugRouteImport.update({
   path: '/objekt/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
+const KunderIdRoute = KunderIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => KunderRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/kunder': typeof KunderRoute
+  '/kunder': typeof KunderRouteWithChildren
   '/listor': typeof ListorRoute
   '/statistik': typeof StatistikRoute
   '/visningar': typeof VisningarRoute
+  '/kunder/$id': typeof KunderIdRoute
   '/objekt/$slug': typeof ObjektSlugRoute
   '/objekt/nytt': typeof ObjektNyttRoute
   '/objekt/': typeof ObjektIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/kunder': typeof KunderRoute
+  '/kunder': typeof KunderRouteWithChildren
   '/listor': typeof ListorRoute
   '/statistik': typeof StatistikRoute
   '/visningar': typeof VisningarRoute
+  '/kunder/$id': typeof KunderIdRoute
   '/objekt/$slug': typeof ObjektSlugRoute
   '/objekt/nytt': typeof ObjektNyttRoute
   '/objekt': typeof ObjektIndexRoute
@@ -82,10 +90,11 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/kunder': typeof KunderRoute
+  '/kunder': typeof KunderRouteWithChildren
   '/listor': typeof ListorRoute
   '/statistik': typeof StatistikRoute
   '/visningar': typeof VisningarRoute
+  '/kunder/$id': typeof KunderIdRoute
   '/objekt/$slug': typeof ObjektSlugRoute
   '/objekt/nytt': typeof ObjektNyttRoute
   '/objekt/': typeof ObjektIndexRoute
@@ -98,6 +107,7 @@ export interface FileRouteTypes {
     | '/listor'
     | '/statistik'
     | '/visningar'
+    | '/kunder/$id'
     | '/objekt/$slug'
     | '/objekt/nytt'
     | '/objekt/'
@@ -108,6 +118,7 @@ export interface FileRouteTypes {
     | '/listor'
     | '/statistik'
     | '/visningar'
+    | '/kunder/$id'
     | '/objekt/$slug'
     | '/objekt/nytt'
     | '/objekt'
@@ -118,6 +129,7 @@ export interface FileRouteTypes {
     | '/listor'
     | '/statistik'
     | '/visningar'
+    | '/kunder/$id'
     | '/objekt/$slug'
     | '/objekt/nytt'
     | '/objekt/'
@@ -125,7 +137,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  KunderRoute: typeof KunderRoute
+  KunderRoute: typeof KunderRouteWithChildren
   ListorRoute: typeof ListorRoute
   StatistikRoute: typeof StatistikRoute
   VisningarRoute: typeof VisningarRoute
@@ -192,12 +204,30 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ObjektSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/kunder/$id': {
+      id: '/kunder/$id'
+      path: '/$id'
+      fullPath: '/kunder/$id'
+      preLoaderRoute: typeof KunderIdRouteImport
+      parentRoute: typeof KunderRoute
+    }
   }
 }
 
+interface KunderRouteChildren {
+  KunderIdRoute: typeof KunderIdRoute
+}
+
+const KunderRouteChildren: KunderRouteChildren = {
+  KunderIdRoute: KunderIdRoute,
+}
+
+const KunderRouteWithChildren =
+  KunderRoute._addFileChildren(KunderRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  KunderRoute: KunderRoute,
+  KunderRoute: KunderRouteWithChildren,
   ListorRoute: ListorRoute,
   StatistikRoute: StatistikRoute,
   VisningarRoute: VisningarRoute,

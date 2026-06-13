@@ -155,6 +155,7 @@ function ObjektListPage() {
                       <Link
                         to="/objekt/$slug"
                         params={{ slug: slugifyAddr(o.adress) }}
+                        search={{ tab: undefined, q: undefined }}
                         className="flex items-center gap-3"
                       >
                         <Thumb src={thumbFor(o)} alt={o.adress} />

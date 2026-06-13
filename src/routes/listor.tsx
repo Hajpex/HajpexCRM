@@ -217,6 +217,7 @@ function IntagTable({ rows, q }: { rows: typeof intagsmoten; q: string }) {
             <Link
               to="/objekt/$slug"
               params={{ slug: slugifyAddr(r.adress) }}
+              search={{ tab: undefined, q: undefined }}
               className="font-medium text-foreground hover:text-primary hover:underline"
             >
               {r.adress}

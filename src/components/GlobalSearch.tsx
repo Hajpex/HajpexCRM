@@ -256,7 +256,7 @@ export function GlobalSearch({ open, onOpenChange }: GlobalSearchProps) {
         {parsed.matchedContacts.length > 0 && (
           <CommandGroup heading="Kunder & kontakter">
             {parsed.matchedContacts.map((c) => {
-              const obj = ALL_OBJECTS.find((o) => o.slug === c.objSlug);
+              const obj = objects.find((o) => o.slug === c.objSlug);
               const dest = obj
                 ? `/objekt/${c.objSlug}?tab=${parsed.matchedSection?.tab ?? "Spekulanter"}`
                 : "/kunder";

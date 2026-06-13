@@ -211,7 +211,7 @@ function ObjektsformularPage() {
     setSavedObjMsg(`Sparat: ${entry.adress}`);
     setTimeout(() => {
       setSavedObjMsg(null);
-      navigate({ to: "/objekt/$slug", params: { slug: slugifyAddr(entry.adress) } });
+      navigate({ to: "/objekt/$slug", params: { slug: slugifyAddr(entry.adress) }, search: { tab: undefined, q: undefined } });
     }, 900);
   }
 
