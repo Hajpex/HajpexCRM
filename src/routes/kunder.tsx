@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useState, useMemo } from "react";
 import { AppShell } from "../components/AppShell";
 import { listKontakter, saveKontakt, findByTelefon } from "../lib/kontaktStore";
@@ -10,8 +10,14 @@ export const Route = createFileRoute("/kunder")({
   head: () => ({
     meta: [{ title: "Kunder · Stendahl CRM" }],
   }),
-  component: KunderPage,
+  component: KunderLayout,
 });
+
+function KunderLayout() {
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  if (pathname === "/kunder") return <KunderPage />;
+  return <Outlet />;
+}
 
 function initials(k: Kontakt) {
   return [k.fornamn[0], k.efternamn[0]].filter(Boolean).join("").toUpperCase() || "?";
@@ -152,7 +158,6 @@ function NyKontaktDialog({
   onClose: () => void;
   onSaved: (id: string) => void;
 }) {
-  const [step, setStep] = useState<"telefon" | "info">("telefon");
   const [telefon, setTelefon] = useState("");
   const [duplikat, setDuplikat] = useState<Kontakt | null>(null);
   const [form, setForm] = useState<FormState>({
@@ -163,13 +168,12 @@ function NyKontaktDialog({
     gdpr: false,
   });
 
-  function checkTelefon() {
-    const found = findByTelefon(telefon);
-    if (found) {
-      setDuplikat(found);
+  function handleTelefonBlur() {
+    if (telefon.trim().length >= 6) {
+      const found = findByTelefon(telefon);
+      setDuplikat(found ?? null);
     } else {
       setDuplikat(null);
-      setStep("info");
     }
   }
 
@@ -200,6 +204,8 @@ function NyKontaktDialog({
     onSaved(k.id);
   }
 
+  const canSave = form.fornamn.trim().length > 0 && !duplikat;
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm"
@@ -214,157 +220,121 @@ function NyKontaktDialog({
         </button>
 
         <div className="mb-6">
-          <div className="text-[11px] uppercase tracking-[0.22em] text-primary/80">
-            {step === "telefon" ? "Steg 1 av 2" : "Steg 2 av 2"}
-          </div>
+          <div className="text-[11px] uppercase tracking-[0.22em] text-primary/80">Ny kontakt</div>
           <h2 className="mt-1 text-2xl font-medium" style={serif}>
-            {step === "telefon" ? "Mobilnummer" : "Personuppgifter"}
-            <span className="text-primary">.</span>
+            Personuppgifter<span className="text-primary">.</span>
           </h2>
         </div>
 
-        {step === "telefon" ? (
-          <div>
-            <p className="mb-5 text-sm text-muted-foreground">
-              Ange mobilnummer — systemet kontrollerar om personen redan finns för att undvika dubletter.
-            </p>
-            <label className="block">
-              <div className="mb-1.5 text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
-                Mobilnummer
-              </div>
-              <input
-                type="tel"
-                value={telefon}
-                onChange={(e) => {
-                  setTelefon(e.target.value);
-                  setDuplikat(null);
-                }}
-                onKeyDown={(e) => e.key === "Enter" && telefon.length >= 6 && checkTelefon()}
-                placeholder="070 000 00 00"
-                className="w-full rounded-lg border border-input bg-background px-4 py-3 text-sm focus:border-primary focus:outline-none"
-                autoFocus
-              />
-            </label>
+        <div className="space-y-4">
+          {/* Telefon — valfritt, dedup-check on blur */}
+          <label className="block">
+            <div className="mb-1.5 flex items-center justify-between text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+              <span>Mobilnummer</span>
+              <span className="normal-case tracking-normal text-muted-foreground/60">valfritt</span>
+            </div>
+            <input
+              type="tel"
+              value={telefon}
+              onChange={(e) => { setTelefon(e.target.value); setDuplikat(null); }}
+              onBlur={handleTelefonBlur}
+              placeholder="070 000 00 00"
+              className="w-full rounded-lg border border-input bg-background px-4 py-3 text-sm focus:border-primary focus:outline-none"
+              autoFocus
+            />
+          </label>
 
-            {duplikat && (
-              <div className="mt-4 rounded-lg border border-amber-500/30 bg-amber-500/10 p-4">
-                <div className="text-sm font-medium text-amber-300">Kontakt finns redan</div>
-                <div className="mt-1 text-xs text-amber-300/80">
-                  {duplikat.fornamn} {duplikat.efternamn}
-                  {duplikat.epost ? ` · ${duplikat.epost}` : ""}
-                </div>
-                <Link
-                  to="/kunder/$id"
-                  params={{ id: duplikat.id }}
-                  onClick={onClose}
-                  className="mt-2 block text-xs font-medium text-amber-300 underline"
-                >
-                  Öppna befintlig kontakt →
-                </Link>
+          {duplikat && (
+            <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-4">
+              <div className="text-sm font-medium text-amber-300">Kontakt finns redan</div>
+              <div className="mt-1 text-xs text-amber-300/80">
+                {duplikat.fornamn} {duplikat.efternamn}
+                {duplikat.epost ? ` · ${duplikat.epost}` : ""}
               </div>
-            )}
-
-            <div className="mt-6 flex gap-3">
-              <button
+              <Link
+                to="/kunder/$id"
+                params={{ id: duplikat.id }}
                 onClick={onClose}
-                className="flex-1 rounded-lg border border-white/10 px-4 py-2.5 text-sm text-muted-foreground hover:bg-white/5"
+                className="mt-2 block text-xs font-medium text-amber-300 underline"
               >
-                Avbryt
-              </button>
-              <button
-                onClick={checkTelefon}
-                disabled={telefon.trim().length < 6}
-                className="flex-1 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground disabled:opacity-40"
-              >
-                Fortsätt →
-              </button>
+                Öppna befintlig kontakt →
+              </Link>
             </div>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
-              <label className="block">
-                <div className="mb-1.5 text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
-                  Förnamn *
-                </div>
-                <input
-                  type="text"
-                  value={form.fornamn}
-                  onChange={(e) => setForm((f) => ({ ...f, fornamn: e.target.value }))}
-                  placeholder="Mikael"
-                  className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm focus:border-primary focus:outline-none"
-                  autoFocus
-                />
-              </label>
-              <label className="block">
-                <div className="mb-1.5 text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
-                  Efternamn
-                </div>
-                <input
-                  type="text"
-                  value={form.efternamn}
-                  onChange={(e) => setForm((f) => ({ ...f, efternamn: e.target.value }))}
-                  placeholder="Test"
-                  className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm focus:border-primary focus:outline-none"
-                />
-              </label>
-            </div>
+          )}
 
+          <div className="grid grid-cols-2 gap-3">
             <label className="block">
-              <div className="mb-1.5 text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
-                E-post
-              </div>
-              <input
-                type="email"
-                value={form.epost}
-                onChange={(e) => setForm((f) => ({ ...f, epost: e.target.value }))}
-                placeholder="mikael@example.se"
-                className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm focus:border-primary focus:outline-none"
-              />
-            </label>
-
-            <label className="block">
-              <div className="mb-1.5 text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
-                Ort
-              </div>
+              <div className="mb-1.5 text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Förnamn *</div>
               <input
                 type="text"
-                value={form.ort}
-                onChange={(e) => setForm((f) => ({ ...f, ort: e.target.value }))}
-                placeholder="Stockholm"
+                value={form.fornamn}
+                onChange={(e) => setForm((f) => ({ ...f, fornamn: e.target.value }))}
+                placeholder="Mikael"
                 className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm focus:border-primary focus:outline-none"
               />
             </label>
-
-            <label className="flex cursor-pointer items-start gap-3">
+            <label className="block">
+              <div className="mb-1.5 text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Efternamn</div>
               <input
-                type="checkbox"
-                checked={form.gdpr}
-                onChange={(e) => setForm((f) => ({ ...f, gdpr: e.target.checked }))}
-                className="mt-0.5 h-4 w-4 accent-primary"
+                type="text"
+                value={form.efternamn}
+                onChange={(e) => setForm((f) => ({ ...f, efternamn: e.target.value }))}
+                placeholder="Svensson"
+                className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm focus:border-primary focus:outline-none"
               />
-              <span className="text-xs text-muted-foreground">
-                Personen har gett samtycke till att vi lagrar och behandlar uppgifter enligt GDPR
-              </span>
             </label>
-
-            <div className="flex gap-3 pt-1">
-              <button
-                onClick={() => setStep("telefon")}
-                className="rounded-lg border border-white/10 px-4 py-2.5 text-sm text-muted-foreground hover:bg-white/5"
-              >
-                ← Tillbaka
-              </button>
-              <button
-                onClick={handleSave}
-                disabled={!form.fornamn.trim()}
-                className="flex-1 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground disabled:opacity-40"
-              >
-                Spara kontakt
-              </button>
-            </div>
           </div>
-        )}
+
+          <label className="block">
+            <div className="mb-1.5 text-[11px] uppercase tracking-[0.14em] text-muted-foreground">E-post</div>
+            <input
+              type="email"
+              value={form.epost}
+              onChange={(e) => setForm((f) => ({ ...f, epost: e.target.value }))}
+              placeholder="mikael@example.se"
+              className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm focus:border-primary focus:outline-none"
+            />
+          </label>
+
+          <label className="block">
+            <div className="mb-1.5 text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Ort</div>
+            <input
+              type="text"
+              value={form.ort}
+              onChange={(e) => setForm((f) => ({ ...f, ort: e.target.value }))}
+              placeholder="Stockholm"
+              className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm focus:border-primary focus:outline-none"
+            />
+          </label>
+
+          <label className="flex cursor-pointer items-start gap-3">
+            <input
+              type="checkbox"
+              checked={form.gdpr}
+              onChange={(e) => setForm((f) => ({ ...f, gdpr: e.target.checked }))}
+              className="mt-0.5 h-4 w-4 accent-primary"
+            />
+            <span className="text-xs text-muted-foreground">
+              Personen har gett samtycke till att vi lagrar och behandlar uppgifter enligt GDPR
+            </span>
+          </label>
+
+          <div className="flex gap-3 pt-1">
+            <button
+              onClick={onClose}
+              className="rounded-lg border border-white/10 px-4 py-2.5 text-sm text-muted-foreground hover:bg-white/5"
+            >
+              Avbryt
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={!canSave}
+              className="flex-1 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground disabled:opacity-40"
+            >
+              Spara kontakt
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );
