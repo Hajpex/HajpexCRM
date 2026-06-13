@@ -24,13 +24,13 @@ export function AppShell({ children }: { children: ReactNode }) {
     <div className="min-h-screen w-full bg-background text-foreground" style={fontStyle}>
       <BackgroundGlow />
       {/* Top search bar */}
-      <div className="sticky top-0 z-50 w-full border-b border-border bg-background/80 backdrop-blur-md">
+      <div className="sticky top-0 z-50 w-full border-b border-border bg-card/90 backdrop-blur-md">
         <div className="mx-auto flex max-w-xl items-center px-4 py-2.5 md:max-w-2xl">
           <GlobalSearchTrigger />
         </div>
       </div>
       <div className="relative z-10 flex min-h-[calc(100vh-3.5rem)]">
-        <aside className="sticky top-[3.35rem] hidden h-[calc(100vh-3.35rem)] w-56 shrink-0 flex-col border-r border-border bg-card/60 backdrop-blur-sm md:flex">
+        <aside className="sticky top-[3.35rem] hidden h-[calc(100vh-3.35rem)] w-56 shrink-0 flex-col border-r border-border bg-card md:flex">
           {/* Logo */}
           <div className="px-5 py-6">
             <div className="flex items-baseline gap-1" style={serifLogo}>

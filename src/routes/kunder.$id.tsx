@@ -4,6 +4,7 @@ import { AppShell } from "../components/AppShell";
 import { getKontakt, updateKontakt, addAktivitet, deleteKontakt } from "../lib/kontaktStore";
 import { getObjektBySlug } from "./objekt.$slug";
 import type { Kontakt, Aktivitet, AktivitetTyp } from "../lib/kontaktTypes";
+import { fmtSweNum, handleNumberInput } from "../lib/formatters";
 
 const serif = { fontFamily: '"Instrument Serif", ui-serif, Georgia, serif', letterSpacing: "-0.01em" } as const;
 
@@ -217,9 +218,9 @@ function IntresseCard({ kontakt, editMode, patch }: { kontakt: Kontakt; editMode
           <div className="mb-1 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">Budget</div>
           {editMode ? (
             <div className="flex items-center gap-2">
-              <EditInput value={kontakt.budgetMin} onChange={(v) => patch({ budgetMin: v })} placeholder="Min" />
-              <span className="text-muted-foreground">–</span>
-              <EditInput value={kontakt.budgetMax} onChange={(v) => patch({ budgetMax: v })} placeholder="Max" />
+              <NumberInput value={kontakt.budgetMin} onChange={(v) => patch({ budgetMin: v })} placeholder="Min kr" />
+              <span className="flex-shrink-0 text-muted-foreground">–</span>
+              <NumberInput value={kontakt.budgetMax} onChange={(v) => patch({ budgetMax: v })} placeholder="Max kr" />
             </div>
           ) : (
             <div className="text-foreground">
@@ -518,6 +519,19 @@ function EditInput({
       type={type}
       value={value}
       onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder}
+      className="w-full rounded-md border border-input bg-background px-2.5 py-1.5 text-sm text-foreground focus:border-primary focus:outline-none"
+    />
+  );
+}
+
+function NumberInput({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder?: string }) {
+  return (
+    <input
+      type="text"
+      inputMode="numeric"
+      value={fmtSweNum(value)}
+      onChange={(e) => handleNumberInput(e, onChange)}
       placeholder={placeholder}
       className="w-full rounded-md border border-input bg-background px-2.5 py-1.5 text-sm text-foreground focus:border-primary focus:outline-none"
     />
