@@ -16,52 +16,68 @@ const ITEMS: Item[] = [
 
 const fontStyle = { fontFamily: '"Work Sans", system-ui, sans-serif' } as const;
 
+const serifLogo = { fontFamily: '"Instrument Serif", ui-serif, Georgia, serif' } as const;
+
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   return (
     <div className="min-h-screen w-full bg-background text-foreground" style={fontStyle}>
       <BackgroundGlow />
-      {/* Top centered search bar — always visible */}
-      <div className="sticky top-0 z-50 w-full border-b border-border bg-card/90 backdrop-blur-md">
+      {/* Top search bar */}
+      <div className="sticky top-0 z-50 w-full border-b border-border bg-background/80 backdrop-blur-md">
         <div className="mx-auto flex max-w-xl items-center px-4 py-2.5 md:max-w-2xl">
           <GlobalSearchTrigger />
         </div>
       </div>
       <div className="relative z-10 flex min-h-[calc(100vh-3.5rem)]">
-        <aside className="sticky top-0 hidden h-[calc(100vh-3.5rem)] w-60 shrink-0 flex-col border-r border-border bg-card/80 backdrop-blur-sm md:flex">
-          <div className="flex items-center gap-3 px-5 py-5">
-            <div className="flex h-9 w-9 items-center justify-center rounded-md bg-foreground text-background">
-              <span className="font-semibold tracking-wider">S</span>
+        <aside className="sticky top-[3.35rem] hidden h-[calc(100vh-3.35rem)] w-56 shrink-0 flex-col border-r border-border bg-card/60 backdrop-blur-sm md:flex">
+          {/* Logo */}
+          <div className="px-5 py-6">
+            <div className="flex items-baseline gap-1" style={serifLogo}>
+              <span className="text-xl font-medium tracking-tight text-foreground">Hajpex</span>
+              <span className="text-xl text-primary">·</span>
             </div>
-            <div className="leading-tight">
-              <div className="text-sm font-medium">Stendahl <span className="text-primary">·</span> CRM</div>
-              <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Erik Lindqvist</div>
-            </div>
+            <div className="mt-0.5 text-[10px] uppercase tracking-[0.22em] text-muted-foreground/60">CRM</div>
           </div>
-          <nav className="mt-2 flex flex-col gap-1 px-3">
+
+          {/* Nav */}
+          <nav className="flex flex-col gap-0.5 px-3">
             {ITEMS.map((it) => {
-              const active = pathname === it.to;
+              const active = pathname === it.to || (it.to !== "/" && pathname.startsWith(it.to));
               return (
                 <Link
                   key={it.to}
                   to={it.to}
                   className={[
-                    "group flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
+                    "group relative flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
                     active
-                      ? "bg-foreground text-background"
-                      : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground",
+                      ? "text-primary"
+                      : "text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground",
                   ].join(" ")}
                 >
-                  <span className={active ? "text-background" : "text-muted-foreground group-hover:text-foreground"}>
+                  {active && (
+                    <span className="absolute left-0 top-1/2 h-4 w-0.5 -translate-y-1/2 rounded-r-full bg-primary" />
+                  )}
+                  <span className={active ? "text-primary" : "text-muted-foreground group-hover:text-foreground"}>
                     {it.icon}
                   </span>
-                  <span>{it.label}</span>
+                  <span className={active ? "font-medium" : ""}>{it.label}</span>
                 </Link>
               );
             })}
           </nav>
-          <div className="mt-auto px-5 py-5 text-[10px] uppercase tracking-[0.2em] text-muted-foreground/60">
-            v0.2 · prototyp
+
+          {/* Footer */}
+          <div className="mt-auto border-t border-border px-5 py-4">
+            <div className="flex items-center gap-2.5">
+              <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/20 text-[11px] font-semibold text-primary">
+                EL
+              </div>
+              <div>
+                <div className="text-xs font-medium text-foreground">Erik Lindqvist</div>
+                <div className="text-[10px] text-muted-foreground">Mäklare</div>
+              </div>
+            </div>
           </div>
         </aside>
 
@@ -74,10 +90,10 @@ export function AppShell({ children }: { children: ReactNode }) {
 function BackgroundGlow() {
   return (
     <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
-      <div className="absolute -top-40 left-1/3 h-[600px] w-[800px] -translate-x-1/2 rounded-full opacity-[0.35]"
-        style={{ background: "radial-gradient(closest-side, oklch(0.72 0.12 80 / 0.25), transparent)" }} />
-      <div className="absolute bottom-0 right-0 h-[500px] w-[500px] opacity-[0.25]"
-        style={{ background: "radial-gradient(closest-side, oklch(0.85 0.04 90 / 0.6), transparent)" }} />
+      <div className="absolute -top-60 left-1/4 h-[700px] w-[900px] -translate-x-1/2 rounded-full opacity-[0.18]"
+        style={{ background: "radial-gradient(closest-side, oklch(0.72 0.12 80), transparent)" }} />
+      <div className="absolute -bottom-20 right-0 h-[600px] w-[600px] opacity-[0.10]"
+        style={{ background: "radial-gradient(closest-side, oklch(0.72 0.12 80), transparent)" }} />
     </div>
   );
 }

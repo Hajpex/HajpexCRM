@@ -1,8 +1,11 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Fragment, createContext, useContext, useState, type ReactNode } from "react";
+import { Fragment, createContext, useContext, useState, useEffect, type ReactNode } from "react";
 import { AppShell } from "../components/AppShell";
 import { OBJEKT, type Objekt } from "../data/objekt";
 import { listObjekt } from "../lib/objektStore";
+import { getObjektNotes, addObjektNote, setObjektBeskrivning } from "../lib/objektNotesStore";
+import { listKontakter, addObjektKoppling } from "../lib/kontaktStore";
+import type { KontaktRelation, Kontakt } from "../lib/kontaktTypes";
 import {
   ResizableHandle,
   ResizablePanel,
@@ -61,8 +64,10 @@ function ObjektDetailPage() {
   const [layoutKey, setLayoutKey] = useState(0);
   const [outerSizes, setOuterSizes] = useState<SavedSizes | null>(null);
   const [innerSizes, setInnerSizes] = useState<SavedSizes | null>(null);
+  const [koppla, setKoppla] = useState<KontaktRelation | null>(null);
 
   const adress = prettyAddr(slug);
+  const o = getObjektBySlug(slug);
   const showSavedLayout = editLayout || outerSizes !== null || innerSizes !== null;
 
   return (
@@ -70,7 +75,7 @@ function ObjektDetailPage() {
       <div className="mx-auto max-w-[1500px] px-6 pb-24 pt-8">
         {/* Breadcrumb / header */}
         <div className="mb-4 flex items-center gap-3 text-xs text-muted-foreground">
-          <Link to="/objekt" className="hover:text-foreground">← Tillbaka till objekt</Link>
+          <Link to="/objekt" className="hover:text-foreground">← Objekt</Link>
           <span className="opacity-40">/</span>
           <span className="text-foreground">{adress}</span>
         </div>
@@ -98,15 +103,26 @@ function ObjektDetailPage() {
         {/* Object title bar */}
         <section className="mb-6 flex flex-wrap items-end justify-between gap-4">
           <div>
-            <div className="mb-2 text-[11px] uppercase tracking-[0.22em] text-primary/80">Objekt</div>
+            <div className="mb-2 flex items-center gap-3">
+              <div className="text-[11px] uppercase tracking-[0.22em] text-primary/80">Objekt</div>
+              {o?.status && (
+                <span className={[
+                  "rounded-full border px-2.5 py-0.5 text-[10px] uppercase tracking-[0.12em]",
+                  o.status === "Till salu" ? "border-primary/40 bg-primary/10 text-primary"
+                  : o.status === "Redo (Kommande)" ? "border-orange-400/40 bg-orange-400/10 text-orange-300"
+                  : o.status === "Såld" ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-400"
+                  : "border-white/10 text-muted-foreground",
+                ].join(" ")}>{o.status}</span>
+              )}
+            </div>
             <h1 className="text-4xl font-medium leading-tight md:text-5xl" style={serif}>
               {adress}<span className="text-primary">.</span>
             </h1>
-            <p className="mt-2 text-sm text-muted-foreground">{propertyLocality(slug).postal} {propertyLocality(slug).city} · SE 123</p>
+            <p className="mt-2 text-sm text-muted-foreground">{propertyLocality(slug).postal} {propertyLocality(slug).city}{o?.typ ? ` · ${o.typ}` : ""}{o?.boarea ? ` · ${o.boarea} m²` : ""}</p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <PillBtn>+ Lägg till säljare</PillBtn>
-            <PillBtn>+ Lägg till köpare</PillBtn>
+            <PillBtn onClick={() => setKoppla("säljare")}>+ Koppla säljare</PillBtn>
+            <PillBtn onClick={() => setKoppla("köpare")}>+ Koppla köpare</PillBtn>
             <PillBtn>Marknad</PillBtn>
             {editLayout && (
               <button
@@ -224,6 +240,14 @@ function ObjektDetailPage() {
           </div>
         )}
       </div>
+      {koppla && (
+        <KontaktVäljarDialog
+          slug={slug}
+          relation={koppla}
+          onClose={() => setKoppla(null)}
+          onLinked={() => setKoppla(null)}
+        />
+      )}
     </AppShell>
   );
 }
@@ -385,36 +409,54 @@ function AktivitetCard() {
 }
 
 function AnteckningarCard() {
-  return <AnteckningarCardInner />;
-}
-function AnteckningarCardInner() {
   const { slug } = Route.useParams();
-  const blank = isUserCreatedSlug(slug);
-  if (blank) {
-    return (
-      <Card title="Anteckningar" icon="📝" action="+">
-        <div className="py-8 text-center text-sm text-muted-foreground">Inga anteckningar ännu</div>
-      </Card>
-    );
+  const [notes, setNotes] = useState(() => getObjektNotes(slug).anteckningar);
+  const [text, setText] = useState("");
+  const [adding, setAdding] = useState(false);
+
+  function handleAdd() {
+    if (!text.trim()) return;
+    addObjektNote(slug, text.trim());
+    setNotes(getObjektNotes(slug).anteckningar);
+    setText("");
+    setAdding(false);
   }
+
   return (
-    <Card title="Anteckningar" icon="📝" action="+">
+    <Card title="Anteckningar" icon="📝" action="+" onAction={() => setAdding((v) => !v)}>
+      {adding && (
+        <div className="mb-3">
+          <textarea
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            placeholder="Skriv anteckning…"
+            rows={2}
+            className="w-full resize-none rounded-md border border-input bg-background px-2.5 py-2 text-sm focus:border-primary focus:outline-none"
+            autoFocus
+          />
+          <div className="mt-2 flex gap-2">
+            <button onClick={() => setAdding(false)} className="rounded-md border border-border px-3 py-1 text-xs text-muted-foreground hover:bg-foreground/5">Avbryt</button>
+            <button onClick={handleAdd} disabled={!text.trim()} className="rounded-md bg-primary px-3 py-1 text-xs font-medium text-primary-foreground disabled:opacity-40">Spara</button>
+          </div>
+        </div>
+      )}
+      {notes.length === 0 ? (
+        <div className="py-8 text-center text-sm text-muted-foreground">Inga anteckningar ännu</div>
+      ) : (
         <ul className="divide-y divide-border text-sm">
-          {[
-            { t: "Visning måndag & tis 22 & 23 eller 29 och 30? ej bokat.", d: "2026-06-12 10:40 · Maria Nilsson" },
-            { t: "Visning planerat till 5 & 6 juli", d: "2026-05-27 11:50 · Maria Nilsson" },
-            { t: "Besiktning 18 juni kl 09:00", d: "2026-05-27 11:50 · Maria Nilsson" },
-            { t: "Foto 8 juni kl 14:00", d: "2026-05-27 11:50 · Maria Nilsson" },
-          ].map((n, i) => (
-            <li key={i} className="flex gap-3 py-3">
+          {notes.map((n) => (
+            <li key={n.id} className="flex gap-3 py-3">
               <span className="mt-0.5 text-muted-foreground">📄</span>
               <div>
-                <div className="text-foreground">{n.t}</div>
-                <div className="mt-0.5 text-[11px] text-muted-foreground">{n.d}</div>
+                <div className="text-foreground">{n.text}</div>
+                <div className="mt-0.5 text-[11px] text-muted-foreground">
+                  {new Date(n.ts).toLocaleString("sv-SE", { day:"numeric", month:"short", year:"numeric", hour:"2-digit", minute:"2-digit" })} · {n.av}
+                </div>
               </div>
             </li>
           ))}
         </ul>
+      )}
     </Card>
   );
 }
@@ -471,54 +513,153 @@ function DetaljerCard({ slug }: { slug: string }) {
 }
 
 function ParterCard({ slug }: { slug: string }) {
-  const blank = isUserCreatedSlug(slug);
-  const o = getObjektBySlug(slug);
-  const persons = blank
-    ? (o?.saljare ? [{ n: o.saljare }] : [])
-    : getSaljarePersons(slug);
+  const [dialogRelation, setDialogRelation] = useState<KontaktRelation | null>(null);
+  const [tick, setTick] = useState(0);
+
+  const linked = listKontakter().filter((k) =>
+    k.objektKopplingar.some((kp) => kp.slug === slug)
+  );
+  const saljare = linked.filter((k) => k.objektKopplingar.some((kp) => kp.slug === slug && kp.relation === "säljare"));
+  const kopare = linked.filter((k) => k.objektKopplingar.some((kp) => kp.slug === slug && kp.relation === "köpare"));
+  const spekulanter = linked.filter((k) => k.objektKopplingar.some((kp) => kp.slug === slug && kp.relation === "spekulant"));
+
+  void tick;
+
   return (
-    <Card title="Parter" icon="👥">
-        <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Säljare</div>
-        {persons.length > 0 ? (
-          <div className="mt-2 space-y-2">
-            {persons.map((p) => (
-              <Party key={p.n} name={p.n} />
-            ))}
-          </div>
-        ) : (
-          <div className="mt-2 text-sm text-muted-foreground italic">Information saknas</div>
+    <>
+      <Card title="Parter" icon="👥">
+        <PartSection label="Säljare" persons={saljare} onAdd={() => setDialogRelation("säljare")} />
+        <PartSection label="Köpare" persons={kopare} onAdd={() => setDialogRelation("köpare")} className="mt-4" />
+        {spekulanter.length > 0 && (
+          <PartSection label="Spekulanter" persons={spekulanter} className="mt-4" />
         )}
-        <div className="mt-5 text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Köpare</div>
-        <div className="mt-2 text-sm text-muted-foreground italic">Information saknas</div>
-    </Card>
+      </Card>
+      {dialogRelation && (
+        <KontaktVäljarDialog
+          slug={slug}
+          relation={dialogRelation}
+          onClose={() => setDialogRelation(null)}
+          onLinked={() => { setTick((t) => t + 1); setDialogRelation(null); }}
+        />
+      )}
+    </>
+  );
+}
+
+function PartSection({ label, persons, onAdd, className }: { label: string; persons: Kontakt[]; onAdd?: () => void; className?: string }) {
+  return (
+    <div className={className}>
+      <div className="flex items-center justify-between">
+        <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">{label}</div>
+        {onAdd && (
+          <button onClick={onAdd} className="text-[10px] text-primary/70 hover:text-primary">+ Koppla</button>
+        )}
+      </div>
+      {persons.length > 0 ? (
+        <div className="mt-2 space-y-2">
+          {persons.map((p) => (
+            <Link key={p.id} to="/kunder/$id" params={{ id: p.id }}>
+              <Party name={`${p.fornamn} ${p.efternamn}`} sub={p.telefon} />
+            </Link>
+          ))}
+        </div>
+      ) : (
+        <div className="mt-1 text-xs text-muted-foreground italic">Ingen kopplad ännu</div>
+      )}
+    </div>
+  );
+}
+
+function KontaktVäljarDialog({
+  slug, relation, onClose, onLinked,
+}: {
+  slug: string; relation: KontaktRelation; onClose: () => void; onLinked: () => void;
+}) {
+  const [q, setQ] = useState("");
+  const all = listKontakter();
+  const filtered = q.trim().length < 2 ? all : all.filter((k) => {
+    const hay = `${k.fornamn} ${k.efternamn} ${k.telefon}`.toLowerCase();
+    return hay.includes(q.toLowerCase());
+  });
+
+  function link(k: Kontakt) {
+    addObjektKoppling(k.id, { slug, relation, addedAt: Date.now(), anteckning: "" });
+    onLinked();
+  }
+
+  const roleLabel = { säljare: "säljare", köpare: "köpare", spekulant: "spekulant", kontakt: "kontakt" }[relation];
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm"
+      onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="relative w-full max-w-md rounded-2xl border border-white/[0.1] bg-card p-6 shadow-2xl">
+        <button onClick={onClose} className="absolute right-5 top-5 text-xl text-muted-foreground hover:text-foreground">✕</button>
+        <div className="mb-1 text-[11px] uppercase tracking-[0.22em] text-primary/80">Koppla kontakt</div>
+        <h2 className="mb-4 text-xl font-medium" style={serif}>Välj {roleLabel}<span className="text-primary">.</span></h2>
+        <input
+          type="text" value={q} onChange={(e) => setQ(e.target.value)}
+          placeholder="Sök namn eller telefon…"
+          className="mb-3 w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm focus:border-primary focus:outline-none"
+          autoFocus
+        />
+        <div className="max-h-64 space-y-1 overflow-y-auto">
+          {filtered.length === 0 ? (
+            <div className="py-8 text-center text-sm text-muted-foreground">Inga kontakter hittades</div>
+          ) : filtered.map((k) => (
+            <button key={k.id} onClick={() => link(k)}
+              className="flex w-full items-center gap-3 rounded-lg border border-white/[0.06] px-3 py-2.5 text-left hover:border-primary/40 hover:bg-primary/5">
+              <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-primary/15 text-xs font-medium text-primary">
+                {[k.fornamn[0], k.efternamn[0]].filter(Boolean).join("").toUpperCase() || "?"}
+              </div>
+              <div>
+                <div className="text-sm font-medium text-foreground">{k.fornamn} {k.efternamn}</div>
+                <div className="text-[11px] text-muted-foreground">{k.telefon || k.epost || "—"}</div>
+              </div>
+            </button>
+          ))}
+        </div>
+        <div className="mt-4 border-t border-white/[0.06] pt-3 text-xs text-muted-foreground">
+          Finns inte kontakten? <Link to="/kunder" onClick={onClose} className="text-primary hover:underline">Lägg till i kundregistret →</Link>
+        </div>
+      </div>
+    </div>
   );
 }
 
 function BeskrivningCard() {
   const { slug } = Route.useParams();
-  const blank = isUserCreatedSlug(slug);
-  if (blank) {
-    return (
-      <Card title="Beskrivning" icon="📄">
-        <div className="py-8 text-center text-sm text-muted-foreground">Ingen beskrivning ännu</div>
-      </Card>
-    );
+  const [editing, setEditing] = useState(false);
+  const [text, setText] = useState(() => getObjektNotes(slug).beskrivning);
+
+  function handleSave() {
+    setObjektBeskrivning(slug, text);
+    setEditing(false);
   }
+
   return (
-    <Card title="Beskrivning" icon="📄">
-        <h3 className="text-lg" style={serif}>Charmigt hus från 1944 i grönskande miljö</h3>
-        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-          Välkommen till ett trivsamt hus från 1944 med ett rofyllt läge och en fantastisk
-          trädgårdstomt om hela 1 994,5 kvm. Här bor du med gott om utrymme både inne och ute,
-          omgiven av uppvuxen grönska, blommande planteringar och generösa gräsytor som ger
-          tomten en privat och inbjudande karaktär.
-        </p>
-        <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-          Huset erbjuder en totalyta om 134 kvm, varav 69 kvm boarea och 65 kvm biarea.
-          Entréplanet rymmer kök, vardagsrum och matplats tillsammans med två sovrum, hall och
-          gäst-WC. En trappa ner finns källarplanet som kompletterar bostaden med badrum, separat
-          WC, en mindre kontorsplats, förråd, pannrum samt grovingång.
-        </p>
+    <Card title="Beskrivning" icon="📄" action="✎" onAction={() => setEditing((v) => !v)}>
+      {editing ? (
+        <div>
+          <textarea
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            rows={7}
+            placeholder="Skriv objektbeskrivningen här…"
+            className="w-full resize-y rounded-md border border-input bg-background px-2.5 py-2 text-sm leading-relaxed focus:border-primary focus:outline-none"
+            autoFocus
+          />
+          <div className="mt-2 flex gap-2">
+            <button onClick={() => setEditing(false)} className="rounded-md border border-border px-3 py-1 text-xs text-muted-foreground hover:bg-foreground/5">Avbryt</button>
+            <button onClick={handleSave} className="rounded-md bg-primary px-3 py-1 text-xs font-medium text-primary-foreground">Spara</button>
+          </div>
+        </div>
+      ) : text ? (
+        <p className="whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">{text}</p>
+      ) : (
+        <div className="py-8 text-center text-sm text-muted-foreground">
+          Ingen beskrivning — klicka ✎ för att lägga till
+        </div>
+      )}
     </Card>
   );
 }
@@ -548,16 +689,16 @@ function Placeholder({ tab }: { tab: string }) {
   );
 }
 
-function Card({ title, icon, action, className, children }: { title: string; icon?: string; action?: string; className?: string; children: ReactNode }) {
+function Card({ title, icon, action, onAction, className, children }: { title: string; icon?: string; action?: string; onAction?: () => void; className?: string; children: ReactNode }) {
   return (
     <section className={["rounded-xl border border-border bg-card/80 p-5 shadow-[0_20px_50px_-30px_rgba(0,0,0,0.25)] backdrop-blur-sm", className].filter(Boolean).join(" ")}>
       <header className="mb-4 flex items-center justify-between">
-        <div className="flex items-center gap-2 text-sm font-medium text-foreground">
-          {icon && <span className="opacity-70">{icon}</span>}
+        <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-primary/70">
+          {icon && <span>{icon}</span>}
           {title}
         </div>
         {action && (
-          <button className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-primary hover:bg-primary/20">{action}</button>
+          <button onClick={onAction} className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-primary hover:bg-primary/20">{action}</button>
         )}
       </header>
       {children}
@@ -565,9 +706,9 @@ function Card({ title, icon, action, className, children }: { title: string; ico
   );
 }
 
-function PillBtn({ children }: { children: ReactNode }) {
+function PillBtn({ children, onClick }: { children: ReactNode; onClick?: () => void }) {
   return (
-    <button className="rounded-md border border-border bg-card px-3 py-2 text-xs font-medium text-foreground hover:border-primary/40 hover:text-primary">
+    <button onClick={onClick} className="rounded-md border border-border bg-card px-3 py-2 text-xs font-medium text-foreground hover:border-primary/40 hover:text-primary">
       {children}
     </button>
   );
@@ -582,16 +723,16 @@ function Row({ k, v }: { k: string; v: string }) {
   );
 }
 
-function Party({ name }: { name: string }) {
+function Party({ name, sub }: { name: string; sub?: string }) {
   return (
-    <div className="flex items-center justify-between rounded-md border border-border bg-foreground/[0.02] px-3 py-2 text-sm">
-      <div className="flex items-center gap-2">
-        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/15 text-[10px] text-primary">
-          {name.split(" ").map((p) => p[0]).slice(0, 2).join("")}
-        </span>
-        {name}
+    <div className="flex items-center gap-2 rounded-md border border-border bg-foreground/[0.02] px-3 py-2 text-sm">
+      <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-primary/15 text-[10px] text-primary">
+        {name.split(" ").map((p) => p[0]).slice(0, 2).join("")}
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="truncate text-foreground">{name}</div>
+        {sub && <div className="truncate text-[10px] text-muted-foreground">{sub}</div>}
       </div>
-      <button className="text-muted-foreground hover:text-foreground">⋯</button>
     </div>
   );
 }
