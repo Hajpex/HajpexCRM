@@ -217,7 +217,7 @@ function ObjektDetailPage() {
             </ResizablePanel>
           </ResizablePanelGroup>
         ) : (
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-[200px_1fr]">
+          <div className="grid grid-cols-1 lg:grid-cols-[200px_1fr] lg:gap-6">
             <Sidebar tab={tab} setTab={setTab} />
             <div>
               {tab === "Start" ? (
@@ -276,9 +276,23 @@ const SECONDARY_TABS: SideTab[] = [
 
 function Sidebar({ tab, setTab }: { tab: SideTab; setTab: (t: SideTab) => void }) {
   const [showMore, setShowMore] = useState(SECONDARY_TABS.includes(tab));
+  const allTabsForMobile = [...PRIMARY_TABS, ...(showMore ? SECONDARY_TABS : [])];
 
-  function TabBtn({ t }: { t: SideTab }) {
+  function TabBtn({ t, mobile }: { t: SideTab; mobile?: boolean }) {
     const active = tab === t;
+    if (mobile) {
+      return (
+        <button
+          onClick={() => setTab(t)}
+          className={[
+            "whitespace-nowrap rounded-full px-3.5 py-1.5 text-sm transition-colors",
+            active ? "bg-foreground text-background font-medium" : "text-muted-foreground hover:text-foreground",
+          ].join(" ")}
+        >
+          {t}
+        </button>
+      );
+    }
     return (
       <button
         onClick={() => setTab(t)}
@@ -295,24 +309,42 @@ function Sidebar({ tab, setTab }: { tab: SideTab; setTab: (t: SideTab) => void }
   }
 
   return (
-    <aside className="h-full space-y-0.5 overflow-y-auto pr-2">
-      {PRIMARY_TABS.map((t) => <TabBtn key={t} t={t} />)}
-
-      <div className="pt-2">
-        <button
-          onClick={() => setShowMore((v) => !v)}
-          className="flex w-full items-center gap-1 rounded-md px-3 py-2 text-left text-[11px] text-muted-foreground/60 hover:text-muted-foreground"
-        >
-          <span className={`transition-transform text-[10px] ${showMore ? "rotate-90" : ""}`}>›</span>
-          {showMore ? "Dölj" : "Fler flikar"}
-        </button>
-        {showMore && (
-          <div className="space-y-0.5">
-            {SECONDARY_TABS.map((t) => <TabBtn key={t} t={t} />)}
-          </div>
-        )}
+    <>
+      {/* Mobile: horizontal scrollable strip */}
+      <div className="lg:hidden -mx-4 mb-4 overflow-x-auto px-4">
+        <div className="flex gap-1.5 pb-1">
+          {allTabsForMobile.map((t) => <TabBtn key={t} t={t} mobile />)}
+          {!showMore && (
+            <button
+              onClick={() => setShowMore(true)}
+              className="whitespace-nowrap rounded-full px-3.5 py-1.5 text-sm text-muted-foreground/60"
+            >
+              ⋯ Mer
+            </button>
+          )}
+        </div>
       </div>
-    </aside>
+
+      {/* Desktop: vertical sidebar */}
+      <aside className="hidden h-full space-y-0.5 overflow-y-auto pr-2 lg:block">
+        {PRIMARY_TABS.map((t) => <TabBtn key={t} t={t} />)}
+
+        <div className="pt-2">
+          <button
+            onClick={() => setShowMore((v) => !v)}
+            className="flex w-full items-center gap-1 rounded-md px-3 py-2 text-left text-[11px] text-muted-foreground/60 hover:text-muted-foreground"
+          >
+            <span className={`transition-transform text-[10px] ${showMore ? "rotate-90" : ""}`}>›</span>
+            {showMore ? "Dölj" : "Fler flikar"}
+          </button>
+          {showMore && (
+            <div className="space-y-0.5">
+              {SECONDARY_TABS.map((t) => <TabBtn key={t} t={t} />)}
+            </div>
+          )}
+        </div>
+      </aside>
+    </>
   );
 }
 

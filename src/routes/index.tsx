@@ -96,6 +96,7 @@ function DashboardPage() {
   const [budMap, setBudMap] = useState<BudMap>({});
   const [intagsmoten, setIntagsmoten] = useState<Intagsmote[]>([]);
   const [visningar, setVisningar] = useState<Visning[]>([]);
+  const [savedObjCount, setSavedObjCount] = useState(0);
   const [now] = useState(() => new Date());
 
   useEffect(() => {
@@ -107,6 +108,7 @@ function DashboardPage() {
     }
     setKontakter(ks);
     setBudMap(bm);
+    setSavedObjCount(listObjekt().length);
     setIntagsmoten(
       listIntagsmoten()
         .filter((m) => m.status !== "Förlorad")
@@ -191,6 +193,11 @@ function DashboardPage() {
               </Link>
             </div>
           </div>
+
+          {/* Onboarding — only when no real data yet */}
+          {savedObjCount === 0 && kontakter.length === 0 && (
+            <OnboardingBanner />
+          )}
 
           {/* KPI strip */}
           <div className="mt-7 grid grid-cols-2 gap-3 md:grid-cols-4">
@@ -635,6 +642,40 @@ function EmptySlot({ icon, text, hint }: { icon?: string; text: string; hint?: s
       {icon && <p className="mb-2 text-2xl">{icon}</p>}
       <p className="text-sm text-muted-foreground">{text}</p>
       {hint && <p className="mt-1 text-[11px] text-muted-foreground/60">{hint}</p>}
+    </div>
+  );
+}
+
+function OnboardingBanner() {
+  const steps = [
+    { icon: "🏠", label: "Lägg till ditt första objekt", to: "/objekt/nytt", cta: "Nytt objekt →" },
+    { icon: "👤", label: "Lägg till din första kontakt", to: "/kunder", cta: "Ny kontakt →" },
+    { icon: "📅", label: "Boka ett intagningsmöte", to: "/kunder", cta: "Gå till kontakter →" },
+  ] as const;
+
+  return (
+    <div className="mt-6 rounded-2xl border border-primary/20 bg-primary/5 p-6">
+      <p className="mb-1 text-[11px] uppercase tracking-[0.22em] text-primary/70">Kom igång</p>
+      <h2 className="mb-4 text-lg font-medium text-foreground" style={{ fontFamily: '"Instrument Serif", ui-serif, Georgia, serif' }}>
+        Välkommen till HajpexCRM<span className="text-primary">.</span>
+      </h2>
+      <div className="grid gap-3 sm:grid-cols-3">
+        {steps.map((s, i) => (
+          <Link
+            key={s.to + i}
+            to={s.to}
+            className="group flex items-start gap-3 rounded-xl border border-border bg-card/60 p-4 transition-colors hover:border-primary/40 hover:bg-card/80"
+          >
+            <span className="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-primary/10 text-base">
+              {s.icon}
+            </span>
+            <div>
+              <p className="text-sm font-medium text-foreground">{s.label}</p>
+              <p className="mt-1 text-[11px] text-primary group-hover:underline">{s.cta}</p>
+            </div>
+          </Link>
+        ))}
+      </div>
     </div>
   );
 }

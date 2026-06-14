@@ -81,8 +81,34 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
         </aside>
 
-        <main className="min-w-0 flex-1">{children}</main>
+        <main className="min-w-0 flex-1 pb-16 md:pb-0">{children}</main>
       </div>
+
+      {/* Mobile bottom nav */}
+      <nav className="fixed bottom-0 left-0 right-0 z-50 flex border-t border-border bg-card/95 backdrop-blur-md md:hidden">
+        {([
+          { to: "/", label: "Hem", icon: <DashboardIcon /> },
+          { to: "/objekt", label: "Objekt", icon: <ListIcon /> },
+          { to: "/kunder", label: "Kontakter", icon: <UsersIcon /> },
+          { to: "/visningar", label: "Visningar", icon: <CalendarIcon /> },
+          { to: "/statistik", label: "Statistik", icon: <ChartIcon /> },
+        ] as Item[]).map((it) => {
+          const active = pathname === it.to || (it.to !== "/" && pathname.startsWith(it.to));
+          return (
+            <Link
+              key={it.to}
+              to={it.to}
+              className={[
+                "flex flex-1 flex-col items-center gap-0.5 px-1 py-2.5 text-[10px] font-medium transition-colors",
+                active ? "text-primary" : "text-muted-foreground",
+              ].join(" ")}
+            >
+              <span className={active ? "text-primary" : "text-muted-foreground"}>{it.icon}</span>
+              {it.label}
+            </Link>
+          );
+        })}
+      </nav>
     </div>
   );
 }
