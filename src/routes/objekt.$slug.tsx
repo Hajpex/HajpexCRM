@@ -11,6 +11,10 @@ import { getDemoSaljare } from "../lib/demoKontakter";
 import { listKontakter, addObjektKoppling } from "../lib/kontaktStore";
 import type { KontaktRelation, Kontakt } from "../lib/kontaktTypes";
 import {
+  listVisningar, saveVisning, deleteVisning, toggleDeltog, addDeltagare,
+  exportVisningToICS, type Visning, type VisningTyp,
+} from "../lib/visningarStore";
+import {
   ResizableHandle,
   ResizablePanel,
   ResizablePanelGroup,
@@ -40,7 +44,7 @@ const SIDE_TABS = [
 type SideTab = (typeof SIDE_TABS)[number];
 type SavedSizes = [number, number];
 
-const TOP_TABS = ["Översikt", "Spekulanter", "Visningar", "Matchning", "Följare", "Statistik"] as const;
+const TOP_TABS = ["Översikt", "Spekulanter"] as const;
 
 function readPanelSizes(layout: Record<string, number>, firstId: string, secondId: string): SavedSizes {
   return [layout[firstId] ?? 50, layout[secondId] ?? 50];
@@ -261,30 +265,53 @@ function ObjektDetailPage() {
   );
 }
 
+const PRIMARY_TABS: SideTab[] = [
+  "Start", "Intag", "Visningar", "Budgivning", "Marknad", "Dokument",
+];
+
+const SECONDARY_TABS: SideTab[] = [
+  "Objektsinfo", "Objektsbeskrivning", "Kontrakt", "Tillträde",
+  "Säljare", "Köpare", "Mäklarräkenskap",
+];
+
 function Sidebar({ tab, setTab }: { tab: SideTab; setTab: (t: SideTab) => void }) {
-  return (
-    <aside className="h-full space-y-1 overflow-y-auto pr-2">
-      {SIDE_TABS.map((t) => {
-        const active = tab === t;
-        return (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={[
-              "block w-full rounded-md px-3 py-2 text-left text-sm transition-colors",
-              active
-                ? "bg-foreground text-background font-medium"
-                : "text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground",
-            ].join(" ")}
-          >
-            {t}
-          </button>
-        );
-      })}
-      <div className="pt-4 text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Avancerat</div>
-      <button className="block w-full rounded-md px-3 py-2 text-left text-sm text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground">
-        Mspecs ↗
+  const [showMore, setShowMore] = useState(SECONDARY_TABS.includes(tab));
+
+  function TabBtn({ t }: { t: SideTab }) {
+    const active = tab === t;
+    return (
+      <button
+        onClick={() => setTab(t)}
+        className={[
+          "block w-full rounded-md px-3 py-2 text-left text-sm transition-colors",
+          active
+            ? "bg-foreground text-background font-medium"
+            : "text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground",
+        ].join(" ")}
+      >
+        {t}
       </button>
+    );
+  }
+
+  return (
+    <aside className="h-full space-y-0.5 overflow-y-auto pr-2">
+      {PRIMARY_TABS.map((t) => <TabBtn key={t} t={t} />)}
+
+      <div className="pt-2">
+        <button
+          onClick={() => setShowMore((v) => !v)}
+          className="flex w-full items-center gap-1 rounded-md px-3 py-2 text-left text-[11px] text-muted-foreground/60 hover:text-muted-foreground"
+        >
+          <span className={`transition-transform text-[10px] ${showMore ? "rotate-90" : ""}`}>›</span>
+          {showMore ? "Dölj" : "Fler flikar"}
+        </button>
+        {showMore && (
+          <div className="space-y-0.5">
+            {SECONDARY_TABS.map((t) => <TabBtn key={t} t={t} />)}
+          </div>
+        )}
+      </div>
     </aside>
   );
 }
@@ -505,11 +532,171 @@ function TrafikCard() {
   );
 }
 
-function VisningarCard() {
+function BokaNyVisningModal({ slug, adress, onClose, onSaved }: { slug: string; adress: string; onClose: () => void; onSaved: () => void }) {
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  tomorrow.setHours(10, 0, 0, 0);
+  const tomorrowEnd = new Date(tomorrow);
+  tomorrowEnd.setHours(12, 0, 0, 0);
+
+  function toLocal(d: Date) {
+    const offset = d.getTimezoneOffset() * 60000;
+    return new Date(d.getTime() - offset).toISOString().slice(0, 16);
+  }
+
+  const [datum, setDatum] = useState(toLocal(tomorrow));
+  const [sluttid, setSluttid] = useState(toLocal(tomorrowEnd));
+  const [typ, setTyp] = useState<VisningTyp>("Öppen");
+  const [anteckningar, setAnteckningar] = useState("");
+
+  function handleSave() {
+    const datumTs = new Date(datum).getTime();
+    const sluttidTs = new Date(sluttid).getTime();
+    if (isNaN(datumTs) || isNaN(sluttidTs) || sluttidTs <= datumTs) return;
+    saveVisning({ slug, datum: datumTs, sluttid: sluttidTs, typ, anteckningar, deltagare: [] });
+    onSaved();
+  }
+
   return (
-    <Card title="Visningar" icon="🏠">
-        <div className="py-8 text-center text-sm text-muted-foreground">Inga inplanerade visningar</div>
-    </Card>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+      <div className="w-full max-w-md rounded-2xl bg-card p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <div className="mb-5 flex items-center justify-between">
+          <h2 className="text-base font-semibold text-foreground">Boka visning — {adress}</h2>
+          <button onClick={onClose} className="text-lg text-muted-foreground hover:text-foreground">✕</button>
+        </div>
+
+        <div className="space-y-4">
+          <div>
+            <p className="mb-1.5 text-xs font-medium text-muted-foreground">Typ</p>
+            <div className="flex gap-2">
+              {(["Öppen", "Privat", "Budvisning"] as VisningTyp[]).map((t) => (
+                <button
+                  key={t}
+                  onClick={() => setTyp(t)}
+                  className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
+                    typ === t ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:border-primary/50"
+                  }`}
+                >
+                  {t}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Start</label>
+              <input
+                type="datetime-local"
+                value={datum}
+                onChange={(e) => setDatum(e.target.value)}
+                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Slut</label>
+              <input
+                type="datetime-local"
+                value={sluttid}
+                onChange={(e) => setSluttid(e.target.value)}
+                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Anteckningar (valfritt)</label>
+            <textarea
+              value={anteckningar}
+              onChange={(e) => setAnteckningar(e.target.value)}
+              rows={3}
+              placeholder="T.ex. nyckelboxkod, parkeringsinstruktioner…"
+              className="w-full resize-none rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
+            />
+          </div>
+        </div>
+
+        <div className="mt-5 flex gap-2">
+          <button onClick={onClose} className="flex-1 rounded-lg border border-border px-4 py-2 text-sm font-medium text-muted-foreground hover:bg-muted/50">
+            Avbryt
+          </button>
+          <button onClick={handleSave} className="flex-1 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90">
+            Boka visning
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function VisningarCard() {
+  const { slug } = Route.useParams();
+  const adress = prettyAddr(slug);
+  const [visningar, setVisningar] = useState<Visning[]>([]);
+  const [showModal, setShowModal] = useState(false);
+
+  function load() { setVisningar(listVisningar(slug)); }
+  useEffect(load, [slug]);
+
+  const now = Date.now();
+  const kommande = visningar.filter((v) => v.sluttid >= now);
+  const past = visningar.filter((v) => v.sluttid < now);
+
+  function timeFmt(ts: number) {
+    return new Date(ts).toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit" });
+  }
+  function dateFmt(ts: number) {
+    return new Date(ts).toLocaleDateString("sv-SE", { weekday: "short", day: "numeric", month: "short" });
+  }
+
+  return (
+    <>
+      <Card title="Visningar" icon="🏠" action={
+        <button
+          onClick={() => setShowModal(true)}
+          className="rounded-md bg-primary/10 px-2.5 py-1 text-[11px] font-medium text-primary hover:bg-primary/20"
+        >
+          + Boka
+        </button>
+      }>
+        {kommande.length === 0 && past.length === 0 ? (
+          <div className="py-6 text-center">
+            <p className="text-sm text-muted-foreground">Inga inplanerade visningar</p>
+            <button
+              onClick={() => setShowModal(true)}
+              className="mt-2 text-xs text-primary hover:underline"
+            >
+              + Boka första visningen
+            </button>
+          </div>
+        ) : (
+          <div className="divide-y divide-border text-sm">
+            {kommande.map((v) => (
+              <div key={v.id} className="flex items-center justify-between py-2.5">
+                <div>
+                  <p className="font-medium text-foreground">{dateFmt(v.datum)}</p>
+                  <p className="text-[11px] text-muted-foreground">
+                    {timeFmt(v.datum)}–{timeFmt(v.sluttid)} · {v.typ} · {v.deltagare.length} anmälda
+                  </p>
+                </div>
+                <button
+                  onClick={() => exportVisningToICS(v, adress)}
+                  className="text-[10px] text-primary hover:underline"
+                >
+                  → Kalender
+                </button>
+              </div>
+            ))}
+            {past.length > 0 && (
+              <p className="pt-2.5 text-[11px] text-muted-foreground">{past.length} genomförd{past.length > 1 ? "a" : ""} visning{past.length > 1 ? "ar" : ""}</p>
+            )}
+          </div>
+        )}
+      </Card>
+      {showModal && (
+        <BokaNyVisningModal slug={slug} adress={adress} onClose={() => setShowModal(false)} onSaved={() => { load(); setShowModal(false); }} />
+      )}
+    </>
   );
 }
 
@@ -848,7 +1035,7 @@ function SpekulanterTopView({ slug }: { slug: string }) {
   );
 }
 
-function Card({ title, icon, action, onAction, className, children }: { title: string; icon?: string; action?: string; onAction?: () => void; className?: string; children: ReactNode }) {
+function Card({ title, icon, action, onAction, className, children }: { title: string; icon?: string; action?: ReactNode; onAction?: () => void; className?: string; children: ReactNode }) {
   return (
     <section className={["rounded-xl border border-border bg-card/80 p-5 shadow-[0_20px_50px_-30px_rgba(0,0,0,0.25)] backdrop-blur-sm", className].filter(Boolean).join(" ")}>
       <header className="mb-4 flex items-center justify-between">
@@ -856,8 +1043,10 @@ function Card({ title, icon, action, onAction, className, children }: { title: s
           {icon && <span>{icon}</span>}
           {title}
         </div>
-        {action && (
-          <button onClick={onAction} className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-primary hover:bg-primary/20">{action}</button>
+        {action !== undefined && (
+          typeof action === "string"
+            ? <button onClick={onAction} className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-primary hover:bg-primary/20">{action}</button>
+            : action
         )}
       </header>
       {children}
@@ -3576,40 +3765,199 @@ function MarknadView() {
    VISNINGAR VIEW (sidomeny → Visningar)
    ============================================================ */
 function VisningarView() {
-  const [open, setOpen] = useState<Record<MaSection, boolean>>({
-    mj: true, marknad: false, visningar: true, publicera: false,
-    boende: false, dokument: false, filer: false, tjanster: false,
-  });
-  const [done, setDone] = useState<Record<MaSection, boolean>>({
-    mj: false, marknad: false, visningar: false, publicera: true,
-    boende: false, dokument: true, filer: true, tjanster: false,
-  });
-  const toggle = (id: MaSection) => setOpen((o) => ({ ...o, [id]: !o[id] }));
-  const toggleDone = (id: MaSection) => setDone((d) => ({ ...d, [id]: !d[id] }));
+  const { slug } = Route.useParams();
+  const adress = prettyAddr(slug);
+  const [visningar, setVisningar] = useState<Visning[]>([]);
+  const [showModal, setShowModal] = useState(false);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [newDeltagare, setNewDeltagare] = useState<Record<string, { namn: string; telefon: string }>>({});
+
+  function load() { setVisningar(listVisningar(slug)); }
+  useEffect(load, [slug]);
+
+  const now = Date.now();
+  const kommande = visningar.filter((v) => v.datum >= now);
+  const genomforda = visningar.filter((v) => v.datum < now);
+
+  function timeFmt(ts: number) {
+    return new Date(ts).toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit" });
+  }
+  function fullDateFmt(ts: number) {
+    return new Date(ts).toLocaleDateString("sv-SE", { weekday: "long", day: "numeric", month: "long" });
+  }
+
+  function handleAddDeltagare(visningId: string) {
+    const d = newDeltagare[visningId];
+    if (!d?.namn?.trim()) return;
+    addDeltagare(slug, visningId, { namn: d.namn.trim(), telefon: d.telefon?.trim() ?? "", anmald: true, deltog: false });
+    setNewDeltagare((prev) => ({ ...prev, [visningId]: { namn: "", telefon: "" } }));
+    load();
+  }
+
+  function handleDeleteVisning(visningId: string) {
+    deleteVisning(slug, visningId);
+    load();
+  }
+
+  function VisningRow({ v }: { v: Visning }) {
+    const isExpanded = expandedId === v.id;
+    const isPast = v.datum < now;
+
+    return (
+      <div className={`rounded-xl border transition-colors ${isPast ? "border-border/50 bg-card/40" : "border-border bg-card/80"}`}>
+        <button
+          className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
+          onClick={() => setExpandedId(isExpanded ? null : v.id)}
+        >
+          <div className="flex items-center gap-3">
+            <span className={`flex h-8 w-8 items-center justify-center rounded-full text-sm ${
+              isPast ? "bg-muted/50 text-muted-foreground" : "bg-primary/10 text-primary"
+            }`}>
+              {v.typ === "Öppen" ? "🏠" : v.typ === "Privat" ? "🔑" : "⚖️"}
+            </span>
+            <div>
+              <p className={`text-sm font-medium ${isPast ? "text-muted-foreground" : "text-foreground"}`}>
+                {fullDateFmt(v.datum)}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {timeFmt(v.datum)}–{timeFmt(v.sluttid)} · {v.typ} · {v.deltagare.length} anmälda
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {!isPast && (
+              <button
+                onClick={(e) => { e.stopPropagation(); exportVisningToICS(v, adress); }}
+                className="rounded-md border border-border px-2 py-1 text-[10px] text-muted-foreground hover:border-primary/50 hover:text-primary"
+              >
+                → Kalender
+              </button>
+            )}
+            <span className={`text-xs text-muted-foreground transition-transform ${isExpanded ? "rotate-90" : ""}`}>›</span>
+          </div>
+        </button>
+
+        {isExpanded && (
+          <div className="border-t border-border px-4 py-4">
+            {v.anteckningar && (
+              <p className="mb-3 text-xs text-muted-foreground">{v.anteckningar}</p>
+            )}
+
+            <p className="mb-2 text-[11px] font-semibold uppercase tracking-widest text-primary/60">
+              Deltagare ({v.deltagare.length})
+            </p>
+
+            {v.deltagare.length > 0 ? (
+              <div className="mb-3 divide-y divide-border rounded-lg border border-border">
+                {v.deltagare.map((d) => (
+                  <div key={d.id} className="flex items-center justify-between px-3 py-2">
+                    <div>
+                      <p className="text-sm text-foreground">{d.namn}</p>
+                      {d.telefon && <p className="text-xs text-muted-foreground">{d.telefon}</p>}
+                    </div>
+                    {isPast && (
+                      <button
+                        onClick={() => { toggleDeltog(slug, v.id, d.id); load(); }}
+                        className={`rounded-full px-2 py-0.5 text-[10px] font-medium transition-colors ${
+                          d.deltog
+                            ? "bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30"
+                            : "bg-muted/60 text-muted-foreground hover:bg-muted"
+                        }`}
+                      >
+                        {d.deltog ? "Deltog ✓" : "Ej deltog"}
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="mb-3 text-xs text-muted-foreground">Inga deltagare registrerade ännu.</p>
+            )}
+
+            <div className="flex gap-2">
+              <input
+                type="text"
+                placeholder="Namn"
+                value={newDeltagare[v.id]?.namn ?? ""}
+                onChange={(e) => setNewDeltagare((p) => ({ ...p, [v.id]: { ...p[v.id], namn: e.target.value } }))}
+                className="flex-1 rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
+              />
+              <input
+                type="tel"
+                placeholder="Telefon"
+                value={newDeltagare[v.id]?.telefon ?? ""}
+                onChange={(e) => setNewDeltagare((p) => ({ ...p, [v.id]: { ...p[v.id], telefon: e.target.value } }))}
+                className="w-28 rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
+              />
+              <button
+                onClick={() => handleAddDeltagare(v.id)}
+                className="rounded-lg bg-primary/10 px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/20"
+              >
+                + Lägg till
+              </button>
+            </div>
+
+            <div className="mt-3 flex justify-end">
+              <button
+                onClick={() => handleDeleteVisning(v.id)}
+                className="text-[11px] text-red-400/60 hover:text-red-400"
+              >
+                Ta bort visning
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
-    <div className="flex flex-col gap-2 pl-2">
-      <MaSec id="mj" title="Mäklarjournal" badge="4" open={open.mj} onToggle={toggle} done={done.mj} onToggleDone={toggleDone}>
-        <MaMjBody />
-      </MaSec>
-      <MaSec id="visningar" title="Visningsdetaljer" open={open.visningar} onToggle={toggle} done={done.visningar} onToggleDone={toggleDone}>
-        <MaVisningarBody />
-      </MaSec>
-      <MaSec id="publicera" title="Publicera" open={open.publicera} onToggle={toggle} done={done.publicera} onToggleDone={toggleDone}>
-        <MaPubliceraBody />
-      </MaSec>
-      <MaSec id="boende" title="Boendekostnadskalkyl" open={open.boende} onToggle={toggle} done={done.boende} onToggleDone={toggleDone}>
-        <MaBoendeBody />
-      </MaSec>
-      <MaSec id="dokument" title="Dokument" open={open.dokument} onToggle={toggle} done={done.dokument} onToggleDone={toggleDone}>
-        <DokumentBody />
-      </MaSec>
-      <MaSec id="filer" title="Filer" open={open.filer} onToggle={toggle} done={done.filer} onToggleDone={toggleDone}>
-        <FilerBody />
-      </MaSec>
-      <MaSec id="tjanster" title="Tjänster" open={open.tjanster} onToggle={toggle} done={done.tjanster} onToggleDone={toggleDone}>
-        <TjansterBody />
-      </MaSec>
+    <div className="space-y-4 pl-2">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-sm font-semibold text-foreground">Visningar</h2>
+          <p className="text-xs text-muted-foreground">{adress}</p>
+        </div>
+        <button
+          onClick={() => setShowModal(true)}
+          className="rounded-xl bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground hover:bg-primary/90"
+        >
+          + Boka visning
+        </button>
+      </div>
+
+      {kommande.length === 0 && genomforda.length === 0 ? (
+        <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-border py-16 text-center">
+          <span className="text-4xl">🏠</span>
+          <p className="text-sm font-medium text-foreground">Inga visningar inplanerade</p>
+          <p className="text-xs text-muted-foreground">Boka den första visningen för att komma igång.</p>
+          <button
+            onClick={() => setShowModal(true)}
+            className="mt-1 rounded-lg bg-primary/10 px-4 py-2 text-xs font-medium text-primary hover:bg-primary/20"
+          >
+            + Boka visning
+          </button>
+        </div>
+      ) : (
+        <>
+          {kommande.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-[11px] font-semibold uppercase tracking-widest text-primary/60">Kommande ({kommande.length})</p>
+              {kommande.map((v) => <VisningRow key={v.id} v={v} />)}
+            </div>
+          )}
+          {genomforda.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/60">Genomförda ({genomforda.length})</p>
+              {genomforda.map((v) => <VisningRow key={v.id} v={v} />)}
+            </div>
+          )}
+        </>
+      )}
+
+      {showModal && (
+        <BokaNyVisningModal slug={slug} adress={adress} onClose={() => setShowModal(false)} onSaved={() => { load(); setShowModal(false); }} />
+      )}
     </div>
   );
 }
@@ -4211,6 +4559,10 @@ function bpick<T>(arr: readonly T[], h: number, rotBits: number): T {
 
 function ObjektsbeskrivningView({ adress, slug }: { adress: string; slug: string }) {
   const o = getObjektBySlug(slug);
+  const notes = getObjektNotes(slug);
+  const aiRubrik = notes.rubrik ?? "";
+  const aiKort = notes.kortBeskrivning ?? "";
+  const aiLang = notes.langBeskrivning ?? "";
   const images = pickImages(slug, o?.typ, o?.boarea);
   const heroImage = images[0];
   const rumStr = o?.rum ? String(o.rum) : "—";
@@ -4310,7 +4662,8 @@ function ObjektsbeskrivningView({ adress, slug }: { adress: string; slug: string
           <div className="p-10">
             {isBrf ? (
               <>
-                <h2 style={serif} className="text-center text-2xl text-neutral-800">{brfTagline}</h2>
+                <h2 style={serif} className="text-center text-2xl text-neutral-800">{aiRubrik || brfTagline}</h2>
+                {aiKort && <p className="mt-4 text-center text-sm text-neutral-600 italic leading-relaxed max-w-2xl mx-auto">{aiKort}</p>}
 
                 <h3 style={serif} className="mt-8 text-xl text-neutral-800">Snabbfakta</h3>
                 <div className="mt-3 grid grid-cols-2 gap-x-8 gap-y-2 text-sm">
@@ -4349,6 +4702,17 @@ function ObjektsbeskrivningView({ adress, slug }: { adress: string; slug: string
                   <Pr k="Senaste årsredovisning" v="2024" />
                 </div>
 
+                {aiLang && (
+                  <div className="mt-8">
+                    <h3 style={serif} className="text-xl text-neutral-800">Beskrivning</h3>
+                    <div className="mt-3 space-y-4 text-sm leading-relaxed text-neutral-700">
+                      {aiLang.split(/\n\n+/).filter(Boolean).map((para, i) => (
+                        <p key={i}>{para}</p>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <h3 style={serif} className="mt-10 text-xl text-neutral-800">Rumsbeskrivning</h3>
                 <div className="mt-3 space-y-3 text-sm leading-relaxed">
                   <RumP titel="HALL" text={brfHall} />
@@ -4380,7 +4744,20 @@ function ObjektsbeskrivningView({ adress, slug }: { adress: string; slug: string
               </>
             ) : (
               <>
-                <h2 style={serif} className="text-center text-2xl text-neutral-800">Charmigt hus från 1944 i grönskande miljö</h2>
+                <h2 style={serif} className="text-center text-2xl text-neutral-800">
+                  {aiRubrik || "Charmigt hus från 1944 i grönskande miljö"}
+                </h2>
+                {aiKort && <p className="mt-4 text-center text-sm text-neutral-600 italic leading-relaxed max-w-2xl mx-auto">{aiKort}</p>}
+                {aiLang && (
+                  <div className="mt-8">
+                    <h3 style={serif} className="text-xl text-neutral-800">Beskrivning</h3>
+                    <div className="mt-3 space-y-4 text-sm leading-relaxed text-neutral-700">
+                      {aiLang.split(/\n\n+/).filter(Boolean).map((para, i) => (
+                        <p key={i}>{para}</p>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 <h3 style={serif} className="mt-8 text-xl text-neutral-800">Snabbfakta</h3>
                 <div className="mt-3 grid grid-cols-2 gap-x-8 gap-y-2 text-sm">

@@ -7,6 +7,7 @@ import { listKontakter } from "../lib/kontaktStore";
 import { listBud, fmtBud } from "../lib/budgivningStore";
 import { slugifyAddr, fmtKrShort } from "./objekt.$slug";
 import { listIntagsmoten, type Intagsmote } from "../lib/intagsmoteStore";
+import { listAllaVisningar, type Visning } from "../lib/visningarStore";
 import type { Kontakt, NastaSteg } from "../lib/kontaktTypes";
 
 export const Route = createFileRoute("/")({
@@ -94,6 +95,7 @@ function DashboardPage() {
   const [kontakter, setKontakter] = useState<Kontakt[]>([]);
   const [budMap, setBudMap] = useState<BudMap>({});
   const [intagsmoten, setIntagsmoten] = useState<Intagsmote[]>([]);
+  const [visningar, setVisningar] = useState<Visning[]>([]);
   const [now] = useState(() => new Date());
 
   useEffect(() => {
@@ -110,6 +112,7 @@ function DashboardPage() {
         .filter((m) => m.status !== "Förlorad")
         .sort((a, b) => a.tidpunkt - b.tidpunkt)
     );
+    setVisningar(listAllaVisningar());
   }, []);
 
   /* derived */
@@ -147,11 +150,13 @@ function DashboardPage() {
     .sort((a, b) => a.ns.datum - b.ns.datum)
     .slice(0, 3);
 
+  const todayVisningar = visningar.filter((v) => isSameDay(v.datum, now)).sort((a, b) => a.datum - b.datum);
+
   const kpis = [
     { label: "Aktiva uppdrag", value: String(activeObjs.length), to: "/objekt" as const },
     { label: "Spekulanter", value: String(totalSpek), to: "/kunder" as const },
     { label: "Pågående bud", value: String(objsWithBids.length), to: "/objekt" as const },
-    { label: "Möten (7 dagar)", value: String(upcomingMoten.length + todayMoten.length), to: "/kunder" as const },
+    { label: "Visningar (7 dagar)", value: String(visningar.filter((v) => v.datum >= nowMs && v.datum <= in7.getTime()).length), to: "/objekt" as const },
   ];
 
   return (
@@ -207,7 +212,7 @@ function DashboardPage() {
             {/* Idag */}
             <DashCard
               title="Idag"
-              eyebrow="Intagsmöten"
+              eyebrow="Agenda"
               action={
                 <Link
                   to="/kunder"
@@ -218,8 +223,8 @@ function DashboardPage() {
                 </Link>
               }
             >
-              {pastPlannerMoten.length === 0 && todayMoten.length === 0 ? (
-                <EmptySlot icon="📅" text="Inga intagsmöten idag" hint="Skapa ett nytt möte från en kontakt" />
+              {pastPlannerMoten.length === 0 && todayMoten.length === 0 && todayVisningar.length === 0 ? (
+                <EmptySlot icon="📅" text="Inga möten eller visningar idag" hint="Skapa ett nytt möte från en kontakt" />
               ) : (
                 <div className="divide-y divide-border">
                   {pastPlannerMoten.slice(0, 2).map((m) => (
@@ -227,6 +232,9 @@ function DashboardPage() {
                   ))}
                   {todayMoten.map((m) => (
                     <MoteRow key={m.id} mote={m} kontakter={kontakter} variant="today" now={now} />
+                  ))}
+                  {todayVisningar.map((v) => (
+                    <VisningDashRow key={v.id} visning={v} />
                   ))}
                 </div>
               )}
@@ -476,6 +484,36 @@ function MoteStatusPill({ status }: { status: string }) {
     <span className={`flex-shrink-0 rounded-full px-2 py-0.5 text-[9px] font-medium uppercase tracking-wide ${cls}`}>
       {status}
     </span>
+  );
+}
+
+/* ── Visning dash row ── */
+
+function VisningDashRow({ visning }: { visning: Visning }) {
+  const slug = visning.slug;
+  const icon = visning.typ === "Öppen" ? "🏠" : visning.typ === "Privat" ? "🔑" : "⚖️";
+  return (
+    <Link
+      to="/objekt/$slug"
+      params={{ slug }}
+      search={{ tab: "Visningar", q: undefined }}
+      className="group flex items-start gap-3.5 py-3"
+    >
+      <div className="mt-0.5 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-amber-500/10 text-sm text-amber-500">
+        {icon}
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-medium text-foreground group-hover:text-primary">
+          {slug.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}
+        </p>
+        <p className="mt-0.5 text-[11px] text-muted-foreground">
+          Visning {visning.typ.toLowerCase()} · {timeFmt(visning.datum)}–{timeFmt(visning.sluttid)} · {visning.deltagare.length} anmälda
+        </p>
+      </div>
+      <span className="flex-shrink-0 rounded-full bg-amber-500/10 px-2 py-0.5 text-[9px] font-medium uppercase tracking-wide text-amber-500">
+        Visning
+      </span>
+    </Link>
   );
 }
 
