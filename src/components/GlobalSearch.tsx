@@ -2,6 +2,8 @@ import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { allObjekt } from "@/lib/objektStore";
 import { slugifyAddr } from "@/data/objekt";
+import { listKontakter } from "@/lib/kontaktStore";
+import type { Kontakt } from "@/lib/kontaktTypes";
 import {
   CommandDialog,
   CommandInput,
@@ -40,12 +42,6 @@ function buildObjectList(): ObjektRow[] {
   }));
 }
 
-const ALL_CONTACTS = [
-  { name: "Margaretha Lindqvist", role: "Spekulant", objSlug: "stationsgatan-8b" },
-  { name: "Erik Svensson",        role: "Säljare",   objSlug: "sodragarden-9" },
-  { name: "Anna Karlsson",        role: "Köpare",    objSlug: "granstigen-18" },
-  { name: "Lars Bergström",       role: "Spekulant", objSlug: "granstigen-18" },
-];
 
 type SectionInfo = { label: string; icon: React.ReactNode; tab: string };
 
@@ -89,7 +85,7 @@ const NAV_ITEMS = [
   { label: "Objekt",    to: "/objekt",     icon: <MapPin size={14} /> },
   { label: "Listor",    to: "/listor",     icon: <Layers size={14} /> },
   { label: "Visningar", to: "/visningar",  icon: <Calendar size={14} /> },
-  { label: "Kunder",    to: "/kunder",     icon: <Users size={14} /> },
+  { label: "Kontakter", to: "/kunder",     icon: <Users size={14} /> },
   { label: "Statistik", to: "/statistik",  icon: <BarChart3 size={14} /> },
 ];
 
@@ -108,12 +104,12 @@ function normalize(s: string) {
 interface ParseResult {
   matchedSection: SectionInfo | null;
   matchedObjects: ObjektRow[];
-  matchedContacts: typeof ALL_CONTACTS;
+  matchedContacts: Kontakt[];
   matchedNav: typeof NAV_ITEMS;
   sectionKey: string | null;
 }
 
-function parseQuery(raw: string, objects: ObjektRow[]): ParseResult {
+function parseQuery(raw: string, objects: ObjektRow[], kontakter: Kontakt[]): ParseResult {
   const q = raw.trim();
   if (!q) {
     return { matchedSection: null, matchedObjects: objects, matchedContacts: [], matchedNav: NAV_ITEMS, sectionKey: null };
@@ -132,7 +128,7 @@ function parseQuery(raw: string, objects: ObjektRow[]): ParseResult {
     }
   }
 
-  // Tokens that aren't section keywords → used for address/name matching
+  // Tokens that aren't section keywords → used for address/name/phone matching
   const searchTokens = tokens.filter((t) => !SECTION_MAP[t] && t.length > 1);
 
   // Match objects: all search tokens must appear somewhere in addr or area
@@ -144,14 +140,21 @@ function parseQuery(raw: string, objects: ObjektRow[]): ParseResult {
           return searchTokens.every((t) => hay.includes(t));
         });
 
-  // Match contacts: any token (≥3 chars) matches name
+  // Match contacts by name, phone, or email — any token (≥2 chars)
   const matchedContacts =
     searchTokens.length === 0
       ? []
-      : ALL_CONTACTS.filter((c) => {
-          const hay = normalize(c.name);
-          return searchTokens.some((t) => t.length >= 3 && hay.includes(t));
-        });
+      : kontakter.filter((k) => {
+          const hayName = normalize(`${k.fornamn} ${k.efternamn}`);
+          const hayPhone = k.telefon.replace(/[\s-]/g, ""); // strip spaces/dashes for phone search
+          const rawPhone = q.replace(/[\s-]/g, "");
+          const hayEmail = k.epost.toLowerCase();
+          return (
+            searchTokens.some((t) => t.length >= 2 && hayName.includes(t)) ||
+            hayPhone.includes(rawPhone) ||
+            hayEmail.includes(q.toLowerCase())
+          );
+        }).slice(0, 8);
 
   // Nav items
   const matchedNav = NAV_ITEMS.filter((n) =>
@@ -172,17 +175,22 @@ interface GlobalSearchProps {
 
 export function GlobalSearch({ open, onOpenChange }: GlobalSearchProps) {
   const [query, setQuery] = useState("");
+  const [kontakter, setKontakter] = useState<Kontakt[]>([]);
   const navigate = useNavigate();
 
-  // Reset query when dialog closes
+  // Reset query and reload data when dialog opens
   useEffect(() => {
-    if (!open) setQuery("");
+    if (open) {
+      setKontakter(listKontakter());
+    } else {
+      setQuery("");
+    }
   }, [open]);
 
   // Build object list fresh each time dialog opens so new objects appear
   const objects = useMemo(() => buildObjectList(), [open]);
 
-  const parsed = useMemo(() => parseQuery(query, objects), [query, objects]);
+  const parsed = useMemo(() => parseQuery(query, objects, kontakter), [query, objects, kontakter]);
 
   function go(to: string) {
     onOpenChange(false);
@@ -254,30 +262,29 @@ export function GlobalSearch({ open, onOpenChange }: GlobalSearchProps) {
 
         {/* ── Kontakter ──────────────────────────────────────────────────── */}
         {parsed.matchedContacts.length > 0 && (
-          <CommandGroup heading="Kunder & kontakter">
-            {parsed.matchedContacts.map((c) => {
-              const obj = objects.find((o) => o.slug === c.objSlug);
-              const dest = obj
-                ? `/objekt/${c.objSlug}?tab=${parsed.matchedSection?.tab ?? "Spekulanter"}`
-                : "/kunder";
+          <CommandGroup heading="Kontakter">
+            {parsed.matchedContacts.map((k) => {
+              const topKoppling = k.objektKopplingar[0];
+              const topObj = topKoppling ? objects.find((o) => o.slug === topKoppling.slug) : null;
+              const rollLabel = topKoppling?.relation
+                ? topKoppling.relation.charAt(0).toUpperCase() + topKoppling.relation.slice(1)
+                : "Kontakt";
               return (
                 <CommandItem
-                  key={c.name}
-                  value={`kontakt ${c.name}`}
-                  onSelect={() => go(dest)}
+                  key={k.id}
+                  value={`kontakt ${k.fornamn} ${k.efternamn} ${k.telefon}`}
+                  onSelect={() => go(`/kunder/${k.id}`)}
                   className="flex items-center justify-between"
                 >
                   <div className="flex items-center gap-3">
-                    <span className="flex h-7 w-7 items-center justify-center rounded-md bg-foreground/[0.06] text-muted-foreground">
-                      <Users size={14} />
+                    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-[11px] font-medium text-primary">
+                      {(k.fornamn[0] ?? "")}{(k.efternamn[0] ?? "")}
                     </span>
                     <div className="leading-tight">
-                      <div className="text-sm text-foreground">{c.name}</div>
+                      <div className="text-sm text-foreground">{k.fornamn} {k.efternamn}</div>
                       <div className="text-[11px] text-muted-foreground">
-                        {c.role}{obj && <> · {obj.addr}</>}
-                        {parsed.matchedSection && (
-                          <> · <span className="text-primary">{parsed.matchedSection.label}</span></>
-                        )}
+                        {k.telefon || k.epost || "—"}
+                        {topObj && <> · {rollLabel} · {topObj.addr}</>}
                       </div>
                     </div>
                   </div>

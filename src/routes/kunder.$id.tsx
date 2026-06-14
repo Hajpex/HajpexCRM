@@ -87,7 +87,7 @@ function KontaktDetailPage() {
       <div className="mx-auto max-w-6xl px-6 pb-24 pt-8">
         {/* Breadcrumb */}
         <div className="mb-5 flex items-center gap-2 text-xs text-muted-foreground">
-          <Link to="/kunder" className="hover:text-foreground">← Kunder</Link>
+          <Link to="/kunder" className="hover:text-foreground">← Kontakter</Link>
           <span className="opacity-40">/</span>
           <span className="text-foreground">{namn}</span>
         </div>

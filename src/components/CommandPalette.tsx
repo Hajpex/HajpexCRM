@@ -40,7 +40,7 @@ type Action = {
 const SHORTCUTS = [
   { id: "new-obj", title: "Nytt objekt", subtitle: "Skapa ett nytt objekt", to: "/objekt/nytt", keys: ["nytt", "ny", "skapa", "objekt"] },
   { id: "objekt", title: "Alla objekt", subtitle: "Visa hela portföljen", to: "/objekt", keys: ["objekt", "lista", "portfölj"] },
-  { id: "kunder", title: "Kunder", subtitle: "Kundregister", to: "/kunder", keys: ["kund", "kunder", "kontakt"] },
+  { id: "kunder", title: "Kontakter", subtitle: "Kontaktregister", to: "/kunder", keys: ["kund", "kunder", "kontakt", "kontakter"] },
   { id: "visningar", title: "Visningar", subtitle: "Kommande visningar", to: "/visningar", keys: ["visning", "visningar", "öppet hus"] },
   { id: "listor", title: "Listor", subtitle: "Sparade listor", to: "/listor", keys: ["listor", "lista"] },
   { id: "statistik", title: "Statistik", subtitle: "Försäljningsstatistik", to: "/statistik", keys: ["statistik", "stats", "siffror"] },

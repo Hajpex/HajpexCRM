@@ -9,7 +9,7 @@ const ITEMS: Item[] = [
   { to: "/objekt/nytt", label: "Nytt objekt", icon: <PlusIcon /> },
   { to: "/objekt", label: "Objekt", icon: <ListIcon /> },
   { to: "/listor", label: "Listor", icon: <LayersIcon /> },
-  { to: "/kunder", label: "Kunder", icon: <UsersIcon /> },
+  { to: "/kunder", label: "Kontakter", icon: <UsersIcon /> },
   { to: "/visningar", label: "Visningar", icon: <CalendarIcon /> },
   { to: "/statistik", label: "Statistik", icon: <ChartIcon /> },
 ];

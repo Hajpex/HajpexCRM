@@ -39,7 +39,7 @@ function topRelation(k: Kontakt): KontaktRelation | null {
 
 export const Route = createFileRoute("/kunder")({
   head: () => ({
-    meta: [{ title: "Kunder · Stendahl CRM" }],
+    meta: [{ title: "Kontakter · Hajpex CRM" }],
   }),
   component: KunderLayout,
 });
@@ -106,7 +106,7 @@ function KunderPage() {
           <div>
             <div className="mb-2 text-[11px] uppercase tracking-[0.22em] text-primary/80">CRM</div>
             <h1 className="text-4xl font-medium md:text-5xl" style={serif}>
-              Kunder<span className="text-primary">.</span>
+              Kontakter<span className="text-primary">.</span>
             </h1>
             <p className="mt-2 text-sm text-muted-foreground">
               {counts.alla} kontakter totalt
