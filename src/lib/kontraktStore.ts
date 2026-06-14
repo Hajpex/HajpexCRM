@@ -66,3 +66,8 @@ export function saveKontrakt(slug: string, data: Partial<KontraktData>) {
   all[slug] = { ...EMPTY, ...(all[slug] ?? {}), ...data };
   write(all);
 }
+
+export function listKontrakt(): { slug: string; data: KontraktData }[] {
+  const all = read();
+  return Object.entries(all).map(([slug, data]) => ({ slug, data }));
+}

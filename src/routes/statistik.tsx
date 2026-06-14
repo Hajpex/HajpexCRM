@@ -4,6 +4,7 @@ import { AppShell } from "../components/AppShell";
 import { listObjekt } from "../lib/objektStore";
 import { OBJEKT } from "../data/objekt";
 import { listKontakter } from "../lib/kontaktStore";
+import { listKontrakt } from "../lib/kontraktStore";
 import { listIntagsmoten, type Intagsmote } from "../lib/intagsmoteStore";
 import type { Kontakt } from "../lib/kontaktTypes";
 import { listAllaVisningar } from "../lib/visningarStore";
@@ -204,22 +205,103 @@ function LiveStatusCard() {
 }
 
 // ---------- Start / Översikt ----------
+const BUDGET_OMS = 300_000;
+const BUDGET_SALDA = 6;
+const BUDGET_INTAG = 18;
+const BUDGET_REDO = 4;
+
+function barColor(pct: number) {
+  return pct >= 80 ? "bg-emerald-500" : pct >= 50 ? "bg-amber-500" : "bg-rose-500";
+}
+function tileColor(pct: number): "good" | "warn" | "bad" {
+  return pct >= 80 ? "good" : pct >= 50 ? "warn" : "bad";
+}
+
 function StartTab() {
+  const [live, setLive] = useState<{
+    intag: number; vunnaIntag: number;
+    saldaThisMonth: number; omsattningMonth: number;
+    omsattning365: number; salda365: number;
+    avgProvision: number;
+    statusCounts: Record<string, number>;
+  } | null>(null);
+
+  useEffect(() => {
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+    const yearAgo = now.getTime() - 365 * 24 * 60 * 60 * 1000;
+
+    const moten = listIntagsmoten();
+    const signed = listKontrakt().filter((k) => k.data.signerat && k.data.slutpris);
+
+    const intagThisMonth = moten.filter((m) => {
+      const d = new Date(m.tidpunkt);
+      return new Date(d.getFullYear(), d.getMonth(), 1).getTime() === new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+    });
+    const intag = intagThisMonth.length;
+    const vunnaIntag = intagThisMonth.filter((m) => m.status === "Vunnen").length;
+
+    const signedThisMonth = signed.filter((k) => {
+      if (!k.data.kontraktsdatum) return false;
+      return new Date(k.data.kontraktsdatum).getTime() >= monthStart;
+    });
+    const saldaThisMonth = signedThisMonth.length;
+    const omsattningMonth = signedThisMonth.reduce((sum, k) => {
+      return sum + Math.round((Number(k.data.slutpris) || 0) * 0.015 * 1.25);
+    }, 0);
+
+    const signed365 = signed.filter((k) => {
+      if (!k.data.kontraktsdatum) return false;
+      return new Date(k.data.kontraktsdatum).getTime() >= yearAgo;
+    });
+    const salda365 = signed365.length;
+    const omsattning365 = signed365.reduce((sum, k) => {
+      return sum + Math.round((Number(k.data.slutpris) || 0) * 0.015 * 1.25);
+    }, 0);
+    const avgProvision = salda365 > 0 ? Math.round(omsattning365 / salda365) : 44_000;
+
+    const savedObjs = listObjekt();
+    const savedAddrs = new Set(savedObjs.map((o) => o.adress));
+    const all = [...savedObjs, ...OBJEKT.filter((o) => !savedAddrs.has(o.adress))];
+    const statusCounts: Record<string, number> = {};
+    for (const o of all) statusCounts[o.status] = (statusCounts[o.status] ?? 0) + 1;
+
+    setLive({ intag, vunnaIntag, saldaThisMonth, omsattningMonth, omsattning365, salda365, avgProvision, statusCounts });
+  }, []);
+
+  const oms = live?.omsattningMonth ?? 0;
+  const salda = live?.saldaThisMonth ?? 0;
+  const intag = live?.intag ?? 0;
+  const vunna = live?.vunnaIntag ?? 0;
+  const salda365 = live?.salda365 ?? 0;
+  const omsattning365 = live?.omsattning365 ?? 0;
+  const avg = live?.avgProvision ?? 44_000;
+
+  const omsPct = Math.round((oms / BUDGET_OMS) * 100);
+  const saldaPct = Math.round((salda / BUDGET_SALDA) * 100);
+  const intagPct = Math.round((intag / BUDGET_INTAG) * 100);
+  const vunnaPct = Math.round((vunna / BUDGET_INTAG) * 100);
+  const redoCount = live?.statusCounts["Redo (Kommande)"] ?? 0;
+  const tillSaluCount = live?.statusCounts["Till salu"] ?? 0;
+  const redoPct = Math.round((redoCount / BUDGET_REDO) * 100);
+  const overallPct = Math.round((omsPct + saldaPct + intagPct) / 3);
+
+  const now = new Date();
+  const monthName = now.toLocaleString("sv-SE", { month: "long", year: "numeric" });
+
   return (
     <div className="space-y-6">
-      {/* Live data */}
       <LiveStatusCard />
 
-      {/* Säljmål */}
-      <Card title="Resultat vs säljmål" hint="Juni 2026 · Erik Lindqvist">
+      <Card title="Resultat vs säljmål" hint={`${monthName.charAt(0).toUpperCase() + monthName.slice(1)} · Erik Lindqvist`}>
         <div className="grid grid-cols-2 gap-4 md:grid-cols-4 lg:grid-cols-7">
-          <KpiTile label="Uppnådda säljmål" value="51%" tone="warn" progress={51} />
-          <KpiTile label="Bokade intag" value="5" sub="/ 18" tone="bad" progress={28} />
-          <KpiTile label="Vunna intag" value="3" sub="säljmål saknas" />
-          <KpiTile label="Sålda objekt" value="4" sub="/ 6" tone="good" progress={67} />
-          <KpiTile label="Omsättning" value="176 000" sub="/ 300 000" tone="warn" progress={59} />
-          <KpiTile label="Publicerade Redo" value="2" sub="/ 4" tone="warn" progress={50} />
-          <KpiTile label="NPS" value="100" sub="4 / 100 svar" tone="good" />
+          <KpiTile label="Uppnådda säljmål" value={`${overallPct}%`} tone={tileColor(overallPct)} progress={overallPct} />
+          <KpiTile label="Bokade intag" value={String(intag)} sub={`/ ${BUDGET_INTAG}`} tone={tileColor(intagPct)} progress={intagPct} />
+          <KpiTile label="Vunna intag" value={String(vunna)} sub="säljmål saknas" />
+          <KpiTile label="Sålda objekt" value={String(salda)} sub={`/ ${BUDGET_SALDA}`} tone={tileColor(saldaPct)} progress={saldaPct} />
+          <KpiTile label="Omsättning" value={fmtKr(oms)} sub={`/ ${fmtKr(BUDGET_OMS)}`} tone={tileColor(omsPct)} progress={omsPct} />
+          <KpiTile label="Publicerade Redo" value={String(redoCount)} sub={`/ ${BUDGET_REDO}`} tone={tileColor(redoPct)} progress={redoPct} />
+          <KpiTile label="NPS" value="—" sub="Ingen data" />
         </div>
       </Card>
 
@@ -231,16 +313,16 @@ function StartTab() {
                 <th className="pb-3 font-normal"></th>
                 <th className="pb-3 font-normal">Aktuell period</th>
                 <th className="pb-3 font-normal">I fjol</th>
-                <th className="pb-3 font-normal">Budget juni 2026</th>
+                <th className="pb-3 font-normal">Budget</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border/40">
-              {[
-                ["Omsättning", "176 000", "0 (0%)", "300 000 (59%)"],
-                ["Sålda objekt", "4", "0 (0%)", "6 (67%)"],
-                ["Vunna intagsmöten", "3", "5 (60%)", ""],
-                ["Antal intagsmöten", "9", "10 (90%)", "18 (50%)"],
-              ].map((r) => (
+              {([
+                ["Omsättning", fmtKr(oms) + " kr", "—", `${fmtKr(BUDGET_OMS)} (${omsPct}%)`],
+                ["Sålda objekt", String(salda), "—", `${BUDGET_SALDA} (${saldaPct}%)`],
+                ["Vunna intagsmöten", String(vunna), "—", "—"],
+                ["Antal intagsmöten", String(intag), "—", `${BUDGET_INTAG} (${intagPct}%)`],
+              ] as const).map((r) => (
                 <tr key={r[0]} className="text-foreground/90">
                   <td className="py-3 text-muted-foreground">{r[0]}</td>
                   <td className="py-3">{r[1]}</td>
@@ -252,27 +334,39 @@ function StartTab() {
           </table>
         </Card>
 
-        <Card title="NPS" hint="Denna månad">
+        <Card title="NPS" hint="Ingen data ännu">
           <div className="flex flex-col items-center justify-center py-6">
-            <div className="text-6xl font-medium text-emerald-400" style={serif}>100</div>
-            <div className="mt-2 text-xs text-muted-foreground">baserat på 4 svar</div>
+            <div className="text-6xl font-medium text-muted-foreground" style={serif}>—</div>
+            <div className="mt-2 text-xs text-muted-foreground">Inga NPS-svar insamlade</div>
           </div>
         </Card>
       </div>
 
       <Card title="Medarbetare utfall" hint="Mot budget · denna månad">
         <div className="space-y-4">
-          {[
-            { name: "Erik Lindqvist", oms: 59, salda: 67, intag: 50, vunna: 30 },
-          ].map((m) => (
-            <div key={m.name} className="grid grid-cols-1 gap-3 md:grid-cols-5">
-              <div className="text-sm font-medium">{m.name}</div>
-              <div><div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Omsättning</div><Bar value={m.oms} max={100} color="bg-amber-500" /><div className="mt-1 text-xs text-muted-foreground">176 000 ({m.oms}%)</div></div>
-              <div><div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Sålda</div><Bar value={m.salda} max={100} color="bg-amber-500" /><div className="mt-1 text-xs text-muted-foreground">4 ({m.salda}%)</div></div>
-              <div><div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Intag</div><Bar value={m.intag} max={100} color="bg-amber-500" /><div className="mt-1 text-xs text-muted-foreground">9 ({m.intag}%)</div></div>
-              <div><div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Vunna</div><Bar value={m.vunna} max={100} color="bg-rose-500" /><div className="mt-1 text-xs text-muted-foreground">3</div></div>
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-5">
+            <div className="text-sm font-medium">Erik Lindqvist</div>
+            <div>
+              <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Omsättning</div>
+              <Bar value={omsPct} max={100} color={barColor(omsPct)} />
+              <div className="mt-1 text-xs text-muted-foreground">{fmtKr(oms)} ({omsPct}%)</div>
             </div>
-          ))}
+            <div>
+              <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Sålda</div>
+              <Bar value={saldaPct} max={100} color={barColor(saldaPct)} />
+              <div className="mt-1 text-xs text-muted-foreground">{salda} ({saldaPct}%)</div>
+            </div>
+            <div>
+              <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Intag</div>
+              <Bar value={intagPct} max={100} color={barColor(intagPct)} />
+              <div className="mt-1 text-xs text-muted-foreground">{intag} ({intagPct}%)</div>
+            </div>
+            <div>
+              <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Vunna</div>
+              <Bar value={vunnaPct} max={100} color={barColor(vunnaPct)} />
+              <div className="mt-1 text-xs text-muted-foreground">{vunna}</div>
+            </div>
+          </div>
         </div>
       </Card>
 
@@ -291,15 +385,20 @@ function StartTab() {
               <tr className="text-left text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
                 <th className="pb-3 font-normal">Status</th>
                 <th className="pb-3 font-normal">Antal</th>
-                <th className="pb-3 font-normal">Hastighet</th>
-                <th className="pb-3 font-normal">Säljgrad</th>
-                <th className="pb-3 font-normal">Senaste 7d</th>
                 <th className="pb-3 font-normal">Est. omsättning</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border/40">
-              <tr><td className="py-3">Redo (kommande)</td><td>23</td><td>35</td><td>53%</td><td>0</td><td>612 011</td></tr>
-              <tr><td className="py-3">Till salu</td><td>9</td><td>18</td><td>72%</td><td>1</td><td>325 335</td></tr>
+              <tr>
+                <td className="py-3">Redo (Kommande)</td>
+                <td>{redoCount}</td>
+                <td>{fmtKr(redoCount * avg)} kr</td>
+              </tr>
+              <tr>
+                <td className="py-3">Till salu</td>
+                <td>{tillSaluCount}</td>
+                <td>{fmtKr(tillSaluCount * avg)} kr</td>
+              </tr>
             </tbody>
           </table>
         </Card>
@@ -307,17 +406,28 @@ function StartTab() {
 
       <div className="grid gap-6 lg:grid-cols-3">
         <Card title="Omsättning senaste 365 dagar">
-          <div className="text-3xl font-medium" style={serif}>2 209 026 kr</div>
-          <div className="mt-1 text-sm text-rose-400">▼ -43 040</div>
+          <div className="text-3xl font-medium" style={serif}>{fmtKr(omsattning365)} kr</div>
+          {salda365 > 0 && <div className="mt-1 text-xs text-muted-foreground">{salda365} sålda · snitt {fmtKr(avg)} kr/objekt</div>}
         </Card>
         <Card title="Sålda objekt senaste 365 dagar">
-          <div className="text-3xl font-medium" style={serif}>44</div>
-          <div className="mt-1 text-sm text-rose-400">▼ -1</div>
+          <div className="text-3xl font-medium" style={serif}>{salda365}</div>
         </Card>
-        <Card title="Resultat / Budget" hint="43% / 17 dagar kvar">
+        <Card title="Resultat / Budget" hint={`${omsPct}% av omsättningsmål`}>
           <div className="space-y-3">
-            <div><div className="mb-1 flex justify-between text-xs"><span>Sålda objekt</span><span className="text-rose-400">59%</span></div><Bar value={59} max={100} color="bg-rose-500" /></div>
-            <div><div className="mb-1 flex justify-between text-xs"><span>Omsättning</span><span className="text-rose-400">59%</span></div><Bar value={59} max={100} color="bg-rose-500" /></div>
+            <div>
+              <div className="mb-1 flex justify-between text-xs">
+                <span>Sålda objekt</span>
+                <span className={saldaPct >= 80 ? "text-emerald-400" : saldaPct >= 50 ? "text-amber-400" : "text-rose-400"}>{saldaPct}%</span>
+              </div>
+              <Bar value={saldaPct} max={100} color={barColor(saldaPct)} />
+            </div>
+            <div>
+              <div className="mb-1 flex justify-between text-xs">
+                <span>Omsättning</span>
+                <span className={omsPct >= 80 ? "text-emerald-400" : omsPct >= 50 ? "text-amber-400" : "text-rose-400"}>{omsPct}%</span>
+              </div>
+              <Bar value={omsPct} max={100} color={barColor(omsPct)} />
+            </div>
           </div>
         </Card>
       </div>
@@ -559,33 +669,93 @@ function IntagTab() {
 }
 
 // ---------- KPI ----------
+const KPI_OPTIONS = ["Arvode/provision", "Antal sålda objekt", "Bokade intag", "Vunna intag", "Snittarvode"] as const;
+type KpiOption = typeof KPI_OPTIONS[number];
+
+function buildMonthDefs(n = 13) {
+  const now = new Date();
+  const MONTH_LABELS = ["Jan","Feb","Mar","Apr","Maj","Jun","Jul","Aug","Sep","Okt","Nov","Dec"];
+  return Array.from({ length: n }, (_, i) => {
+    const d = new Date(now.getFullYear(), now.getMonth() - (n - 1 - i), 1);
+    return { label: `${MONTH_LABELS[d.getMonth()]} '${String(d.getFullYear()).slice(2)}`, year: d.getFullYear(), month: d.getMonth() };
+  });
+}
+
 function KpiTab() {
-  const [kpi, setKpi] = useState("Arvode/provision");
-  const months = ["Jun '25","Jul '25","Aug '25","Sep '25","Okt '25","Nov '25","Dec '25","Jan '26","Feb '26","Mar '26","Apr '26","Maj '26","Jun '26"];
-  const data = [85, 155, 90, 395, 5, 445, 60, 45, 130, 410, 165, 70, 175];
-  const max = Math.max(...data);
+  const [kpi, setKpi] = useState<KpiOption>("Arvode/provision");
+  const [chartState, setChartState] = useState<{ months: string[]; data: number[]; chartMax: number; unit: string } | null>(null);
+
+  useEffect(() => {
+    const monthDefs = buildMonthDefs(13);
+    const signed = listKontrakt().filter((k) => k.data.signerat && k.data.slutpris);
+    const moten = listIntagsmoten();
+
+    function valueFor(year: number, month: number): number {
+      const inMonth = signed.filter((k) => {
+        if (!k.data.kontraktsdatum) return false;
+        const d = new Date(k.data.kontraktsdatum);
+        return d.getFullYear() === year && d.getMonth() === month;
+      });
+      const motenInMonth = moten.filter((m) => {
+        const d = new Date(m.tidpunkt);
+        return d.getFullYear() === year && d.getMonth() === month;
+      });
+      if (kpi === "Arvode/provision") {
+        return inMonth.reduce((s, k) => s + Math.round((Number(k.data.slutpris) || 0) * 0.015 * 1.25 / 1000), 0);
+      }
+      if (kpi === "Antal sålda objekt") return inMonth.length;
+      if (kpi === "Bokade intag") return motenInMonth.length;
+      if (kpi === "Vunna intag") return motenInMonth.filter((m) => m.status === "Vunnen").length;
+      if (kpi === "Snittarvode") {
+        if (inMonth.length === 0) return 0;
+        const total = inMonth.reduce((s, k) => s + Math.round((Number(k.data.slutpris) || 0) * 0.015 * 1.25 / 1000), 0);
+        return Math.round(total / inMonth.length);
+      }
+      return 0;
+    }
+
+    const data = monthDefs.map((m) => valueFor(m.year, m.month));
+    const peak = Math.max(...data, 1);
+    const isMonetary = kpi === "Arvode/provision" || kpi === "Snittarvode";
+    const chartMax = isMonetary
+      ? Math.ceil(peak / 100) * 100 || 500
+      : Math.ceil(peak / 5) * 5 || 10;
+    const unit = isMonetary ? "k" : "";
+
+    setChartState({ months: monthDefs.map((m) => m.label), data, chartMax, unit });
+  }, [kpi]);
+
+  if (!chartState) return null;
+  const { months, data, chartMax, unit } = chartState;
+  const yTicks = [0, chartMax * 0.25, chartMax * 0.5, chartMax * 0.75, chartMax];
+
   return (
     <Card
       title={kpi}
-      hint="Juni 2025 – Juni 2026 · Erik Lindqvist"
-      right={<Select value={kpi} onChange={setKpi} options={["Arvode/provision","Antal sålda objekt","Bokade intag","Vunna intag","Snittarvode"]} />}
+      hint="Senaste 13 månader · Erik Lindqvist"
+      right={<Select value={kpi} onChange={(v) => setKpi(v as KpiOption)} options={[...KPI_OPTIONS]} />}
     >
       <div className="relative h-80 w-full">
         <svg viewBox="0 0 700 280" className="h-full w-full">
-          {[0, 70, 140, 210, 280].map((y) => (
-            <line key={y} x1="40" x2="690" y1={y} y2={y} stroke="currentColor" className="text-border/40" />
-          ))}
-          {[0,100,200,300,400,500].map((v,i)=> (
-            <text key={v} x="0" y={280-(v/500)*280+4} className="fill-current text-[10px] text-muted-foreground">{v}k</text>
-          ))}
+          {yTicks.map((v) => {
+            const y = 280 - (v / chartMax) * 250;
+            return (
+              <g key={v}>
+                <line x1="40" x2="690" y1={y} y2={y} stroke="currentColor" className="text-border/40" />
+                <text x="35" y={y + 4} textAnchor="end" className="fill-current text-[10px] text-muted-foreground">
+                  {Math.round(v)}{unit}
+                </text>
+              </g>
+            );
+          })}
           <polyline
             fill="none"
             stroke="hsl(var(--primary))"
             strokeWidth="2"
-            points={data.map((d, i) => `${40 + (i * (650 / (data.length - 1)))},${280 - (d / max) * 250}`).join(" ")}
+            points={data.map((d, i) => `${40 + i * (650 / (data.length - 1))},${280 - (d / chartMax) * 250}`).join(" ")}
           />
           {data.map((d, i) => (
-            <circle key={i} cx={40 + (i * (650 / (data.length - 1)))} cy={280 - (d / max) * 250} r="3" fill="hsl(var(--primary))" />
+            <circle key={i} cx={40 + i * (650 / (data.length - 1))} cy={280 - (d / chartMax) * 250} r="3" fill="hsl(var(--primary))" />
           ))}
         </svg>
         <div className="mt-2 flex justify-between text-[10px] text-muted-foreground">
@@ -737,8 +907,61 @@ function NpsTab() {
 
 // ---------- Tillväxt ----------
 function TillvaxtTab() {
+  const [stats, setStats] = useState<{
+    omsattning: number; salda: number; snittprov: string;
+    snittarvode: number; intag: number; hitrate: number;
+    publicerade: number; snittSpek: number;
+  } | null>(null);
+
+  useEffect(() => {
+    const signed = listKontrakt().filter((k) => k.data.signerat && k.data.slutpris);
+    const moten = listIntagsmoten();
+    const vunna = moten.filter((m) => m.status === "Vunnen");
+
+    const totalSlutpris = signed.reduce((s, k) => s + (Number(k.data.slutpris) || 0), 0);
+    const omsattning = signed.reduce((s, k) => s + Math.round((Number(k.data.slutpris) || 0) * 0.015 * 1.25), 0);
+    const salda = signed.length;
+    const snittprov = salda > 0 && totalSlutpris > 0
+      ? ((omsattning / totalSlutpris) * 100).toFixed(2) + "%"
+      : "—";
+    const snittarvode = salda > 0 ? Math.round(omsattning / salda) : 0;
+    const hitrate = moten.length > 0 ? Math.round((vunna.length / moten.length) * 100) : 0;
+
+    const savedObjs = listObjekt();
+    const savedAddrs = new Set(savedObjs.map((o) => o.adress));
+    const all = [...savedObjs, ...OBJEKT.filter((o) => !savedAddrs.has(o.adress))];
+    const publicerade = all.filter((o) => o.status === "Till salu" || o.status === "Redo (Kommande)").length;
+    const aktiva = all.filter((o) => o.status === "Till salu" || o.status === "Redo (Kommande)");
+    const snittSpek = aktiva.length > 0
+      ? Math.round(aktiva.reduce((s, o) => s + (Array.isArray(o.spek) ? o.spek.reduce((a: number, b: number) => a + b, 0) : 0), 0) / aktiva.length)
+      : 0;
+
+    setStats({ omsattning, salda, snittprov, snittarvode, intag: moten.length, hitrate, publicerade, snittSpek });
+  }, []);
+
+  if (!stats) return null;
+
+  const now = new Date();
+  const hint = `Totalt t.o.m. ${now.toLocaleDateString("sv-SE")} · Havsbyn/Stenkulla`;
+
+  const row = (label: string, isTotal: boolean) => (
+    <tr className={isTotal ? "font-medium" : "text-primary"}>
+      <td className="py-3">{label}</td>
+      <td>{fmtKr(stats.omsattning)} kr</td>
+      <td>{stats.salda}</td>
+      <td>{stats.snittprov}</td>
+      <td>{stats.snittarvode > 0 ? fmtKr(stats.snittarvode) + " kr" : "—"}</td>
+      <td>—</td>
+      <td>{stats.intag}</td>
+      <td>{stats.hitrate}%</td>
+      <td>0</td>
+      <td>{stats.publicerade}</td>
+      <td>{stats.snittSpek}</td>
+    </tr>
+  );
+
   return (
-    <Card title="Tillväxtrapport" hint="2026-06-01 → 2026-06-13 · Havsbyn/Stenkulla">
+    <Card title="Tillväxtrapport" hint={hint}>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[900px] text-sm">
           <thead>
@@ -757,8 +980,8 @@ function TillvaxtTab() {
             </tr>
           </thead>
           <tbody className="divide-y divide-border/40">
-            <tr className="font-medium"><td className="py-3">Totalt</td><td>176 000</td><td>4</td><td>2,07%</td><td>44 000</td><td>100</td><td>9</td><td>33</td><td>1</td><td>3</td><td>9</td></tr>
-            <tr className="text-primary"><td className="py-3">Erik Lindqvist</td><td>176 000</td><td>4</td><td>2,07%</td><td>44 000</td><td>100</td><td>9</td><td>33</td><td>1</td><td>3</td><td>9</td></tr>
+            {row("Totalt", true)}
+            {row("Erik Lindqvist", false)}
           </tbody>
         </table>
       </div>
