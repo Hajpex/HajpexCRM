@@ -1508,14 +1508,18 @@ function KopplaKontaktModal({
       .map((k) => k.id)
   );
   const q = query.toLowerCase();
-  const normTel = (t: string) => t.replace(/[\s\-()+]/g, "");
+  const normTel = (t: string) => {
+    let s = t.replace(/[\s\-()+.]/g, "");
+    // +46701234567 / 46701234567 → 0701234567
+    if (s.startsWith("46") && s.length >= 11) s = "0" + s.slice(2);
+    return s;
+  };
   const qTel = normTel(query);
   const filtered = all.filter(
     (k) =>
-      !alreadyIds.has(k.id) &&
-      (`${k.fornamn} ${k.efternamn}`.toLowerCase().includes(q) ||
-        normTel(k.telefon).includes(qTel) ||
-        k.epost.toLowerCase().includes(q))
+      `${k.fornamn} ${k.efternamn}`.toLowerCase().includes(q) ||
+      normTel(k.telefon).includes(qTel) ||
+      k.epost.toLowerCase().includes(q)
   );
 
   function link(kontaktId: string) {
@@ -1572,19 +1576,24 @@ function KopplaKontaktModal({
                 Ingen kontakt matchar sökningen
               </div>
             ) : (
-              filtered.slice(0, 25).map((k) => (
-                <button
-                  key={k.id}
-                  onClick={() => link(k.id)}
-                  className="flex w-full items-center justify-between px-3 py-3 text-left text-sm transition-colors hover:bg-muted/30"
-                >
-                  <div>
-                    <div className="font-medium">{k.fornamn} {k.efternamn}</div>
-                    <div className="text-xs text-muted-foreground">{k.telefon || k.epost || "—"}</div>
-                  </div>
-                  <span className="text-xs font-medium text-primary">+ Koppla</span>
-                </button>
-              ))
+              filtered.slice(0, 25).map((k) => {
+                const linked = alreadyIds.has(k.id);
+                return (
+                  <button
+                    key={k.id}
+                    onClick={() => !linked && link(k.id)}
+                    className={`flex w-full items-center justify-between px-3 py-3 text-left text-sm transition-colors ${linked ? "cursor-default opacity-50" : "hover:bg-muted/30"}`}
+                  >
+                    <div>
+                      <div className="font-medium">{k.fornamn} {k.efternamn}</div>
+                      <div className="text-xs text-muted-foreground">{k.telefon || k.epost || "—"}</div>
+                    </div>
+                    <span className={`text-xs font-medium ${linked ? "text-muted-foreground" : "text-primary"}`}>
+                      {linked ? "✓ Kopplad" : "+ Koppla"}
+                    </span>
+                  </button>
+                );
+              })
             )}
           </div>
 
