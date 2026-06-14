@@ -3802,7 +3802,9 @@ function VisningarView() {
   const [visningar, setVisningar] = useState<Visning[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [newDeltagare, setNewDeltagare] = useState<Record<string, { namn: string; telefon: string }>>({});
+  const [newDeltagare, setNewDeltagare] = useState<Record<string, { namn: string; telefon: string; kontaktId?: string }>>({});
+  const [kontaktSuggestions, setKontaktSuggestions] = useState<{ id: string; namn: string; telefon: string }[]>([]);
+  const [suggForId, setSuggForId] = useState<string | null>(null);
 
   function load() { setVisningar(listVisningar(slug)); }
   useEffect(load, [slug]);
@@ -3818,11 +3820,35 @@ function VisningarView() {
     return new Date(ts).toLocaleDateString("sv-SE", { weekday: "long", day: "numeric", month: "long" });
   }
 
+  function onNamnChange(visningId: string, val: string) {
+    setNewDeltagare((p) => ({ ...p, [visningId]: { ...p[visningId], namn: val, kontaktId: undefined } }));
+    const q = val.toLowerCase().trim();
+    if (q.length < 2) { setKontaktSuggestions([]); setSuggForId(null); return; }
+    const all = listKontakter();
+    const matches = all
+      .filter((k) => `${k.fornamn} ${k.efternamn}`.toLowerCase().includes(q) || k.telefon?.includes(q))
+      .slice(0, 5)
+      .map((k) => ({ id: k.id, namn: `${k.fornamn} ${k.efternamn}`, telefon: k.telefon ?? "" }));
+    setKontaktSuggestions(matches);
+    setSuggForId(matches.length > 0 ? visningId : null);
+  }
+
+  function pickKontakt(visningId: string, k: { id: string; namn: string; telefon: string }) {
+    setNewDeltagare((p) => ({ ...p, [visningId]: { namn: k.namn, telefon: k.telefon, kontaktId: k.id } }));
+    setKontaktSuggestions([]);
+    setSuggForId(null);
+  }
+
   function handleAddDeltagare(visningId: string) {
     const d = newDeltagare[visningId];
     if (!d?.namn?.trim()) return;
-    addDeltagare(slug, visningId, { namn: d.namn.trim(), telefon: d.telefon?.trim() ?? "", anmald: true, deltog: false });
+    addDeltagare(slug, visningId, {
+      namn: d.namn.trim(), telefon: d.telefon?.trim() ?? "",
+      kontaktId: d.kontaktId, anmald: true, deltog: false,
+    });
     setNewDeltagare((prev) => ({ ...prev, [visningId]: { namn: "", telefon: "" } }));
+    setKontaktSuggestions([]);
+    setSuggForId(null);
     load();
   }
 
@@ -3906,27 +3932,49 @@ function VisningarView() {
               <p className="mb-3 text-xs text-muted-foreground">Inga deltagare registrerade ännu.</p>
             )}
 
-            <div className="flex gap-2">
-              <input
-                type="text"
-                placeholder="Namn"
-                value={newDeltagare[v.id]?.namn ?? ""}
-                onChange={(e) => setNewDeltagare((p) => ({ ...p, [v.id]: { ...p[v.id], namn: e.target.value } }))}
-                className="flex-1 rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
-              />
-              <input
-                type="tel"
-                placeholder="Telefon"
-                value={newDeltagare[v.id]?.telefon ?? ""}
-                onChange={(e) => setNewDeltagare((p) => ({ ...p, [v.id]: { ...p[v.id], telefon: e.target.value } }))}
-                className="w-28 rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
-              />
-              <button
-                onClick={() => handleAddDeltagare(v.id)}
-                className="rounded-lg bg-primary/10 px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/20"
-              >
-                + Lägg till
-              </button>
+            <div className="space-y-1.5">
+              <div className="relative flex gap-2">
+                <div className="relative flex-1">
+                  <input
+                    type="text"
+                    placeholder="Namn eller sök kontakt…"
+                    value={newDeltagare[v.id]?.namn ?? ""}
+                    onChange={(e) => onNamnChange(v.id, e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handleAddDeltagare(v.id)}
+                    className="w-full rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
+                  />
+                  {suggForId === v.id && kontaktSuggestions.length > 0 && (
+                    <div className="absolute left-0 top-full z-10 mt-1 w-full rounded-lg border border-border bg-card shadow-lg">
+                      {kontaktSuggestions.map((k) => (
+                        <button
+                          key={k.id}
+                          onMouseDown={() => pickKontakt(v.id, k)}
+                          className="flex w-full items-center justify-between px-3 py-2 text-left text-xs hover:bg-foreground/[0.04]"
+                        >
+                          <span className="font-medium text-foreground">{k.namn}</span>
+                          <span className="text-muted-foreground">{k.telefon}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <input
+                  type="tel"
+                  placeholder="Telefon"
+                  value={newDeltagare[v.id]?.telefon ?? ""}
+                  onChange={(e) => setNewDeltagare((p) => ({ ...p, [v.id]: { ...p[v.id], telefon: e.target.value } }))}
+                  className="w-28 rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
+                />
+                <button
+                  onClick={() => handleAddDeltagare(v.id)}
+                  className="rounded-lg bg-primary/10 px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/20"
+                >
+                  + Lägg till
+                </button>
+              </div>
+              {newDeltagare[v.id]?.kontaktId && (
+                <p className="text-[10px] text-emerald-500">✓ Kopplad till befintlig kontakt</p>
+              )}
             </div>
 
             <div className="mt-3 flex justify-end">

@@ -153,6 +153,9 @@ function DashboardPage() {
     .slice(0, 3);
 
   const todayVisningar = visningar.filter((v) => isSameDay(v.datum, now)).sort((a, b) => a.datum - b.datum);
+  const upcomingVisningar = visningar
+    .filter((v) => v.datum > nowMs && !isSameDay(v.datum, now) && v.datum <= in7.getTime())
+    .sort((a, b) => a.datum - b.datum);
 
   const kpis = [
     { label: "Aktiva uppdrag", value: String(activeObjs.length), to: "/objekt" as const },
@@ -248,15 +251,21 @@ function DashboardPage() {
             </DashCard>
 
             {/* Kommande */}
-            {upcomingMoten.filter((m) => !isSameDay(m.tidpunkt, now)).length > 0 && (
-              <DashCard title="Kommande möten" eyebrow="Nästa 7 dagar">
+            {(upcomingMoten.length > 0 || upcomingVisningar.length > 0) && (
+              <DashCard title="Kommande" eyebrow="Nästa 7 dagar">
                 <div className="divide-y divide-border">
-                  {upcomingMoten
-                    .filter((m) => !isSameDay(m.tidpunkt, now))
-                    .slice(0, 5)
-                    .map((m) => (
-                      <MoteRow key={m.id} mote={m} kontakter={kontakter} variant="upcoming" now={now} />
-                    ))}
+                  {/* Merge and sort all upcoming items by date */}
+                  {[
+                    ...upcomingMoten.map((m) => ({ type: "mote" as const, ts: m.tidpunkt, item: m })),
+                    ...upcomingVisningar.map((v) => ({ type: "visning" as const, ts: v.datum, item: v })),
+                  ]
+                    .sort((a, b) => a.ts - b.ts)
+                    .slice(0, 7)
+                    .map((e) =>
+                      e.type === "mote"
+                        ? <MoteRow key={e.item.id} mote={e.item as Intagsmote} kontakter={kontakter} variant="upcoming" now={now} />
+                        : <VisningDashRow key={e.item.id} visning={e.item as Visning} />
+                    )}
                 </div>
               </DashCard>
             )}
