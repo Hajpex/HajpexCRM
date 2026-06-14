@@ -84,3 +84,17 @@ export function addObjektKoppling(kontaktId: string, koppling: ObjektKoppling) {
   }
   write(list);
 }
+
+export function removeObjektKoppling(
+  kontaktId: string,
+  slug: string,
+  relation: import("./kontaktTypes").KontaktRelation
+) {
+  const list = read();
+  const idx = list.findIndex((k) => k.id === kontaktId);
+  if (idx < 0) return;
+  list[idx].objektKopplingar = list[idx].objektKopplingar.filter(
+    (kp) => !(kp.slug === slug && kp.relation === relation)
+  );
+  write(list);
+}

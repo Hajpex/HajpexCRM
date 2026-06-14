@@ -9,7 +9,7 @@ import { listBud, addBud, markeraVinnare, deleteBud, fmtBud, type Bud } from "..
 import { getKontrakt, saveKontrakt, type KontraktData } from "../lib/kontraktStore";
 import { fmtSweNum, handleNumberInput } from "../lib/formatters";
 import { getDemoSaljare } from "../lib/demoKontakter";
-import { listKontakter, addObjektKoppling } from "../lib/kontaktStore";
+import { listKontakter, addObjektKoppling, saveKontakt, removeObjektKoppling } from "../lib/kontaktStore";
 import type { KontaktRelation, Kontakt } from "../lib/kontaktTypes";
 import {
   listVisningar, saveVisning, deleteVisning, toggleDeltog, addDeltagare,
@@ -1487,13 +1487,168 @@ function HandlaggareBody() {
   );
 }
 
+/* -------- Koppla kontakt-modal -------- */
+function KopplaKontaktModal({
+  slug,
+  relation,
+  onClose,
+}: {
+  slug: string;
+  relation: "säljare" | "köpare";
+  onClose: () => void;
+}) {
+  const [query, setQuery] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [form, setForm] = useState({ fornamn: "", efternamn: "", telefon: "", epost: "" });
+
+  const all = listKontakter();
+  const alreadyIds = new Set(
+    all
+      .filter((k) => k.objektKopplingar.some((kp) => kp.slug === slug && kp.relation === relation))
+      .map((k) => k.id)
+  );
+  const q = query.toLowerCase();
+  const filtered = all.filter(
+    (k) =>
+      !alreadyIds.has(k.id) &&
+      (`${k.fornamn} ${k.efternamn}`.toLowerCase().includes(q) ||
+        k.telefon.includes(query) ||
+        k.epost.toLowerCase().includes(q))
+  );
+
+  function link(kontaktId: string) {
+    addObjektKoppling(kontaktId, { slug, relation, addedAt: Date.now(), anteckning: "" });
+    onClose();
+  }
+
+  function createAndLink() {
+    if (!form.fornamn || !form.efternamn) return;
+    const k = saveKontakt({
+      fornamn: form.fornamn, efternamn: form.efternamn,
+      telefon: form.telefon, epost: form.epost,
+      adress: "", ort: "", budgetMin: "", budgetMax: "",
+      sokTyper: [], sokOmraden: [], anteckningar: "",
+      gdprGodkant: null, objektKopplingar: [], aktiviteter: [], nastaSteg: null,
+    });
+    addObjektKoppling(k.id, { slug, relation, addedAt: Date.now(), anteckning: "" });
+    onClose();
+  }
+
+  const label = relation === "säljare" ? "säljare" : "köpare";
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-md rounded-2xl border border-border bg-card shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between border-b border-border px-5 py-4">
+          <h2 className="text-base font-medium">Koppla {label}</h2>
+          <button onClick={onClose} className="text-lg leading-none text-muted-foreground hover:text-foreground">✕</button>
+        </div>
+
+        <div className="space-y-4 p-5">
+          <input
+            autoFocus
+            type="text"
+            placeholder="Sök namn, telefon eller e-post…"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:border-primary/40 focus:outline-none"
+          />
+
+          <div className="max-h-56 divide-y divide-border/40 overflow-y-auto rounded-md border border-border">
+            {filtered.length === 0 ? (
+              <div className="px-3 py-5 text-center text-sm text-muted-foreground">
+                {query ? "Ingen kontakt matchar sökningen" : "Inga tillgängliga kontakter"}
+              </div>
+            ) : (
+              filtered.slice(0, 25).map((k) => (
+                <button
+                  key={k.id}
+                  onClick={() => link(k.id)}
+                  className="flex w-full items-center justify-between px-3 py-3 text-left text-sm transition-colors hover:bg-muted/30"
+                >
+                  <div>
+                    <div className="font-medium">{k.fornamn} {k.efternamn}</div>
+                    <div className="text-xs text-muted-foreground">{k.telefon || k.epost || "—"}</div>
+                  </div>
+                  <span className="text-xs font-medium text-primary">+ Koppla</span>
+                </button>
+              ))
+            )}
+          </div>
+
+          <div className="border-t border-border/60 pt-4">
+            {!creating ? (
+              <button onClick={() => setCreating(true)} className="text-sm text-primary hover:underline">
+                + Skapa ny kontakt och koppla
+              </button>
+            ) : (
+              <div className="space-y-3">
+                <p className="text-sm font-medium">Ny kontakt</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {([["Förnamn *", "fornamn"], ["Efternamn *", "efternamn"], ["Telefon", "telefon"], ["E-post", "epost"]] as const).map(
+                    ([ph, key]) => (
+                      <input
+                        key={key}
+                        placeholder={ph}
+                        value={form[key]}
+                        onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
+                        className="rounded-md border border-border bg-background px-3 py-2 text-sm focus:border-primary/40 focus:outline-none"
+                      />
+                    )
+                  )}
+                </div>
+                <div className="flex items-center justify-end gap-2">
+                  <button onClick={() => setCreating(false)} className="text-sm text-muted-foreground hover:text-foreground">Avbryt</button>
+                  <button
+                    onClick={createAndLink}
+                    disabled={!form.fornamn || !form.efternamn}
+                    className="rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-40"
+                  >
+                    Skapa och koppla
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function loadKopare(slug: string) {
+  return listKontakter().filter((k) =>
+    k.objektKopplingar.some((kp) => kp.slug === slug && kp.relation === "köpare")
+  );
+}
+
 function KopareView({ onTabChange }: { onTabChange?: (tab: SideTab) => void }) {
+  const { slug } = Route.useParams();
   const [open, setOpen] = useState(true);
-  const buyers: SaljarePerson[] = [];
-  const cols = ["Sorteringsordning","Namn","Andel","Pers. nr./Org. nr.","Telefon","E-post","Adress","BankID","Aktivitet"];
+  const [showModal, setShowModal] = useState(false);
+  const [persons, setPersons] = useState(() => loadKopare(slug));
+
+  function refresh() { setPersons(loadKopare(slug)); }
+
+  const cols = ["#", "Namn", "Telefon", "E-post", "Ort", "BankID", "Ta bort"];
+
   return (
     <div className="space-y-6">
       {onTabChange && <QuickNavBar onTabChange={onTabChange} />}
+
+      {showModal && (
+        <KopplaKontaktModal
+          slug={slug}
+          relation="köpare"
+          onClose={() => { setShowModal(false); refresh(); }}
+        />
+      )}
 
       <section className="rounded-md border border-border bg-card">
         <button
@@ -1503,6 +1658,9 @@ function KopareView({ onTabChange }: { onTabChange?: (tab: SideTab) => void }) {
         >
           <div className="flex items-center gap-2">
             <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-foreground">Köpare</span>
+            {persons.length > 0 && (
+              <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[10px] text-primary">{persons.length}</span>
+            )}
             <span className={`text-xs text-muted-foreground transition-transform ${open ? "rotate-90" : ""}`}>›</span>
           </div>
           <div className="flex items-center gap-4 text-xs">
@@ -1513,44 +1671,49 @@ function KopareView({ onTabChange }: { onTabChange?: (tab: SideTab) => void }) {
         {open && (
           <div className="border-t border-border px-4 py-5">
             <div className="mb-3 flex flex-wrap items-center justify-end gap-2">
-              <BtnGhost>✎ Byt köparens adress</BtnGhost>
-              <BtnPrimary>+ Lägg till ny kontakt</BtnPrimary>
+              <BtnPrimary onClick={() => setShowModal(true)}>+ Lägg till köpare</BtnPrimary>
             </div>
             <div className="overflow-x-auto rounded-md border border-border">
               <table className="w-full text-sm">
                 <thead className="bg-foreground/[0.04] text-left text-xs uppercase tracking-wider text-muted-foreground">
                   <tr>
-                    {cols.map((h) => (
-                      <th key={h} className="px-3 py-2 font-medium">{h}</th>
-                    ))}
+                    {cols.map((h) => <th key={h} className="px-3 py-2 font-medium">{h}</th>)}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {buyers.length === 0 ? (
+                  {persons.length === 0 ? (
                     <tr>
                       <td colSpan={cols.length} className="px-3 py-6 text-center text-sm text-muted-foreground">
-                        Inga poster
+                        Inga köpare kopplade ännu.{" "}
+                        <button onClick={() => setShowModal(true)} className="text-primary hover:underline">
+                          Lägg till köpare →
+                        </button>
                       </td>
                     </tr>
-                  ) : (
-                    buyers.map((s, i) => (
-                      <Fragment key={s.n}>
-                        <tr>
-                          <td className="px-3 py-2">{i + 1}</td>
-                          <td className="px-3 py-2">{s.n}</td>
-                          <td className="px-3 py-2">{s.a}</td>
-                          <td className="px-3 py-2 text-muted-foreground">{s.pnr}</td>
-                          <td className="px-3 py-2 text-muted-foreground">📞 {s.tel}</td>
-                          <td className="px-3 py-2 text-muted-foreground">
-                          {s.mail ? <a href={`mailto:${s.mail}`} className="hover:text-primary">{s.mail} ✉</a> : "—"}
-                        </td>
-                          <td className="px-3 py-2 text-muted-foreground">{s.adr}</td>
-                          <td className="px-3 py-2"><span className="rounded bg-emerald-500/15 px-2 py-0.5 text-[10px] text-emerald-300">BankID ✓</span></td>
-                          <td className="px-3 py-2 text-muted-foreground">⚙</td>
-                        </tr>
-                      </Fragment>
-                    ))
-                  )}
+                  ) : persons.map((p, i) => (
+                    <tr key={p.id}>
+                      <td className="px-3 py-2 text-muted-foreground">{i + 1}</td>
+                      <td className="px-3 py-2 font-medium">{p.fornamn} {p.efternamn}</td>
+                      <td className="px-3 py-2 text-muted-foreground">
+                        {p.telefon ? <a href={`tel:${p.telefon}`} className="hover:text-primary">{p.telefon}</a> : "—"}
+                      </td>
+                      <td className="px-3 py-2 text-muted-foreground">
+                        {p.epost ? <a href={`mailto:${p.epost}`} className="hover:text-primary">{p.epost}</a> : "—"}
+                      </td>
+                      <td className="px-3 py-2 text-muted-foreground">{p.ort || "—"}</td>
+                      <td className="px-3 py-2">
+                        <span className="rounded bg-emerald-500/15 px-2 py-0.5 text-[10px] text-emerald-300">BankID ✓</span>
+                      </td>
+                      <td className="px-3 py-2">
+                        <button
+                          onClick={() => { removeObjektKoppling(p.id, slug, "köpare"); refresh(); }}
+                          className="text-xs text-rose-400 hover:text-rose-300"
+                        >
+                          ✕
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
@@ -4682,13 +4845,34 @@ const SALJARE_CUSTOMER = [
   { k: "Byggnadsinformation", s: "Granskad & importerad", sCls: "bg-emerald-500/20 text-emerald-200", u: "" },
 ];
 
+function loadSaljare(slug: string) {
+  return listKontakter().filter((k) =>
+    k.objektKopplingar.some((kp) => kp.slug === slug && kp.relation === "säljare")
+  );
+}
+
 function SaljareView({ onTabChange }: { onTabChange: (tab: SideTab) => void }) {
   const { slug } = Route.useParams();
-  const persons = getSaljarePersons(slug);
   const [open, setOpen] = useState(true);
+  const [showModal, setShowModal] = useState(false);
+  const [realSaljare, setRealSaljare] = useState(() => loadSaljare(slug));
+
+  function refreshSaljare() { setRealSaljare(loadSaljare(slug)); }
+
+  const demoPersons = realSaljare.length === 0 ? getSaljarePersons(slug) : [];
+  const totalPersons = realSaljare.length + demoPersons.length;
+
   return (
     <div className="space-y-6">
       <QuickNavBar onTabChange={onTabChange} />
+
+      {showModal && (
+        <KopplaKontaktModal
+          slug={slug}
+          relation="säljare"
+          onClose={() => { setShowModal(false); refreshSaljare(); }}
+        />
+      )}
 
       <section className="rounded-md border border-border bg-card">
         <button
@@ -4698,6 +4882,9 @@ function SaljareView({ onTabChange }: { onTabChange: (tab: SideTab) => void }) {
         >
           <div className="flex items-center gap-2">
             <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-foreground">Säljare</span>
+            {realSaljare.length > 0 && (
+              <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[10px] text-primary">{realSaljare.length}</span>
+            )}
             <span className={`text-xs text-muted-foreground transition-transform ${open ? "rotate-90" : ""}`}>›</span>
           </div>
           <div className="flex items-center gap-4 text-xs">
@@ -4710,7 +4897,7 @@ function SaljareView({ onTabChange }: { onTabChange: (tab: SideTab) => void }) {
           <div className="border-t border-border px-4 py-5">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <BtnGhost>Fördela andelar</BtnGhost>
-              <BtnPrimary>+ Lägg till säljare</BtnPrimary>
+              <BtnPrimary onClick={() => setShowModal(true)}>+ Lägg till säljare</BtnPrimary>
             </div>
             <div className="overflow-x-auto rounded-md border border-border">
               <table className="w-full text-sm">
@@ -4722,12 +4909,53 @@ function SaljareView({ onTabChange }: { onTabChange: (tab: SideTab) => void }) {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {persons.map((s, i) => (
+                  {realSaljare.map((p, i) => (
+                    <Fragment key={p.id}>
+                      <tr>
+                        <td className="px-3 py-2">
+                          <select defaultValue={String(i + 1)} className="w-16 rounded-md border border-border bg-background/40 px-2 py-1 text-xs">
+                            {Array.from({ length: totalPersons }, (_, j) => <option key={j}>{j + 1}</option>)}
+                          </select>
+                        </td>
+                        <td className="px-3 py-2 font-medium">{p.fornamn} {p.efternamn}</td>
+                        <td className="px-3 py-2 text-muted-foreground">—</td>
+                        <td className="px-3 py-2 text-muted-foreground">—</td>
+                        <td className="px-3 py-2">Nej</td>
+                        <td className="px-3 py-2 text-muted-foreground">
+                          {p.telefon ? <>📞 <a href={`tel:${p.telefon}`} className="hover:text-primary">{p.telefon}</a></> : "—"}
+                        </td>
+                        <td className="px-3 py-2 text-muted-foreground">
+                          {p.epost ? <a href={`mailto:${p.epost}`} className="hover:text-primary">{p.epost} ✉</a> : "—"}
+                        </td>
+                        <td className="px-3 py-2 text-muted-foreground">{[p.adress, p.ort].filter(Boolean).join(", ") || "—"}</td>
+                        <td className="px-3 py-2"><span className="rounded bg-emerald-500/15 px-2 py-0.5 text-[10px] text-emerald-300">BankID ✓</span></td>
+                        <td className="px-3 py-2">Ja</td>
+                        <td className="px-3 py-2">
+                          <button
+                            onClick={() => { removeObjektKoppling(p.id, slug, "säljare"); refreshSaljare(); }}
+                            className="text-xs text-rose-400 hover:text-rose-300"
+                            title="Ta bort koppling"
+                          >
+                            ✕
+                          </button>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td colSpan={11} className="px-3 py-2">
+                          <textarea
+                            placeholder="Kommentar"
+                            className="min-h-[64px] w-full rounded-md border border-border bg-background/40 px-3 py-2 text-sm placeholder:text-muted-foreground/50 focus:border-primary/40 focus:outline-none"
+                          />
+                        </td>
+                      </tr>
+                    </Fragment>
+                  ))}
+                  {demoPersons.map((s, i) => (
                     <Fragment key={s.n}>
                       <tr>
                         <td className="px-3 py-2">
                           <select defaultValue={String(i + 1)} className="w-16 rounded-md border border-border bg-background/40 px-2 py-1 text-xs">
-                            {persons.map((_, j) => <option key={j}>{j + 1}</option>)}
+                            {demoPersons.map((_, j) => <option key={j}>{j + 1}</option>)}
                           </select>
                         </td>
                         <td className="px-3 py-2">{s.n}</td>
