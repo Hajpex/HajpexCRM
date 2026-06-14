@@ -58,6 +58,38 @@ function fmtDate(ts: number) {
   return new Date(ts).toLocaleDateString("sv-SE", { day: "numeric", month: "short", year: "numeric" });
 }
 
+type SortMode = "prioritet" | "az" | "senast";
+
+function warmthLevel(k: Kontakt): "green" | "amber" | "red" | "none" {
+  const ns = k.nastaSteg;
+  const now = Date.now();
+  if (ns && ns.datum < now) return "red";
+  const lastTs = k.aktiviteter.length > 0
+    ? Math.max(...k.aktiviteter.map((a) => a.tidpunkt))
+    : k.skapadAt;
+  const daysSince = (now - lastTs) / 86_400_000;
+  if (daysSince > 21) return "red";
+  if (ns && ns.datum <= now + 7 * 86_400_000) return "green";
+  if (daysSince <= 7) return "green";
+  if (daysSince <= 21) return "amber";
+  return "none";
+}
+
+function priorityScore(k: Kontakt): number {
+  const ns = k.nastaSteg;
+  const now = Date.now();
+  if (ns && ns.datum < now) return 0;
+  if (ns && ns.datum <= now + 86_400_000) return 1;
+  if (ns && ns.datum <= now + 7 * 86_400_000) return 2;
+  const lastTs = k.aktiviteter.length > 0
+    ? Math.max(...k.aktiviteter.map((a) => a.tidpunkt))
+    : k.skapadAt;
+  const daysSince = (now - lastTs) / 86_400_000;
+  if (daysSince > 21) return 3;
+  if (ns) return 4;
+  return 5;
+}
+
 function nastaStegBadge(k: Kontakt) {
   const ns = k.nastaSteg;
   if (!ns) return null;
@@ -82,6 +114,7 @@ function KunderPage() {
   const [tick, setTick] = useState(0);
   const [q, setQ] = useState("");
   const [roll, setRoll] = useState<RollFilter>("alla");
+  const [sort, setSort] = useState<SortMode>("prioritet");
   const [dialogOpen, setDialogOpen] = useState(false);
 
   const { kontakter, counts } = useMemo(() => {
@@ -107,8 +140,26 @@ function KunderPage() {
       );
     }
 
+    if (sort === "prioritet") {
+      filtered = [...filtered].sort((a, b) => {
+        const diff = priorityScore(a) - priorityScore(b);
+        if (diff !== 0) return diff;
+        return (a.nastaSteg?.datum ?? a.skapadAt) - (b.nastaSteg?.datum ?? b.skapadAt);
+      });
+    } else if (sort === "az") {
+      filtered = [...filtered].sort((a, b) =>
+        `${a.fornamn} ${a.efternamn}`.localeCompare(`${b.fornamn} ${b.efternamn}`, "sv")
+      );
+    } else {
+      filtered = [...filtered].sort((a, b) => {
+        const la = a.aktiviteter.length > 0 ? Math.max(...a.aktiviteter.map((x) => x.tidpunkt)) : a.skapadAt;
+        const lb = b.aktiviteter.length > 0 ? Math.max(...b.aktiviteter.map((x) => x.tidpunkt)) : b.skapadAt;
+        return lb - la;
+      });
+    }
+
     return { kontakter: filtered, counts };
-  }, [q, roll, tick]);
+  }, [q, roll, sort, tick]);
 
   function onSaved(id: string) {
     setDialogOpen(false);
@@ -157,7 +208,7 @@ function KunderPage() {
           ))}
         </div>
 
-        <div className="mb-6">
+        <div className="mb-6 flex flex-wrap items-center gap-3">
           <input
             type="text"
             value={q}
@@ -165,6 +216,17 @@ function KunderPage() {
             placeholder="Sök namn, telefon, e-post eller ort…"
             className="w-full max-w-sm rounded-lg border border-input bg-background px-4 py-2.5 text-sm placeholder:text-muted-foreground/50 focus:border-primary focus:outline-none"
           />
+          <div className="flex items-center gap-0.5 rounded-lg border border-white/[0.08] bg-white/[0.02] p-1">
+            {(["prioritet", "az", "senast"] as SortMode[]).map((s) => (
+              <button
+                key={s}
+                onClick={() => setSort(s)}
+                className={["rounded-md px-3 py-1 text-[11px] transition-colors", sort === s ? "bg-white/[0.08] text-foreground" : "text-muted-foreground hover:text-foreground"].join(" ")}
+              >
+                {s === "prioritet" ? "Prioritet" : s === "az" ? "A–Ö" : "Senast aktiv"}
+              </button>
+            ))}
+          </div>
         </div>
 
         {kontakter.length === 0 ? (
@@ -192,11 +254,19 @@ function KunderPage() {
                   params={{ id: k.id }}
                   className="flex items-center gap-4 rounded-xl border border-white/[0.07] bg-card/60 p-4 backdrop-blur-sm transition-all hover:border-primary/30 hover:bg-card/80"
                 >
-                  <div
-                    className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-primary/15 text-sm font-medium text-primary"
-                    style={serif}
-                  >
-                    {initials(k)}
+                  <div className="relative flex-shrink-0">
+                    <div
+                      className="flex h-11 w-11 items-center justify-center rounded-full bg-primary/15 text-sm font-medium text-primary"
+                      style={serif}
+                    >
+                      {initials(k)}
+                    </div>
+                    {(() => {
+                      const w = warmthLevel(k);
+                      if (w === "none") return null;
+                      const dot = w === "green" ? "bg-emerald-400" : w === "amber" ? "bg-amber-400" : "bg-red-400";
+                      return <span className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-card ${dot}`} />;
+                    })()}
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="truncate font-medium text-foreground" style={serif}>
