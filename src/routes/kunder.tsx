@@ -132,9 +132,15 @@ function KunderPage() {
 
     if (q.trim()) {
       const lq = q.toLowerCase();
+      const normTel = (t: string) => {
+        let s = t.replace(/[\s\-()+.]/g, "");
+        if (s.startsWith("46") && s.length >= 11) s = "0" + s.slice(2);
+        return s;
+      };
+      const qTel = normTel(q);
       filtered = filtered.filter((k) =>
         `${k.fornamn} ${k.efternamn}`.toLowerCase().includes(lq) ||
-        k.telefon.includes(lq) ||
+        normTel(k.telefon).includes(qTel) ||
         k.epost.toLowerCase().includes(lq) ||
         k.ort.toLowerCase().includes(lq)
       );
