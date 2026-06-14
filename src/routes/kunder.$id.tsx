@@ -65,6 +65,7 @@ function KontaktDetailPage() {
   const [kontakt, setKontakt] = useState<Kontakt | null>(null);
   const [tab, setTab] = useState<Tab>("historik");
   const [editMode, setEditMode] = useState(false);
+  const [logSamtalOpen, setLogSamtalOpen] = useState(false);
 
   function load() {
     const k = getKontakt(id);
@@ -117,7 +118,7 @@ function KontaktDetailPage() {
                 {kontakt.ort ? ` · ${kontakt.ort}` : ""}
               </p>
               {/* Quick actions — extra handy on mobile */}
-              <div className="mt-2 flex gap-2">
+              <div className="mt-2 flex flex-wrap gap-2">
                 {kontakt.telefon && (
                   <a
                     href={`tel:${kontakt.telefon.replace(/\s/g, "")}`}
@@ -134,6 +135,12 @@ function KontaktDetailPage() {
                     ✉️ Mejl
                   </a>
                 )}
+                <button
+                  onClick={() => setLogSamtalOpen(true)}
+                  className="inline-flex items-center gap-1 rounded-lg bg-foreground/[0.06] px-3 py-1.5 text-[11px] font-medium text-muted-foreground hover:bg-foreground/[0.10] hover:text-foreground"
+                >
+                  📋 Logg samtal
+                </button>
               </div>
             </div>
           </div>
@@ -196,7 +203,86 @@ function KontaktDetailPage() {
           </div>
         </div>
       </div>
+      {logSamtalOpen && (
+        <LoggaSamtalModal
+          kontaktId={kontakt.id}
+          namn={`${kontakt.fornamn} ${kontakt.efternamn}`}
+          onClose={() => setLogSamtalOpen(false)}
+          onSaved={() => { load(); setLogSamtalOpen(false); setTab("historik"); }}
+        />
+      )}
     </AppShell>
+  );
+}
+
+/* ─── Logg samtal modal ─── */
+function LoggaSamtalModal({ kontaktId, namn, onClose, onSaved }: {
+  kontaktId: string; namn: string; onClose: () => void; onSaved: () => void;
+}) {
+  const [text, setText] = useState("");
+  const [outcome, setOutcome] = useState<"intresserad" | "ej_intresserad" | "boka_mote" | "annat">("intresserad");
+  const outcomes = [
+    { id: "intresserad" as const, label: "Intresserad" },
+    { id: "ej_intresserad" as const, label: "Ej intresserad nu" },
+    { id: "boka_mote" as const, label: "Boka möte" },
+    { id: "annat" as const, label: "Annat" },
+  ];
+
+  function handleSave() {
+    const outcomeLabel = outcomes.find((o) => o.id === outcome)?.label ?? "";
+    addAktivitet(kontaktId, {
+      typ: "samtal",
+      tidpunkt: Date.now(),
+      beskrivning: [outcomeLabel, text.trim()].filter(Boolean).join(" — "),
+    });
+    onSaved();
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4 sm:items-center" onClick={onClose}>
+      <div className="w-full max-w-md rounded-2xl bg-card p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-base font-semibold text-foreground">Logg samtal — {namn}</h2>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground">✕</button>
+        </div>
+
+        <div className="mb-4">
+          <p className="mb-2 text-xs font-medium text-muted-foreground">Utfall</p>
+          <div className="grid grid-cols-2 gap-2">
+            {outcomes.map((o) => (
+              <button
+                key={o.id}
+                onClick={() => setOutcome(o.id)}
+                className={[
+                  "rounded-lg border px-3 py-2 text-xs font-medium transition-colors text-left",
+                  outcome === o.id ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:border-primary/50",
+                ].join(" ")}
+              >
+                {o.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <textarea
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder="Anteckning (valfritt)…"
+          rows={3}
+          autoFocus
+          className="w-full resize-none rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/50 focus:border-primary focus:outline-none"
+        />
+
+        <div className="mt-4 flex gap-2">
+          <button onClick={onClose} className="flex-1 rounded-lg border border-border px-4 py-2 text-sm text-muted-foreground hover:bg-muted/50">
+            Avbryt
+          </button>
+          <button onClick={handleSave} className="flex-1 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90">
+            Spara samtal
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
