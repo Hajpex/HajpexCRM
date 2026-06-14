@@ -47,7 +47,7 @@ const PIPELINE_COLS: { id: string; label: string; statuses: Status[]; accent: st
   { id: "kommande", label: "Kommande",  statuses: ["Redo (Kommande)"],                         accent: "text-primary border-primary/25 bg-primary/[0.06]" },
   { id: "tillsalu", label: "Till salu", statuses: ["Till salu"],                               accent: "text-emerald-400 border-emerald-400/25 bg-emerald-400/[0.06]" },
   { id: "vilande",  label: "Vilande",   statuses: ["Vilande"],                                 accent: "text-amber-400 border-amber-400/25 bg-amber-400/[0.06]" },
-  { id: "sald",     label: "Såld",      statuses: ["Såld", "Arkiverad"],                       accent: "text-muted-foreground border-white/10 bg-white/[0.02]" },
+  { id: "sald",     label: "Såld",      statuses: ["Såld", "Arkiverad"],                       accent: "text-muted-foreground border-border bg-muted/30" },
 ];
 
 function ObjektListPage() {
@@ -93,7 +93,7 @@ function ObjektListPage() {
         </section>
 
         {/* Smart search */}
-        <div className="mb-4 flex items-center gap-3 rounded-xl border border-white/[0.07] bg-card/60 px-4 py-3 backdrop-blur-sm">
+        <div className="mb-4 flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 shadow-sm">
           <SearchIcon />
           <input
             value={query}
@@ -119,7 +119,7 @@ function ObjektListPage() {
                     "rounded-full border px-3 py-1 text-xs transition-colors",
                     active
                       ? "border-primary/40 bg-primary/10 text-primary"
-                      : "border-white/[0.08] bg-white/[0.02] text-muted-foreground hover:text-foreground",
+                      : "border-border bg-muted/30 text-muted-foreground hover:text-foreground",
                   ].join(" ")}
                 >
                   {v.label}
@@ -127,11 +127,11 @@ function ObjektListPage() {
               );
             })}
           </div>
-          <div className="flex items-center gap-1 rounded-lg border border-white/[0.08] bg-white/[0.02] p-1">
+          <div className="flex items-center gap-1 rounded-lg border border-border bg-muted/30 p-1">
             <button
               onClick={() => setViewMode("lista")}
               title="Lista"
-              className={["rounded-md px-2.5 py-1 text-xs transition-colors", viewMode === "lista" ? "bg-white/10 text-foreground" : "text-muted-foreground hover:text-foreground"].join(" ")}
+              className={["rounded-md px-2.5 py-1 text-xs transition-colors", viewMode === "lista" ? "bg-primary/10 text-foreground" : "text-muted-foreground hover:text-foreground"].join(" ")}
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
                 <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
@@ -140,7 +140,7 @@ function ObjektListPage() {
             <button
               onClick={() => setViewMode("pipeline")}
               title="Pipeline"
-              className={["rounded-md px-2.5 py-1 text-xs transition-colors", viewMode === "pipeline" ? "bg-white/10 text-foreground" : "text-muted-foreground hover:text-foreground"].join(" ")}
+              className={["rounded-md px-2.5 py-1 text-xs transition-colors", viewMode === "pipeline" ? "bg-primary/10 text-foreground" : "text-muted-foreground hover:text-foreground"].join(" ")}
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
                 <rect x="3" y="3" width="5" height="18" rx="1"/><rect x="10" y="3" width="5" height="18" rx="1"/><rect x="17" y="3" width="5" height="18" rx="1"/>
@@ -161,12 +161,12 @@ function ObjektListPage() {
 
         {/* Table */}
         {viewMode === "lista" && (
-        <section className="rounded-xl border border-white/[0.07] bg-card/60 p-6 backdrop-blur-sm shadow-[0_30px_60px_-30px_rgba(0,0,0,0.6)]">
+        <section className="rounded-xl border border-border bg-card p-6 shadow-sm">
           <div className="mb-3 flex items-center justify-between">
             <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">{filtered.length} träffar</div>
             <div className="flex gap-1 text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
-              <button className="rounded px-2 py-1 hover:bg-white/[0.04] hover:text-foreground">Exportera</button>
-              <button className="rounded px-2 py-1 hover:bg-white/[0.04] hover:text-foreground">Kolumner</button>
+              <button className="rounded px-2 py-1 hover:bg-muted/50 hover:text-foreground">Exportera</button>
+              <button className="rounded px-2 py-1 hover:bg-muted/50 hover:text-foreground">Kolumner</button>
             </div>
           </div>
           <div className="overflow-x-auto">
@@ -186,7 +186,7 @@ function ObjektListPage() {
               </thead>
               <tbody>
                 {filtered.map((o, i) => (
-                  <tr key={i} className="border-t border-white/[0.05] hover:bg-white/[0.015]">
+                  <tr key={i} className="border-t border-border/50 hover:bg-muted/20">
                     <td className="py-3 pr-3">
                       <Link
                         to="/objekt/$slug"
@@ -236,7 +236,7 @@ function PipelineView({ objects }: { objects: Objekt[] }) {
               </div>
               <div className="space-y-2.5">
                 {colObjs.length === 0 ? (
-                  <div className="rounded-xl border border-dashed border-white/[0.05] py-8 text-center text-xs text-muted-foreground/30">
+                  <div className="rounded-xl border border-dashed border-border/50 py-8 text-center text-xs text-muted-foreground/30">
                     Inga objekt
                   </div>
                 ) : (
@@ -260,15 +260,15 @@ function PipelineCard({ o }: { o: Objekt }) {
       to="/objekt/$slug"
       params={{ slug: slugifyAddr(o.adress) }}
       search={{ tab: undefined, q: undefined }}
-      className="group block rounded-xl border border-white/[0.07] bg-white/[0.025] p-3 transition-all hover:border-primary/30 hover:bg-white/[0.045] hover:shadow-[0_8px_24px_-8px_rgba(0,0,0,0.4)]"
+      className="group block rounded-xl border border-border bg-card p-3 transition-all hover:border-primary/30 hover:bg-primary/5 hover:shadow-md"
     >
       {thumb ? (
         <img
           src={thumb} alt={o.adress} loading="lazy"
-          className="mb-2.5 h-28 w-full rounded-lg border border-white/[0.06] object-cover group-hover:brightness-110 transition-all"
+          className="mb-2.5 h-28 w-full rounded-lg border border-border/50 object-cover group-hover:brightness-110 transition-all"
         />
       ) : (
-        <div className="mb-2.5 flex h-20 w-full items-center justify-center rounded-lg border border-dashed border-white/[0.07] bg-white/[0.015] text-muted-foreground/25">
+        <div className="mb-2.5 flex h-20 w-full items-center justify-center rounded-lg border border-dashed border-border bg-muted/20 text-muted-foreground/25">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
         </div>
       )}
@@ -302,7 +302,7 @@ function TypeChip({ label, active, onClick }: { label: string; active: boolean; 
         "rounded-md border px-2.5 py-1 text-[11px] transition-colors",
         active
           ? "border-primary/40 bg-primary/10 text-primary"
-          : "border-white/[0.06] bg-white/[0.015] text-muted-foreground hover:text-foreground",
+          : "border-border/50 bg-muted/20 text-muted-foreground hover:text-foreground",
       ].join(" ")}
     >
       {label}
@@ -313,7 +313,7 @@ function TypeChip({ label, active, onClick }: { label: string; active: boolean; 
 function Thumb({ src, alt }: { src: string | null; alt: string }) {
   if (!src) {
     return (
-      <div className="flex h-12 w-16 shrink-0 items-center justify-center rounded-md border border-dashed border-white/10 bg-white/[0.02] text-muted-foreground/50">
+      <div className="flex h-12 w-16 shrink-0 items-center justify-center rounded-md border border-dashed border-border bg-muted/30 text-muted-foreground/50">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
           <rect x="3" y="5" width="18" height="14" rx="2" /><circle cx="9" cy="11" r="1.5" /><path d="m21 17-5-5-9 9" />
         </svg>
@@ -325,20 +325,20 @@ function Thumb({ src, alt }: { src: string | null; alt: string }) {
       src={src}
       alt={alt}
       loading="lazy"
-      className="h-12 w-16 shrink-0 rounded-md border border-white/10 object-cover"
+      className="h-12 w-16 shrink-0 rounded-md border border-border object-cover"
     />
   );
 }
 
 function StatusPill({ status }: { status: Status }) {
   const tone =
-    status === "Till salu" ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-300"
-    : status === "Under intag" ? "border-blue-400/30 bg-blue-400/10 text-blue-300"
+    status === "Till salu" ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700"
+    : status === "Under intag" ? "border-blue-500/30 bg-blue-500/10 text-blue-700"
     : status === "Redo (Kommande)" ? "border-primary/40 bg-primary/10 text-primary"
-    : status === "Såld" ? "border-white/15 bg-white/[0.04] text-muted-foreground"
-    : status === "Vilande" ? "border-amber-400/30 bg-amber-400/10 text-amber-300"
-    : status === "Inget uppdrag" ? "border-white/10 bg-white/[0.025] text-muted-foreground/80"
-    : "border-white/15 bg-white/[0.04] text-muted-foreground";
+    : status === "Såld" ? "border-border bg-muted/50 text-muted-foreground"
+    : status === "Vilande" ? "border-amber-500/30 bg-amber-500/10 text-amber-700"
+    : status === "Inget uppdrag" ? "border-border bg-card text-muted-foreground/80"
+    : "border-border bg-muted/50 text-muted-foreground";
   return (
     <span className={`whitespace-nowrap rounded-full border px-2.5 py-0.5 text-[10px] uppercase tracking-[0.14em] ${tone}`}>
       {status}
@@ -348,7 +348,7 @@ function StatusPill({ status }: { status: Status }) {
 
 function SpekDots({ dots }: { dots: [number, number, number, number] }) {
   // varma, ljumna, kalla, övriga
-  const colors = ["bg-rose-400/20 text-rose-300", "bg-amber-400/20 text-amber-300", "bg-sky-400/20 text-sky-300", "bg-white/[0.04] text-muted-foreground"];
+  const colors = ["bg-rose-500/15 text-rose-700", "bg-amber-500/15 text-amber-700", "bg-sky-500/15 text-sky-700", "bg-muted/50 text-muted-foreground"];
   const labels = ["Heta", "Ljumna", "Kalla", "Övriga"];
   return (
     <div className="flex gap-1">

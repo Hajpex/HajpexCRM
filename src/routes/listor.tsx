@@ -131,7 +131,7 @@ function ListorPage() {
         </section>
 
         {/* Tabs */}
-        <div className="mb-6 flex flex-wrap gap-1 border-b border-white/[0.07]">
+        <div className="mb-6 flex flex-wrap gap-1 border-b border-border">
           {TABS.map((t) => {
             const active = tab === t.id;
             return (
@@ -152,7 +152,7 @@ function ListorPage() {
         </div>
 
         {/* Smart search */}
-        <div className="mb-4 flex items-center gap-3 rounded-xl border border-white/[0.07] bg-card/60 px-4 py-3 backdrop-blur-sm">
+        <div className="mb-4 flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 ">
           <SearchIcon />
           <input
             value={query}
@@ -160,7 +160,7 @@ function ListorPage() {
             placeholder={placeholder}
             className="flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground/70"
           />
-          <button className="hidden rounded-md border border-white/[0.08] px-2.5 py-1 text-[10px] uppercase tracking-[0.16em] text-muted-foreground hover:text-foreground md:inline-block">
+          <button className="hidden rounded-md border border-border px-2.5 py-1 text-[10px] uppercase tracking-[0.16em] text-muted-foreground hover:text-foreground md:inline-block">
             ⌘K
           </button>
           <button className="rounded-md bg-primary/10 px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/20">
@@ -180,7 +180,7 @@ function ListorPage() {
                   "rounded-full border px-3 py-1 text-xs transition-colors",
                   active
                     ? "border-primary/40 bg-primary/10 text-primary"
-                    : "border-white/[0.08] bg-white/[0.02] text-muted-foreground hover:text-foreground",
+                    : "border-border bg-muted/30 text-muted-foreground hover:text-foreground",
                 ].join(" ")}
               >
                 {v.label}
@@ -212,7 +212,7 @@ function IntagTable({ rows, q }: { rows: typeof intagsmoten; q: string }) {
   return (
     <TableShell head={["Adress", "Objektsstatus", "Säljare", "Mötesstatus", "Bokades", "Tid", "Källa"]} count={data.length}>
       {data.map((r, i) => (
-        <tr key={i} className="border-t border-white/[0.05] hover:bg-white/[0.015]">
+        <tr key={i} className="border-t border-border/50 hover:bg-muted/20">
           <td className="py-3 pr-4">
             <Link
               to="/objekt/$slug"
@@ -243,8 +243,8 @@ function UppgifterTable({ rows, q }: { rows: typeof uppgifter; q: string }) {
   return (
     <TableShell head={["", "Rubrik", "Kontakt", "Källa", "Skapad", "Förfaller"]} count={data.length}>
       {data.map((r, i) => (
-        <tr key={i} className="border-t border-white/[0.05] hover:bg-white/[0.015]">
-          <td className="py-3 pr-3"><input type="checkbox" className="h-3.5 w-3.5 rounded border-white/20 bg-transparent accent-primary" /></td>
+        <tr key={i} className="border-t border-border/50 hover:bg-muted/20">
+          <td className="py-3 pr-3"><input type="checkbox" className="h-3.5 w-3.5 rounded border-border bg-transparent accent-primary" /></td>
           <td className="py-3 pr-4 text-foreground">{r.rubrik}</td>
           <td className="py-3 pr-4 text-muted-foreground">{r.kontakt}</td>
           <td className="py-3 pr-4 text-xs text-muted-foreground">{r.kalla}</td>
@@ -261,7 +261,7 @@ function KontakterTable({ rows, q }: { rows: typeof kontakter; q: string }) {
   return (
     <TableShell head={["Förnamn", "Efternamn", "Gata", "Skapad", "Källa"]} count={data.length}>
       {data.map((r, i) => (
-        <tr key={i} className="border-t border-white/[0.05] hover:bg-white/[0.015]">
+        <tr key={i} className="border-t border-border/50 hover:bg-muted/20">
           <td className="py-3 pr-4 font-medium text-foreground">{r.fornamn}</td>
           <td className="py-3 pr-4 text-foreground">{r.efternamn}</td>
           <td className="py-3 pr-4 text-xs text-muted-foreground">{r.gata}</td>
@@ -278,12 +278,12 @@ function LeadsTable({ rows, q }: { rows: typeof leads; q: string }) {
   return (
     <TableShell head={["Rubrik", "Kontakt", "Källa", "Status", "Skapad", "Förfaller"]} count={data.length}>
       {data.map((r, i) => (
-        <tr key={i} className="border-t border-white/[0.05] hover:bg-white/[0.015]">
+        <tr key={i} className="border-t border-border/50 hover:bg-muted/20">
           <td className="py-3 pr-4 text-foreground">{r.rubrik}</td>
           <td className="py-3 pr-4 text-muted-foreground">{r.kontakt}</td>
           <td className="py-3 pr-4 text-xs text-muted-foreground">{r.kalla}</td>
           <td className="py-3 pr-4">
-            <span className="rounded-full border border-white/15 bg-white/[0.04] px-2.5 py-0.5 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+            <span className="rounded-full border border-border bg-muted/50 px-2.5 py-0.5 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
               {r.status}
             </span>
           </td>
@@ -301,8 +301,8 @@ function TableShell({ head, count, children }: { head: string[]; count: number; 
       <div className="mb-3 flex items-center justify-between">
         <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">{count} träffar</div>
         <div className="flex gap-1 text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
-          <button className="rounded px-2 py-1 hover:bg-white/[0.04] hover:text-foreground">Exportera</button>
-          <button className="rounded px-2 py-1 hover:bg-white/[0.04] hover:text-foreground">Kolumner</button>
+          <button className="rounded px-2 py-1 hover:bg-muted/50 hover:text-foreground">Exportera</button>
+          <button className="rounded px-2 py-1 hover:bg-muted/50 hover:text-foreground">Kolumner</button>
         </div>
       </div>
       <div className="overflow-x-auto">
@@ -323,7 +323,7 @@ function TableShell({ head, count, children }: { head: string[]; count: number; 
 
 function Card({ children }: { children: ReactNode }) {
   return (
-    <section className="rounded-xl border border-white/[0.07] bg-card/60 p-6 backdrop-blur-sm shadow-[0_30px_60px_-30px_rgba(0,0,0,0.6)]">
+    <section className="rounded-xl border border-border bg-card p-6  shadow-sm">
       {children}
     </section>
   );
@@ -332,8 +332,8 @@ function Card({ children }: { children: ReactNode }) {
 function StatusPill({ label }: { label: string }) {
   const tone =
     label === "Till salu" ? "border-primary/40 bg-primary/10 text-primary"
-    : label === "Under intag" ? "border-blue-400/30 bg-blue-400/10 text-blue-300"
-    : "border-white/15 bg-white/[0.04] text-muted-foreground";
+    : label === "Under intag" ? "border-blue-400/30 bg-blue-400/10 text-blue-700"
+    : "border-border bg-muted/50 text-muted-foreground";
   return (
     <span className={`rounded-full border px-2.5 py-0.5 text-[10px] uppercase tracking-[0.14em] ${tone}`}>
       {label}

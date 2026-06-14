@@ -862,7 +862,7 @@ function KontaktVäljarDialog({
   const roleLabel = { säljare: "säljare", köpare: "köpare", spekulant: "spekulant", kontakt: "kontakt" }[relation];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm"
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 "
       onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="relative w-full max-w-md rounded-2xl border border-white/[0.1] bg-card p-6 shadow-2xl">
         <button onClick={onClose} className="absolute right-5 top-5 text-xl text-muted-foreground hover:text-foreground">✕</button>
@@ -879,7 +879,7 @@ function KontaktVäljarDialog({
             <div className="py-8 text-center text-sm text-muted-foreground">Inga kontakter hittades</div>
           ) : filtered.map((k) => (
             <button key={k.id} onClick={() => link(k)}
-              className="flex w-full items-center gap-3 rounded-lg border border-white/[0.06] px-3 py-2.5 text-left hover:border-primary/40 hover:bg-primary/5">
+              className="flex w-full items-center gap-3 rounded-lg border border-border/50 px-3 py-2.5 text-left hover:border-primary/40 hover:bg-primary/5">
               <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-primary/15 text-xs font-medium text-primary">
                 {[k.fornamn[0], k.efternamn[0]].filter(Boolean).join("").toUpperCase() || "?"}
               </div>
@@ -890,7 +890,7 @@ function KontaktVäljarDialog({
             </button>
           ))}
         </div>
-        <div className="mt-4 border-t border-white/[0.06] pt-3 text-xs text-muted-foreground">
+        <div className="mt-4 border-t border-border/50 pt-3 text-xs text-muted-foreground">
           Finns inte kontakten? <Link to="/kunder" onClick={onClose} className="text-primary hover:underline">Lägg till i kundregistret →</Link>
         </div>
       </div>
@@ -951,7 +951,7 @@ function VardebevakareCard({ className }: { className?: string }) {
 
 function Placeholder({ tab }: { tab: string }) {
   return (
-    <div className="rounded-xl border border-border bg-card/60 p-12 text-center backdrop-blur-sm">
+    <div className="rounded-xl border border-border bg-card p-12 text-center ">
       <div className="text-xs uppercase tracking-[0.22em] text-primary/80">{tab}</div>
       <div className="mt-3 text-2xl" style={serif}>Kommer härnäst</div>
       <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
@@ -1022,7 +1022,7 @@ function SpekulanterTopView({ slug }: { slug: string }) {
   );
 
   return (
-    <div className="rounded-xl border border-border bg-card/80 p-6 shadow-[0_20px_50px_-30px_rgba(0,0,0,0.25)] backdrop-blur-sm">
+    <div className="rounded-xl border border-border bg-card/80 p-6 shadow-[0_20px_50px_-30px_rgba(0,0,0,0.25)] ">
       <div className="mb-5 flex items-center justify-between">
         <div>
           <div className="text-[10px] uppercase tracking-[0.22em] text-primary/70">Spekulanter</div>
@@ -1093,7 +1093,7 @@ function SpekulanterTopView({ slug }: { slug: string }) {
 
 function Card({ title, icon, action, onAction, className, children }: { title: string; icon?: string; action?: ReactNode; onAction?: () => void; className?: string; children: ReactNode }) {
   return (
-    <section className={["rounded-xl border border-border bg-card/80 p-5 shadow-[0_20px_50px_-30px_rgba(0,0,0,0.25)] backdrop-blur-sm", className].filter(Boolean).join(" ")}>
+    <section className={["rounded-xl border border-border bg-card/80 p-5 shadow-[0_20px_50px_-30px_rgba(0,0,0,0.25)] ", className].filter(Boolean).join(" ")}>
       <header className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-primary/70">
           {icon && <span>{icon}</span>}
@@ -1727,12 +1727,12 @@ function KopareView({ onTabChange }: { onTabChange?: (tab: SideTab) => void }) {
                       </td>
                       <td className="px-3 py-2 text-muted-foreground">{p.ort || "—"}</td>
                       <td className="px-3 py-2">
-                        <span className="rounded bg-emerald-500/15 px-2 py-0.5 text-[10px] text-emerald-300">BankID ✓</span>
+                        <span className="rounded bg-emerald-500/15 px-2 py-0.5 text-[10px] text-emerald-700">BankID ✓</span>
                       </td>
                       <td className="px-3 py-2">
                         <button
                           onClick={() => { removeObjektKoppling(p.id, slug, "köpare"); refresh(); }}
-                          className="text-xs text-rose-400 hover:text-rose-300"
+                          className="text-xs text-rose-400 hover:text-rose-700"
                         >
                           ✕
                         </button>
@@ -1822,7 +1822,7 @@ function TiSec({
             title={done ? "Klart – klicka för att avmarkera" : "Markera som klart"}
             className={`flex h-4 w-4 cursor-pointer items-center justify-center rounded-sm text-[10px] transition-colors ${
               done
-                ? "bg-emerald-500/25 text-emerald-300 hover:bg-emerald-500/35"
+                ? "bg-emerald-500/25 text-emerald-700 hover:bg-emerald-500/35"
                 : "border border-border bg-transparent text-transparent hover:border-emerald-500/60 hover:text-emerald-400/50"
             }`}
           >
@@ -1925,9 +1925,9 @@ type DokRow = { n: string; meta?: string; tag: string; tagCls: string; created: 
 function getDokDocuments(isBrf: boolean): DokRow[] {
   const typLabel = isBrf ? "Bostadsrätt" : "Fastighet";
   return [
-    { n: "Frågelistan", meta: "Import från kundenssida  Import från kundenssida", tag: "Licensdokument", tagCls: "bg-sky-500/15 text-sky-300", created: "2026-06-11", updated: "2026-06-12" },
-    { n: `Förmedlingsuppdrag - ${typLabel}`, meta: "MSF 1.2  1.0", tag: "Licensdokument", tagCls: "bg-sky-500/15 text-sky-300", created: "2026-05-27", updated: "2026-05-27" },
-    { n: `Intag - ${typLabel.toLowerCase()}`, meta: "Mspecs  1.0", tag: "MSF dokument", tagCls: "bg-amber-500/15 text-amber-300", created: "2026-05-27", updated: "2026-05-27" },
+    { n: "Frågelistan", meta: "Import från kundenssida  Import från kundenssida", tag: "Licensdokument", tagCls: "bg-sky-500/15 text-sky-700", created: "2026-06-11", updated: "2026-06-12" },
+    { n: `Förmedlingsuppdrag - ${typLabel}`, meta: "MSF 1.2  1.0", tag: "Licensdokument", tagCls: "bg-sky-500/15 text-sky-700", created: "2026-05-27", updated: "2026-05-27" },
+    { n: `Intag - ${typLabel.toLowerCase()}`, meta: "Mspecs  1.0", tag: "MSF dokument", tagCls: "bg-amber-500/15 text-amber-700", created: "2026-05-27", updated: "2026-05-27" },
   ];
 }
 
@@ -1964,7 +1964,7 @@ function DokSection({
 }
 
 function FileIcon({ ext }: { ext: "pdf" | "png" }) {
-  const cls = ext === "pdf" ? "bg-red-500/20 text-red-300" : "bg-emerald-500/20 text-emerald-300";
+  const cls = ext === "pdf" ? "bg-red-500/20 text-red-300" : "bg-emerald-500/20 text-emerald-700";
   return <span className={`inline-flex h-7 w-6 items-center justify-center rounded-sm text-[9px] font-bold uppercase ${cls}`}>{ext}</span>;
 }
 
@@ -2547,7 +2547,7 @@ function TiEfterarbeteBody() {
                 <td className="px-3 py-2 text-muted-foreground">📞 {s.tel}</td>
                 <td className="px-3 py-2 text-muted-foreground">{s.mail} ✉</td>
                 <td className="px-3 py-2 text-muted-foreground">{s.adr}</td>
-                <td className="px-3 py-2"><span className="rounded bg-emerald-500/15 px-2 py-0.5 text-[10px] text-emerald-300">BankID ✓</span></td>
+                <td className="px-3 py-2"><span className="rounded bg-emerald-500/15 px-2 py-0.5 text-[10px] text-emerald-700">BankID ✓</span></td>
                 <td className="px-3 py-2">{s.ks}</td>
                 <td className="px-3 py-2 text-muted-foreground">⚙</td>
               </tr>
@@ -2841,7 +2841,7 @@ function TjansterBody() {
             <div key={a.name} className="rounded-md border border-border bg-background/40 p-3">
               <div className="mb-2 flex items-center justify-between">
                 <div className="font-medium">{a.name}</div>
-                <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] text-emerald-300">{a.status}</span>
+                <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] text-emerald-700">{a.status}</span>
               </div>
               <div className="mb-2 text-xs text-muted-foreground">{a.desc}</div>
               <div className="text-[11px] text-muted-foreground">Senast updaterad: {a.d}</div>
@@ -3020,7 +3020,7 @@ function OiSec({
             onClick={(e) => { e.stopPropagation(); onToggleDone?.(id); }}
             className={`flex h-4 w-4 cursor-pointer items-center justify-center rounded-sm text-[10px] transition-colors ${
               done
-                ? "bg-emerald-500/25 text-emerald-300 hover:bg-emerald-500/35"
+                ? "bg-emerald-500/25 text-emerald-700 hover:bg-emerald-500/35"
                 : "border border-border bg-transparent text-transparent hover:border-emerald-500/60 hover:text-emerald-400/50"
             }`}
           >
@@ -3423,7 +3423,7 @@ function KoSec({
             title={done ? "Klart – klicka för att avmarkera" : "Markera som klart"}
             className={`flex h-4 w-4 cursor-pointer items-center justify-center rounded-sm text-[10px] transition-colors ${
               done
-                ? "bg-emerald-500/25 text-emerald-300 hover:bg-emerald-500/35"
+                ? "bg-emerald-500/25 text-emerald-700 hover:bg-emerald-500/35"
                 : "border border-border bg-transparent text-transparent hover:border-emerald-500/60 hover:text-emerald-400/50"
             }`}
           >
@@ -3744,7 +3744,7 @@ function BuSec({
             title={done ? "Klart – klicka för att avmarkera" : "Markera som klart"}
             className={`flex h-4 w-4 cursor-pointer items-center justify-center rounded-sm text-[10px] transition-colors ${
               done
-                ? "bg-emerald-500/25 text-emerald-300 hover:bg-emerald-500/35"
+                ? "bg-emerald-500/25 text-emerald-700 hover:bg-emerald-500/35"
                 : "border border-border bg-transparent text-transparent hover:border-emerald-500/60 hover:text-emerald-400/50"
             }`}
           >
@@ -3904,7 +3904,7 @@ function LäggTillBudDialog({ slug, onClose, onSaved }: { slug: string; onClose:
   const canSave = namn.trim().length > 0 && parseInt(beloppRaw.replace(/\D/g, ""), 10) > 0;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm"
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 "
       onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="relative w-full max-w-md rounded-2xl border border-white/[0.1] bg-card p-6 shadow-2xl">
         <button onClick={onClose} className="absolute right-5 top-5 text-xl text-muted-foreground hover:text-foreground">✕</button>
@@ -4528,7 +4528,7 @@ function MaSec({
             title={done ? "Klart – klicka för att avmarkera" : "Markera som klart"}
             className={`flex h-4 w-4 cursor-pointer items-center justify-center rounded-sm text-[10px] transition-colors ${
               done
-                ? "bg-emerald-500/25 text-emerald-300 hover:bg-emerald-500/35"
+                ? "bg-emerald-500/25 text-emerald-700 hover:bg-emerald-500/35"
                 : "border border-border bg-transparent text-transparent hover:border-emerald-500/60 hover:text-emerald-400/50"
             }`}
           >
@@ -4817,7 +4817,7 @@ function MaPubliceraBody() {
               <div className="font-medium">SkandiaMäklarna</div>
               <div className="mt-2 grid grid-cols-[160px_1fr] gap-y-1 text-sm">
                 <span className="text-muted-foreground">Nuvarande status:</span>
-                <span><span className="rounded bg-emerald-500/15 px-2 py-0.5 text-[10px] uppercase text-emerald-300">Förhandsgranskning</span></span>
+                <span><span className="rounded bg-emerald-500/15 px-2 py-0.5 text-[10px] uppercase text-emerald-700">Förhandsgranskning</span></span>
                 <span className="text-muted-foreground">Publicerad:</span><span>2026-06-12 10:09</span>
                 <span className="text-muted-foreground">Senast uppdaterad:</span><span>2026-06-12 13:40</span>
               </div>
@@ -4985,12 +4985,12 @@ function SaljareView({ onTabChange }: { onTabChange: (tab: SideTab) => void }) {
                           {p.epost ? <a href={`mailto:${p.epost}`} className="hover:text-primary">{p.epost} ✉</a> : "—"}
                         </td>
                         <td className="px-3 py-2 text-muted-foreground">{[p.adress, p.ort].filter(Boolean).join(", ") || "—"}</td>
-                        <td className="px-3 py-2"><span className="rounded bg-emerald-500/15 px-2 py-0.5 text-[10px] text-emerald-300">BankID ✓</span></td>
+                        <td className="px-3 py-2"><span className="rounded bg-emerald-500/15 px-2 py-0.5 text-[10px] text-emerald-700">BankID ✓</span></td>
                         <td className="px-3 py-2">Ja</td>
                         <td className="px-3 py-2">
                           <button
                             onClick={() => { removeObjektKoppling(p.id, slug, "säljare"); refreshSaljare(); }}
-                            className="text-xs text-rose-400 hover:text-rose-300"
+                            className="text-xs text-rose-400 hover:text-rose-700"
                             title="Ta bort koppling"
                           >
                             ✕
@@ -5024,7 +5024,7 @@ function SaljareView({ onTabChange }: { onTabChange: (tab: SideTab) => void }) {
                           {s.mail ? <a href={`mailto:${s.mail}`} className="hover:text-primary">{s.mail} ✉</a> : "—"}
                         </td>
                         <td className="px-3 py-2 text-muted-foreground">{s.adr}</td>
-                        <td className="px-3 py-2"><span className="rounded bg-emerald-500/15 px-2 py-0.5 text-[10px] text-emerald-300">BankID ✓</span></td>
+                        <td className="px-3 py-2"><span className="rounded bg-emerald-500/15 px-2 py-0.5 text-[10px] text-emerald-700">BankID ✓</span></td>
                         <td className="px-3 py-2">{s.ks}</td>
                         <td className="px-3 py-2 text-muted-foreground">⚙</td>
                       </tr>

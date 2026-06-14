@@ -336,11 +336,11 @@ function ObjektsformularPage() {
           </div>
           <div className="flex items-center gap-6 text-xs uppercase tracking-[0.18em] text-muted-foreground">
             <Stat label="Rum" value={String(rooms.length)} />
-            <div className="h-8 w-px bg-white/10" />
+            <div className="h-8 w-px bg-muted/60" />
             <Stat label="Bilder" value={String(totalImages)} />
-            <div className="h-8 w-px bg-white/10" />
+            <div className="h-8 w-px bg-muted/60" />
             <Stat label="Fält" value={String(filledFields)} />
-            <div className="h-8 w-px bg-white/10" />
+            <div className="h-8 w-px bg-muted/60" />
             <div className="flex flex-col items-end gap-1">
               <button
                 type="button"
@@ -367,7 +367,7 @@ function ObjektsformularPage() {
                     "rounded-full border px-5 py-2 text-sm font-medium transition-all",
                     active
                       ? "border-primary bg-primary text-primary-foreground shadow-[0_0_30px_-8px_var(--primary)]"
-                      : "border-white/10 bg-white/[0.02] text-muted-foreground hover:border-primary/40 hover:text-foreground",
+                      : "border-border bg-muted/30 text-muted-foreground hover:border-primary/40 hover:text-foreground",
                   ].join(" ")}>
                   {TYP_LABELS[t]}
                 </button>
@@ -386,14 +386,14 @@ function ObjektsformularPage() {
             <Field label="Postnummer och ort" value={grund.ort} onChange={(v) => setGrund({ ...grund, ort: v })} placeholder="T.ex. 123 45 Stockholm" />
             <Field label="Område / stadsdel" value={grund.omrade} onChange={(v) => setGrund({ ...grund, omrade: v })} placeholder="T.ex. Södermalm" />
           </Grid>
-          <Grid cols={4} className="mt-6 border-t border-white/[0.06] pt-6">
+          <Grid cols={4} className="mt-6 border-t border-border/50 pt-6">
             <FieldNumber label="Utgångspris (SEK)" value={grund.pris} onChange={(v) => setGrund({ ...grund, pris: v })} />
             <Field label="Boarea (kvm)" value={grund.boarea} onChange={(v) => setGrund({ ...grund, boarea: v })} type="number" />
             <Field label="Antal rum" value={grund.rum} onChange={(v) => setGrund({ ...grund, rum: v })} type="number" />
             <FieldNumber label={type === "brf" ? "Månadsavgift (SEK)" : "Driftkostnad/år (SEK)"} value={grund.avgift}
               onChange={(v) => setGrund({ ...grund, avgift: v })} />
           </Grid>
-          <Grid cols={2} className="mt-6 border-t border-white/[0.06] pt-6">
+          <Grid cols={2} className="mt-6 border-t border-border/50 pt-6">
             <Field label={type === "brf" ? "Bostadsrättsförening" : "Fastighetsbeteckning"} value={grund.forening}
               onChange={(v) => setGrund({ ...grund, forening: v })} />
             <Field label="Övrigt att lyfta" value={grund.nyckelord}
@@ -405,7 +405,7 @@ function ObjektsformularPage() {
           <Card>
             <SectionTitle eyebrow="03" title="Bostadsrättsförening"
               subtitle="All info om föreningen — visas bara för bostadsrätter." />
-            <div className="mb-6 rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
+            <div className="mb-6 rounded-xl border border-border/50 bg-muted/30 p-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <div className="text-sm font-medium text-foreground">Föreningskort</div>
@@ -419,7 +419,7 @@ function ObjektsformularPage() {
                   <button
                     type="button"
                     onClick={newBrf}
-                    className="rounded-lg border border-white/10 px-3 py-1.5 text-xs text-foreground hover:bg-white/5"
+                    className="rounded-lg border border-border px-3 py-1.5 text-xs text-foreground hover:bg-white/5"
                   >
                     Ny förening
                   </button>
@@ -443,7 +443,7 @@ function ObjektsformularPage() {
                   className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/60 outline-none focus:ring-2 focus:ring-primary/40"
                 />
                 {brfPickerOpen && (
-                  <div className="absolute z-20 mt-1 max-h-72 w-full overflow-auto rounded-lg border border-white/10 bg-popover shadow-lg">
+                  <div className="absolute z-20 mt-1 max-h-72 w-full overflow-auto rounded-lg border border-border bg-popover shadow-lg">
                     {brfMatches.length === 0 ? (
                       <div className="px-3 py-3 text-xs text-muted-foreground">
                         Inga sparade föreningar{brfQuery ? " matchar din sökning" : " ännu"}.
@@ -503,17 +503,17 @@ function ObjektsformularPage() {
               <Field label="Tomtarea (kvm)" value={byggnad.tomt} onChange={(v) => setByggnad({ ...byggnad, tomt: v })} />
               <Field label="Biarea (kvm)" value={byggnad.biarea} onChange={(v) => setByggnad({ ...byggnad, biarea: v })} type="number" />
             </Grid>
-            <Grid cols={3} className="mt-6 border-t border-white/[0.06] pt-6">
+            <Grid cols={3} className="mt-6 border-t border-border/50 pt-6">
               <Field label="Uppvärmning" value={byggnad.varme} onChange={(v) => setByggnad({ ...byggnad, varme: v })} />
               <Field label="Fasad" value={byggnad.fasad} onChange={(v) => setByggnad({ ...byggnad, fasad: v })} />
               <Field label="Fönster" value={byggnad.fonster} onChange={(v) => setByggnad({ ...byggnad, fonster: v })} />
             </Grid>
-            <Grid cols={3} className="mt-6 border-t border-white/[0.06] pt-6">
+            <Grid cols={3} className="mt-6 border-t border-border/50 pt-6">
               <Field label="Vatten & avlopp" value={byggnad.vatten} onChange={(v) => setByggnad({ ...byggnad, vatten: v })} />
               <Field label="El / kabel" value={byggnad.el} onChange={(v) => setByggnad({ ...byggnad, el: v })} />
               <Field label="Ventilation" value={byggnad.ventilation} onChange={(v) => setByggnad({ ...byggnad, ventilation: v })} />
             </Grid>
-            <div className="mt-6 border-t border-white/[0.06] pt-6">
+            <div className="mt-6 border-t border-border/50 pt-6">
               <FieldTextarea label="Övrigt om byggnaden" value={byggnad.ovrigt} onChange={(v) => setByggnad({ ...byggnad, ovrigt: v })} />
             </div>
           </Card>
@@ -527,7 +527,7 @@ function ObjektsformularPage() {
           />
 
           {customFields.length === 0 ? (
-            <div className="mb-5 rounded-xl border border-dashed border-white/10 bg-black/20 px-5 py-8 text-center text-sm text-muted-foreground">
+            <div className="mb-5 rounded-xl border border-dashed border-border bg-black/20 px-5 py-8 text-center text-sm text-muted-foreground">
               Inga egna fält tillagda än.
             </div>
           ) : (
@@ -535,7 +535,7 @@ function ObjektsformularPage() {
               {customFields.map((c) => (
                 <div
                   key={c.id}
-                  className="rounded-xl border border-white/[0.08] bg-white/[0.02] p-4"
+                  className="rounded-xl border border-border bg-muted/30 p-4"
                 >
                   <div className="grid gap-3 md:grid-cols-[1fr_2fr_auto] md:items-start">
                     <input
@@ -555,13 +555,13 @@ function ObjektsformularPage() {
                     <button
                       type="button"
                       onClick={() => removeCustomField(c.id)}
-                      className="self-start rounded-lg border border-white/10 px-3 py-2 text-xs text-muted-foreground hover:bg-white/5 hover:text-foreground"
+                      className="self-start rounded-lg border border-border px-3 py-2 text-xs text-muted-foreground hover:bg-white/5 hover:text-foreground"
                       aria-label="Ta bort fält"
                     >
                       Ta bort
                     </button>
                   </div>
-                  <div className="mt-3 flex flex-wrap gap-4 border-t border-white/[0.06] pt-3">
+                  <div className="mt-3 flex flex-wrap gap-4 border-t border-border/50 pt-3">
                     <label className="flex cursor-pointer items-center gap-2 text-xs text-foreground">
                       <input
                         type="checkbox"
@@ -597,7 +597,7 @@ function ObjektsformularPage() {
                 key={preset}
                 type="button"
                 onClick={() => addCustomField(preset)}
-                className="rounded-full border border-white/10 bg-white/[0.03] px-3.5 py-1.5 text-xs font-medium text-foreground transition-all hover:border-primary/50 hover:bg-primary/10 hover:text-primary"
+                className="rounded-full border border-border bg-muted/40 px-3.5 py-1.5 text-xs font-medium text-foreground transition-all hover:border-primary/50 hover:bg-primary/10 hover:text-primary"
               >
                 + {preset}
               </button>
@@ -621,12 +621,12 @@ function ObjektsformularPage() {
           />
 
           {/* Quick-add */}
-          <div className="mb-6 rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
+          <div className="mb-6 rounded-xl border border-border/50 bg-muted/30 p-5">
             <MiniLabel className="mb-3">Snabblägg till</MiniLabel>
             <div className="flex flex-wrap gap-2">
               {QUICK_ROOMS.map((name) => (
                 <button key={name} onClick={() => addRoom(name)}
-                  className="rounded-full border border-white/10 bg-white/[0.03] px-3.5 py-1.5 text-xs font-medium text-foreground transition-all hover:border-primary/50 hover:bg-primary/10 hover:text-primary">
+                  className="rounded-full border border-border bg-muted/40 px-3.5 py-1.5 text-xs font-medium text-foreground transition-all hover:border-primary/50 hover:bg-primary/10 hover:text-primary">
                   + {name}
                 </button>
               ))}
@@ -638,7 +638,7 @@ function ObjektsformularPage() {
           </div>
 
           {rooms.length === 0 ? (
-            <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-white/10 bg-black/20 px-6 py-16 text-center">
+            <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border bg-black/20 px-6 py-16 text-center">
               <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full border border-primary/30 bg-primary/10 text-primary">
                 <UploadIcon />
               </div>
@@ -706,7 +706,7 @@ function RoomCard({
   );
 
   return (
-    <div className="overflow-hidden rounded-xl border border-white/[0.07] bg-white/[0.015]">
+    <div className="overflow-hidden rounded-xl border border-border bg-muted/20">
       {/* Header */}
       <div className="flex flex-wrap items-center gap-3 border-b border-white/5 px-5 py-4">
         <span className="font-mono text-xs text-primary/70">{String(index).padStart(2, "0")}</span>
@@ -735,7 +735,7 @@ function RoomCard({
                   className={[
                     "rounded-md border px-2.5 py-1 text-[11px] transition-colors",
                     active ? "border-primary bg-primary/15 text-primary"
-                           : "border-white/10 bg-white/[0.02] text-muted-foreground hover:border-white/20 hover:text-foreground",
+                           : "border-border bg-muted/30 text-muted-foreground hover:border-border hover:text-foreground",
                   ].join(" ")}>
                   {f}
                 </button>
@@ -745,7 +745,7 @@ function RoomCard({
 
           <MiniLabel className="mt-5">Anteckningar</MiniLabel>
           <textarea
-            className="mt-2 min-h-[140px] w-full resize-y rounded-lg border border-white/10 bg-white/[0.03] px-3.5 py-3 text-sm placeholder:text-muted-foreground/50 focus:border-primary focus:outline-none"
+            className="mt-2 min-h-[140px] w-full resize-y rounded-lg border border-border bg-muted/40 px-3.5 py-3 text-sm placeholder:text-muted-foreground/50 focus:border-primary focus:outline-none"
             value={room.notes}
             onChange={(e) => onPatch({ notes: e.target.value })}
             placeholder="Material, renoveringsår, mått, utrustning... AI-texten klistras in här."
@@ -756,7 +756,7 @@ function RoomCard({
         <div>
           <MiniLabel>Foton</MiniLabel>
           {room.images.length === 0 ? (
-            <label className="mt-2 flex cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-white/15 bg-white/[0.02] px-5 py-8 text-center transition-colors hover:border-primary/50 hover:bg-primary/[0.04]">
+            <label className="mt-2 flex cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-border bg-muted/30 px-5 py-8 text-center transition-colors hover:border-primary/50 hover:bg-primary/[0.04]">
               <input type="file" multiple accept="image/*" className="hidden"
                 onChange={(e) => { onUpload(e.target.files); e.currentTarget.value = ""; }} />
               <UploadIcon />
@@ -767,14 +767,14 @@ function RoomCard({
             <div className="mt-2 space-y-3">
               <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
                 {room.images.map((img) => (
-                  <div key={img.id} className="group relative aspect-square overflow-hidden rounded-md border border-white/10 bg-black/30">
+                  <div key={img.id} className="group relative aspect-square overflow-hidden rounded-md border border-border bg-black/30">
                     <img src={img.dataUrl} alt={img.name} className="h-full w-full object-cover" />
                     <button onClick={() => onRemoveImage(img.id)}
                       className="absolute right-1 top-1 hidden h-6 w-6 items-center justify-center rounded-full bg-black/70 text-xs text-white group-hover:flex"
                       aria-label="Ta bort bild">×</button>
                   </div>
                 ))}
-                <label className="flex aspect-square cursor-pointer flex-col items-center justify-center rounded-md border border-dashed border-white/15 bg-white/[0.02] text-muted-foreground hover:border-primary/50 hover:text-primary">
+                <label className="flex aspect-square cursor-pointer flex-col items-center justify-center rounded-md border border-dashed border-border bg-muted/30 text-muted-foreground hover:border-primary/50 hover:text-primary">
                   <input type="file" multiple accept="image/*" className="hidden"
                     onChange={(e) => { onUpload(e.target.files); e.currentTarget.value = ""; }} />
                   <span className="text-2xl leading-none">+</span>
@@ -830,7 +830,7 @@ function RoomCard({
                               className={[
                                 "rounded-md border px-2.5 py-1 text-xs transition-colors",
                                 sel ? "border-primary bg-primary text-primary-foreground"
-                                    : "border-white/10 bg-white/[0.03] text-foreground hover:border-primary/50",
+                                    : "border-border bg-muted/40 text-foreground hover:border-primary/50",
                               ].join(" ")}>
                               {opt}
                             </button>
@@ -872,7 +872,7 @@ function Stat({ label, value }: { label: string; value: string }) {
 
 function Card({ children }: { children: ReactNode }) {
   return (
-    <section className="relative mb-6 overflow-hidden rounded-xl border border-white/[0.07] bg-card/60 p-7 backdrop-blur-sm shadow-[0_30px_60px_-30px_rgba(0,0,0,0.6),inset_0_1px_0_0_rgba(255,255,255,0.04)]">
+    <section className="relative mb-6 overflow-hidden rounded-xl border border-border bg-card p-7  shadow-[0_30px_60px_-30px_rgba(0,0,0,0.6),inset_0_1px_0_0_rgba(255,255,255,0.04)]">
       {children}
     </section>
   );
@@ -1039,7 +1039,7 @@ function BrfTabs({
 
   return (
     <div>
-      <div className="mb-6 flex flex-wrap gap-1 border-b border-white/[0.08]">
+      <div className="mb-6 flex flex-wrap gap-1 border-b border-border">
         {BRF_TABS.map((t) => {
           const active = tab === t.id;
           return (
@@ -1067,7 +1067,7 @@ function BrfTabs({
             <Field label="Organisationsnummer" value={brf.orgnr} onChange={(v) => patch({ orgnr: v })} />
             <Field label="Bildades år" value={brf.bildades} onChange={(v) => patch({ bildades: v })} type="number" />
           </Grid>
-          <Grid cols={4} className="mt-6 border-t border-white/[0.06] pt-6">
+          <Grid cols={4} className="mt-6 border-t border-border/50 pt-6">
             <FieldSelect label="Taxeringstyp" value={brf.taxering} onChange={(v) => patch({ taxering: v })}
               options={["Privatbostadsföretag (äkta)", "Oäkta bostadsföretag"]} />
             <FieldSelect label="Juridisk person accepteras" value={brf.juridiskPerson} onChange={(v) => patch({ juridiskPerson: v })}
@@ -1076,12 +1076,12 @@ function BrfTabs({
               options={["Föreningen äger marken", "Tomträtt"]} />
             <Field label="TV / internet" value={brf.tvInternet} onChange={(v) => patch({ tvInternet: v })} />
           </Grid>
-          <Grid cols={3} className="mt-6 border-t border-white/[0.06] pt-6">
+          <Grid cols={3} className="mt-6 border-t border-border/50 pt-6">
             <Field label="Antal lägenheter" value={brf.antalLgh} onChange={(v) => patch({ antalLgh: v })} type="number" />
             <Field label="Antal hyresrätter" value={brf.antalHyres} onChange={(v) => patch({ antalHyres: v })} type="number" />
             <Field label="Antal lokaler" value={brf.antalLokaler} onChange={(v) => patch({ antalLokaler: v })} type="number" />
           </Grid>
-          <div className="mt-6 border-t border-white/[0.06] pt-6">
+          <div className="mt-6 border-t border-border/50 pt-6">
             <FieldTextarea label="Allmän information" value={brf.allman} onChange={(v) => patch({ allman: v })} />
           </div>
         </div>
@@ -1147,7 +1147,7 @@ function BrfTabs({
       )}
 
       {tab === "bostader" && (
-        <div className="rounded-xl border border-dashed border-white/10 bg-black/20 px-6 py-10 text-center">
+        <div className="rounded-xl border border-dashed border-border bg-black/20 px-6 py-10 text-center">
           <div className="text-sm text-foreground" style={serifStyle}>Bostäder i föreningen</div>
           <div className="mt-2 text-xs text-muted-foreground">
             Här listas alla objekt du har skapat i appen som tillhör <span className="text-foreground">{brf.namn || "den här föreningen"}</span> — sålda, till salu och utkast.
@@ -1173,7 +1173,7 @@ function BrfFilesPanel({ filer, onChange }: { filer: BrfFile[]; onChange: (f: Br
   }
   return (
     <div>
-      <label className="mb-4 flex cursor-pointer items-center justify-center gap-3 rounded-lg border border-dashed border-white/15 bg-white/[0.02] px-6 py-8 text-sm text-muted-foreground hover:border-primary/40 hover:bg-primary/5 hover:text-foreground">
+      <label className="mb-4 flex cursor-pointer items-center justify-center gap-3 rounded-lg border border-dashed border-border bg-muted/30 px-6 py-8 text-sm text-muted-foreground hover:border-primary/40 hover:bg-primary/5 hover:text-foreground">
         <UploadIcon />
         <span>Ladda upp PDF, årsredovisning, stadgar…</span>
         <input type="file" multiple className="hidden" onChange={(e) => handleFiles(e.target.files)} />
@@ -1181,7 +1181,7 @@ function BrfFilesPanel({ filer, onChange }: { filer: BrfFile[]; onChange: (f: Br
       {filer.length === 0 ? (
         <div className="text-center text-xs text-muted-foreground">Inga filer uppladdade.</div>
       ) : (
-        <ul className="divide-y divide-white/[0.06] rounded-lg border border-white/[0.06]">
+        <ul className="divide-y divide-white/[0.06] rounded-lg border border-border/50">
           {filer.map((f) => (
             <li key={f.id} className="flex items-center justify-between gap-3 px-4 py-2.5">
               <div className="min-w-0">
@@ -1191,7 +1191,7 @@ function BrfFilesPanel({ filer, onChange }: { filer: BrfFile[]; onChange: (f: Br
               <button
                 type="button"
                 onClick={() => onChange(filer.filter((x) => x.id !== f.id))}
-                className="rounded px-2 py-1 text-xs text-muted-foreground hover:bg-white/10 hover:text-foreground"
+                className="rounded px-2 py-1 text-xs text-muted-foreground hover:bg-muted/60 hover:text-foreground"
               >
                 Ta bort
               </button>
@@ -1217,7 +1217,7 @@ function BrfImagesPanel({ bilder, onChange }: { bilder: BrfImage[]; onChange: (b
   }
   return (
     <div>
-      <label className="mb-4 flex cursor-pointer items-center justify-center gap-3 rounded-lg border border-dashed border-white/15 bg-white/[0.02] px-6 py-8 text-sm text-muted-foreground hover:border-primary/40 hover:bg-primary/5 hover:text-foreground">
+      <label className="mb-4 flex cursor-pointer items-center justify-center gap-3 rounded-lg border border-dashed border-border bg-muted/30 px-6 py-8 text-sm text-muted-foreground hover:border-primary/40 hover:bg-primary/5 hover:text-foreground">
         <UploadIcon />
         <span>Ladda upp bilder på fastigheten, innergård…</span>
         <input type="file" multiple accept="image/*" className="hidden" onChange={(e) => handleFiles(e.target.files)} />
@@ -1227,7 +1227,7 @@ function BrfImagesPanel({ bilder, onChange }: { bilder: BrfImage[]; onChange: (b
       ) : (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
           {bilder.map((b) => (
-            <div key={b.id} className="group relative overflow-hidden rounded-lg border border-white/[0.06]">
+            <div key={b.id} className="group relative overflow-hidden rounded-lg border border-border/50">
               <img src={b.dataUrl} alt={b.name} className="aspect-square w-full object-cover" />
               <button
                 type="button"
@@ -1294,13 +1294,13 @@ function BrfByggnaderPanel({
       </div>
 
       {byggnader.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-white/10 bg-black/20 px-6 py-8 text-center text-sm text-muted-foreground">
+        <div className="rounded-xl border border-dashed border-border bg-black/20 px-6 py-8 text-center text-sm text-muted-foreground">
           Inga byggnader tillagda.
         </div>
       ) : (
-        <div className="overflow-hidden rounded-xl border border-white/[0.08]">
+        <div className="overflow-hidden rounded-xl border border-border">
           <table className="w-full text-sm">
-            <thead className="bg-white/[0.03] text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
+            <thead className="bg-muted/40 text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
               <tr>
                 <th className="px-4 py-2.5 text-left font-medium">Namn på byggnaden</th>
                 <th className="px-4 py-2.5 text-left font-medium">Byggår</th>
@@ -1311,7 +1311,7 @@ function BrfByggnaderPanel({
             <tbody className="divide-y divide-white/[0.06]">
               {byggnader.map((b) => (
                 <Fragment key={b.id}>
-                  <tr className="hover:bg-white/[0.02]">
+                  <tr className="hover:bg-muted/30">
                     <td className="px-4 py-2.5 text-foreground">{b.namn || <span className="text-muted-foreground">—</span>}</td>
                     <td className="px-4 py-2.5 text-foreground">{b.byggar || <span className="text-muted-foreground">—</span>}</td>
                     <td className="px-4 py-2.5 text-muted-foreground">{[b.gatuadress, b.ort].filter(Boolean).join(", ") || "—"}</td>
@@ -1326,7 +1326,7 @@ function BrfByggnaderPanel({
                       <button
                         type="button"
                         onClick={() => remove(b.id)}
-                        className="ml-1 rounded px-2 py-1 text-xs text-muted-foreground hover:bg-white/10 hover:text-foreground"
+                        className="ml-1 rounded px-2 py-1 text-xs text-muted-foreground hover:bg-muted/60 hover:text-foreground"
                       >
                         Ta bort
                       </button>
@@ -1369,7 +1369,7 @@ function BrfByggnaderPanel({
         </div>
       )}
 
-      <div className="mt-6 grid gap-5 border-t border-white/[0.06] pt-6 md:grid-cols-2">
+      <div className="mt-6 grid gap-5 border-t border-border/50 pt-6 md:grid-cols-2">
         <FieldTextarea label="Övriga utrymmen i föreningen" value={ovrigaUtrymmen} onChange={setOvrigaUtrymmen} />
         <FieldTextarea label="Utförda renoveringar" value={renoveringar} onChange={setRenoveringar} />
         <FieldTextarea label="Kommande renoveringar" value={kommandeRenoveringar} onChange={setKommandeRenoveringar} />
@@ -1387,7 +1387,7 @@ function BrfKostnaderPanel({ brf, patch }: { brf: Brf; patch: (p: Partial<Brf>) 
   return (
     <div>
       <div className="mb-2 text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Ingår i avgiften</div>
-      <div className="mb-6 flex flex-wrap gap-2 rounded-xl border border-white/[0.08] bg-white/[0.02] p-3">
+      <div className="mb-6 flex flex-wrap gap-2 rounded-xl border border-border bg-muted/30 p-3">
         {INGAR_I_AVGIFTEN.map((item) => {
           const active = brf.ingarIAvgiften.includes(item);
           return (
@@ -1399,7 +1399,7 @@ function BrfKostnaderPanel({ brf, patch }: { brf: Brf; patch: (p: Partial<Brf>) 
                 "rounded-full border px-3 py-1.5 text-xs font-medium transition-all " +
                 (active
                   ? "border-primary bg-primary/15 text-primary"
-                  : "border-white/10 bg-white/[0.03] text-foreground hover:border-primary/40 hover:bg-primary/5")
+                  : "border-border bg-muted/40 text-foreground hover:border-primary/40 hover:bg-primary/5")
               }
             >
               {active ? "✓ " : ""}{item}
@@ -1413,7 +1413,7 @@ function BrfKostnaderPanel({ brf, patch }: { brf: Brf; patch: (p: Partial<Brf>) 
         <FieldTextarea label="Beskrivning av kostnader som ingår" value={brf.beskrivningKostnaderIngar} onChange={(v) => patch({ beskrivningKostnaderIngar: v })} />
       </div>
 
-      <Grid cols={2} className="mt-6 border-t border-white/[0.06] pt-6">
+      <Grid cols={2} className="mt-6 border-t border-border/50 pt-6">
         <FieldNumber label="Pantsättningsavgift" value={brf.pantavgift} onChange={(v) => patch({ pantavgift: v })} />
         <FieldNumber label="Överlåtelseavgift" value={brf.overlatelseavgift} onChange={(v) => patch({ overlatelseavgift: v })} />
       </Grid>
@@ -1461,13 +1461,13 @@ function BrfKontakterPanel({ kontakter, onChange }: { kontakter: BrfKontakt[]; o
       </div>
 
       {kontakter.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-white/10 bg-black/20 px-6 py-8 text-center text-sm text-muted-foreground">
+        <div className="rounded-xl border border-dashed border-border bg-black/20 px-6 py-8 text-center text-sm text-muted-foreground">
           Inga kontakter tillagda.
         </div>
       ) : (
-        <div className="overflow-hidden rounded-xl border border-white/[0.08]">
+        <div className="overflow-hidden rounded-xl border border-border">
           <table className="w-full text-sm">
-            <thead className="bg-white/[0.03] text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
+            <thead className="bg-muted/40 text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
               <tr>
                 <th className="px-4 py-2.5 text-left font-medium">Namn</th>
                 <th className="px-4 py-2.5 text-left font-medium">Roll</th>
@@ -1481,7 +1481,7 @@ function BrfKontakterPanel({ kontakter, onChange }: { kontakter: BrfKontakt[]; o
                 const namn = [k.fornamn, k.efternamn].filter(Boolean).join(" ") || "—";
                 return (
                   <Fragment key={k.id}>
-                    <tr className="hover:bg-white/[0.02]">
+                    <tr className="hover:bg-muted/30">
                       <td className="px-4 py-2.5 text-foreground">{namn}</td>
                       <td className="px-4 py-2.5 text-muted-foreground">{k.roll || "—"}</td>
                       <td className="px-4 py-2.5 text-muted-foreground">{k.telefon || "—"}</td>
@@ -1497,7 +1497,7 @@ function BrfKontakterPanel({ kontakter, onChange }: { kontakter: BrfKontakt[]; o
                         <button
                           type="button"
                           onClick={() => remove(k.id)}
-                          className="ml-1 rounded px-2 py-1 text-xs text-muted-foreground hover:bg-white/10 hover:text-foreground"
+                          className="ml-1 rounded px-2 py-1 text-xs text-muted-foreground hover:bg-muted/60 hover:text-foreground"
                         >
                           Ta bort
                         </button>

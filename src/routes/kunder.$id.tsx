@@ -151,14 +151,14 @@ function KontaktDetailPage() {
                 "rounded-md border px-4 py-2 text-xs font-medium uppercase tracking-[0.14em] transition-colors",
                 editMode
                   ? "border-primary bg-primary text-primary-foreground"
-                  : "border-white/10 text-muted-foreground hover:border-primary/40 hover:text-foreground",
+                  : "border-border text-muted-foreground hover:border-primary/40 hover:text-foreground",
               ].join(" ")}
             >
               {editMode ? "✓ Klar" : "✎ Redigera"}
             </button>
             <button
               onClick={handleDelete}
-              className="rounded-md border border-white/10 px-4 py-2 text-xs text-muted-foreground hover:border-destructive/40 hover:text-destructive"
+              className="rounded-md border border-border px-4 py-2 text-xs text-muted-foreground hover:border-destructive/40 hover:text-destructive"
             >
               Ta bort
             </button>
@@ -177,7 +177,7 @@ function KontaktDetailPage() {
 
           {/* Right main — first on mobile, second on desktop */}
           <div className="order-first lg:order-last">
-            <div className="mb-5 flex border-b border-white/[0.08]">
+            <div className="mb-5 flex border-b border-border">
               {(["intagsmoten", "historik", "objekt", "anteckningar"] as Tab[]).map((t) => (
                 <button
                   key={t}
@@ -354,7 +354,7 @@ function KlarMedLoggModal({ ns, kontaktId, namn, onClose, onSaved }: {
         </button>
 
         {sattNytt && (
-          <div className="mb-4 space-y-2.5 rounded-lg border border-white/10 bg-white/[0.03] p-3">
+          <div className="mb-4 space-y-2.5 rounded-lg border border-border bg-muted/40 p-3">
             <div className="flex gap-1.5 flex-wrap">
               {NASTA_STEG_TYPER.map((t) => (
                 <button
@@ -362,7 +362,7 @@ function KlarMedLoggModal({ ns, kontaktId, namn, onClose, onSaved }: {
                   onClick={() => setNyttTyp(t.typ)}
                   className={[
                     "flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] transition-colors",
-                    nyttTyp === t.typ ? "border-primary bg-primary/15 text-primary" : "border-white/10 text-muted-foreground hover:border-primary/40",
+                    nyttTyp === t.typ ? "border-primary bg-primary/15 text-primary" : "border-border text-muted-foreground hover:border-primary/40",
                   ].join(" ")}
                 >
                   {t.icon} {t.label}
@@ -374,13 +374,13 @@ function KlarMedLoggModal({ ns, kontaktId, namn, onClose, onSaved }: {
               onChange={(e) => setNyttText(e.target.value)}
               placeholder="Vad ska du göra?"
               rows={2}
-              className="w-full resize-none rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary/50 focus:outline-none"
+              className="w-full resize-none rounded-lg border border-border bg-muted/50 px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary/50 focus:outline-none"
             />
             <input
               type="date"
               value={nyttDatum}
               onChange={(e) => setNyttDatum(e.target.value)}
-              className="w-full rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-foreground focus:border-primary/50 focus:outline-none"
+              className="w-full rounded-lg border border-border bg-muted/50 px-3 py-2 text-sm text-foreground focus:border-primary/50 focus:outline-none"
             />
           </div>
         )}
@@ -422,7 +422,7 @@ function InfoCard({ kontakt, editMode, patch }: { kontakt: Kontakt; editMode: bo
           ? <EditInput value={kontakt.ort} onChange={(v) => patch({ ort: v })} placeholder="Stockholm" />
           : <span>{kontakt.ort || <Muted>—</Muted>}</span>}
       </InfoRow>
-      <div className="mt-3 border-t border-white/[0.06] pt-3 text-[10px] text-muted-foreground">
+      <div className="mt-3 border-t border-border/50 pt-3 text-[10px] text-muted-foreground">
         Kontakt sedan {fmtDate(kontakt.skapadAt)}
       </div>
     </Card>
@@ -467,7 +467,7 @@ function IntresseCard({ kontakt, editMode, patch }: { kontakt: Kontakt; editMode
                   <button key={t} onClick={() => toggleTyp(t)}
                     className={[
                       "rounded-full border px-2.5 py-1 text-[11px] transition-colors",
-                      on ? "border-primary bg-primary/15 text-primary" : "border-white/10 text-muted-foreground hover:border-primary/40",
+                      on ? "border-primary bg-primary/15 text-primary" : "border-border text-muted-foreground hover:border-primary/40",
                     ].join(" ")}>
                     {t}
                   </button>
@@ -478,7 +478,7 @@ function IntresseCard({ kontakt, editMode, patch }: { kontakt: Kontakt; editMode
             kontakt.sokTyper.length > 0
               ? <div className="flex flex-wrap gap-1.5">
                   {kontakt.sokTyper.map((t) => (
-                    <span key={t} className="rounded-full border border-white/10 px-2.5 py-0.5 text-[11px] text-foreground">{t}</span>
+                    <span key={t} className="rounded-full border border-border px-2.5 py-0.5 text-[11px] text-foreground">{t}</span>
                   ))}
                 </div>
               : <Muted>Ej angett</Muted>
@@ -525,7 +525,7 @@ function GdprCard({ kontakt, patch }: { kontakt: Kontakt; patch: (p: Partial<Kon
       {!ok && (
         <button
           onClick={() => patch({ gdprGodkant: Date.now() })}
-          className="mt-3 w-full rounded-lg border border-white/10 py-2 text-xs text-muted-foreground hover:border-emerald-500/40 hover:text-emerald-400"
+          className="mt-3 w-full rounded-lg border border-border py-2 text-xs text-muted-foreground hover:border-emerald-500/40 hover:text-emerald-400"
         >
           Markera som godkänd
         </button>
@@ -574,7 +574,7 @@ function NastaStegCard({ kontakt, onUpdate }: { kontakt: Kontakt; onUpdate: () =
     <Card title="Nästa steg">
       {ns ? (
         <div className="space-y-3">
-          <div className="flex items-start gap-2.5 rounded-lg border border-white/[0.07] bg-white/[0.03] p-3">
+          <div className="flex items-start gap-2.5 rounded-lg border border-border bg-muted/40 p-3">
             <span className="text-base">{icon}</span>
             <div className="min-w-0 flex-1">
               <p className="text-sm text-foreground">{ns.text}</p>
@@ -587,13 +587,13 @@ function NastaStegCard({ kontakt, onUpdate }: { kontakt: Kontakt; onUpdate: () =
           <div className="flex gap-2">
             <button
               onClick={() => setKlarOpen(true)}
-              className="flex-1 rounded-lg border border-white/10 py-1.5 text-xs text-muted-foreground hover:border-emerald-500/40 hover:text-emerald-400"
+              className="flex-1 rounded-lg border border-border py-1.5 text-xs text-muted-foreground hover:border-emerald-500/40 hover:text-emerald-400"
             >
               ✓ Klar
             </button>
             <button
               onClick={() => { setAdding(true); setTyp(ns.typ); setText(ns.text); }}
-              className="flex-1 rounded-lg border border-white/10 py-1.5 text-xs text-muted-foreground hover:border-primary/40 hover:text-primary"
+              className="flex-1 rounded-lg border border-border py-1.5 text-xs text-muted-foreground hover:border-primary/40 hover:text-primary"
             >
               Ändra
             </button>
@@ -610,7 +610,7 @@ function NastaStegCard({ kontakt, onUpdate }: { kontakt: Kontakt; onUpdate: () =
                   "flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] transition-colors",
                   typ === t.typ
                     ? "border-primary bg-primary/15 text-primary"
-                    : "border-white/10 text-muted-foreground hover:border-primary/40",
+                    : "border-border text-muted-foreground hover:border-primary/40",
                 ].join(" ")}
               >
                 {t.icon} {t.label}
@@ -622,13 +622,13 @@ function NastaStegCard({ kontakt, onUpdate }: { kontakt: Kontakt; onUpdate: () =
             onChange={(e) => setText(e.target.value)}
             placeholder="Vad ska du göra?"
             rows={2}
-            className="w-full resize-none rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary/50 focus:outline-none"
+            className="w-full resize-none rounded-lg border border-border bg-muted/50 px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary/50 focus:outline-none"
           />
           <input
             type="date"
             value={datum}
             onChange={(e) => setDatum(e.target.value)}
-            className="w-full rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-foreground focus:border-primary/50 focus:outline-none"
+            className="w-full rounded-lg border border-border bg-muted/50 px-3 py-2 text-sm text-foreground focus:border-primary/50 focus:outline-none"
           />
           <div className="flex gap-2">
             <button
@@ -640,7 +640,7 @@ function NastaStegCard({ kontakt, onUpdate }: { kontakt: Kontakt; onUpdate: () =
             </button>
             <button
               onClick={() => setAdding(false)}
-              className="flex-1 rounded-lg border border-white/10 py-1.5 text-xs text-muted-foreground hover:border-primary/40"
+              className="flex-1 rounded-lg border border-border py-1.5 text-xs text-muted-foreground hover:border-primary/40"
             >
               Avbryt
             </button>
@@ -649,7 +649,7 @@ function NastaStegCard({ kontakt, onUpdate }: { kontakt: Kontakt; onUpdate: () =
       ) : (
         <button
           onClick={() => setAdding(true)}
-          className="w-full rounded-lg border border-dashed border-white/10 py-3 text-xs text-muted-foreground hover:border-primary/40 hover:text-primary"
+          className="w-full rounded-lg border border-dashed border-border py-3 text-xs text-muted-foreground hover:border-primary/40 hover:text-primary"
         >
           + Sätt nästa steg
         </button>
@@ -696,19 +696,19 @@ function HistorikTab({ kontakt, onAdd }: { kontakt: Kontakt; onAdd: () => void }
       <div className="mb-4 flex justify-end">
         <button
           onClick={() => setShowForm((v) => !v)}
-          className="rounded-md border border-white/10 px-3 py-1.5 text-xs text-muted-foreground hover:border-primary/40 hover:text-primary"
+          className="rounded-md border border-border px-3 py-1.5 text-xs text-muted-foreground hover:border-primary/40 hover:text-primary"
         >
           + Lägg till aktivitet
         </button>
       </div>
 
       {showForm && (
-        <div className="mb-5 rounded-xl border border-white/[0.08] bg-card/60 p-5">
+        <div className="mb-5 rounded-xl border border-border bg-card p-5">
           <div className="mb-3 flex flex-wrap gap-2">
             {(["anteckning", "samtal", "visning", "bud", "mejl"] as AktivitetTyp[]).map((t) => (
               <button key={t} onClick={() => setTyp(t)}
                 className={["rounded-full border px-3 py-1 text-xs transition-colors",
-                  typ === t ? "border-primary bg-primary/15 text-primary" : "border-white/10 text-muted-foreground hover:border-primary/40"].join(" ")}>
+                  typ === t ? "border-primary bg-primary/15 text-primary" : "border-border text-muted-foreground hover:border-primary/40"].join(" ")}>
                 {AKTIVITET_ICONS[t]} {AKTIVITET_LABELS[t]}
               </button>
             ))}
@@ -722,7 +722,7 @@ function HistorikTab({ kontakt, onAdd }: { kontakt: Kontakt; onAdd: () => void }
             autoFocus
           />
           <div className="mt-3 flex gap-2">
-            <button onClick={() => setShowForm(false)} className="rounded-lg border border-white/10 px-3 py-1.5 text-xs text-muted-foreground hover:bg-white/5">
+            <button onClick={() => setShowForm(false)} className="rounded-lg border border-border px-3 py-1.5 text-xs text-muted-foreground hover:bg-white/5">
               Avbryt
             </button>
             <button onClick={handleAdd} disabled={!text.trim()} className="rounded-lg bg-primary px-4 py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-40">
@@ -741,7 +741,7 @@ function HistorikTab({ kontakt, onAdd }: { kontakt: Kontakt; onAdd: () => void }
             return (
               <div key={a.id} className="flex gap-4 pb-5">
                 <div className="flex flex-col items-center">
-                  <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border border-white/[0.08] bg-card text-sm">
+                  <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border border-border bg-card text-sm">
                     {AKTIVITET_ICONS[a.typ]}
                   </div>
                   {i < aktiviteter.length - 1 && (
@@ -788,8 +788,8 @@ function ObjektTab({ kontakt }: { kontakt: Kontakt }) {
         const obj = getObjektBySlug(kp.slug);
         return (
           <div key={`${kp.slug}-${kp.relation}`}
-            className="flex items-center gap-4 rounded-xl border border-white/[0.07] bg-card/60 p-4">
-            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg border border-white/[0.06] bg-white/[0.03] text-lg">
+            className="flex items-center gap-4 rounded-xl border border-border bg-card p-4">
+            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg border border-border/50 bg-muted/40 text-lg">
               🏠
             </div>
             <div className="min-w-0 flex-1">
@@ -836,7 +836,7 @@ function AnteckningarTab({ kontakt, patch }: { kontakt: Kontakt; patch: (p: Part
         onChange={(e) => setText(e.target.value)}
         rows={12}
         placeholder="Fria anteckningar om kontakten — behov, preferenser, bakgrund…"
-        className="w-full resize-y rounded-xl border border-white/[0.08] bg-card/60 px-5 py-4 text-sm leading-relaxed placeholder:text-muted-foreground/40 focus:border-primary/50 focus:outline-none"
+        className="w-full resize-y rounded-xl border border-border bg-card px-5 py-4 text-sm leading-relaxed placeholder:text-muted-foreground/40 focus:border-primary/50 focus:outline-none"
       />
       <div className="mt-3 flex items-center gap-3">
         <button
@@ -921,7 +921,7 @@ function IntagsmotenTab({ kontakt }: { kontakt: Kontakt }) {
       </div>
 
       {moten.length === 0 && !showForm ? (
-        <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-white/10 py-16 text-center">
+        <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border py-16 text-center">
           <div className="mb-3 text-3xl opacity-30">🏠</div>
           <div className="text-sm text-muted-foreground">Inga intagsmöten ännu.</div>
           <button
@@ -939,7 +939,7 @@ function IntagsmotenTab({ kontakt }: { kontakt: Kontakt }) {
             return (
               <div key={m.id} className={[
                 "overflow-hidden rounded-xl border transition-colors",
-                isOpen ? "border-primary/30 bg-card/80" : "border-white/[0.07] bg-card/50 hover:border-white/[0.14]",
+                isOpen ? "border-primary/30 bg-card/80" : "border-border bg-card/50 hover:border-white/[0.14]",
               ].join(" ")}>
                 {/* Summary row */}
                 <button
@@ -962,7 +962,7 @@ function IntagsmotenTab({ kontakt }: { kontakt: Kontakt }) {
 
                 {/* Detail panel */}
                 {isOpen && (
-                  <div className="border-t border-white/[0.06] px-5 py-5">
+                  <div className="border-t border-border/50 px-5 py-5">
                     <div className="grid gap-4 sm:grid-cols-2">
                       <div className="space-y-2 text-sm">
                         <DetailRow label="Adress" value={`${m.adress}${m.postnr ? ", " + m.postnr : ""}${m.ort ? " " + m.ort : ""}`} />
@@ -995,7 +995,7 @@ function IntagsmotenTab({ kontakt }: { kontakt: Kontakt }) {
                               to="/objekt/$slug"
                               params={{ slug: m.objektSlug! }}
                               search={{ tab: undefined, q: undefined }}
-                              className="text-sm font-medium text-emerald-300 hover:underline"
+                              className="text-sm font-medium text-emerald-700 hover:underline"
                             >
                               {obj.adress} →
                             </Link>
@@ -1013,27 +1013,27 @@ function IntagsmotenTab({ kontakt }: { kontakt: Kontakt }) {
                         <div className="flex flex-col gap-2">
                           <button
                             onClick={() => exportToICS(m, kontakt)}
-                            className="flex items-center justify-center gap-2 rounded-lg border border-white/10 py-2.5 text-xs text-muted-foreground hover:border-blue-400/40 hover:text-blue-300"
+                            className="flex items-center justify-center gap-2 rounded-lg border border-border py-2.5 text-xs text-muted-foreground hover:border-blue-400/40 hover:text-blue-700"
                           >
                             📅 Exportera till Outlook / Kalender
                           </button>
                           <button
                             onClick={() => setShowPrint(m.id)}
-                            className="flex items-center justify-center gap-2 rounded-lg border border-white/10 py-2.5 text-xs text-muted-foreground hover:border-amber-400/40 hover:text-amber-300"
+                            className="flex items-center justify-center gap-2 rounded-lg border border-border py-2.5 text-xs text-muted-foreground hover:border-amber-400/40 hover:text-amber-700"
                           >
                             🖨 Skriv ut intag-blankett
                           </button>
                           {obj?.typ && ["Villa", "Radhus", "Fritidshus"].includes(obj.typ) && (
                             <button
                               onClick={() => printFastighetsutdrag(m, kontakt)}
-                              className="flex items-center justify-center gap-2 rounded-lg border border-white/10 py-2.5 text-xs text-muted-foreground hover:border-amber-400/40 hover:text-amber-300"
+                              className="flex items-center justify-center gap-2 rounded-lg border border-border py-2.5 text-xs text-muted-foreground hover:border-amber-400/40 hover:text-amber-700"
                             >
                               📄 Fastighetsutdrag
                             </button>
                           )}
                           <button
                             onClick={() => handleDelete(m.id)}
-                            className="flex items-center justify-center gap-2 rounded-lg border border-white/10 py-2.5 text-xs text-destructive/60 hover:border-destructive/40 hover:text-destructive"
+                            className="flex items-center justify-center gap-2 rounded-lg border border-border py-2.5 text-xs text-destructive/60 hover:border-destructive/40 hover:text-destructive"
                           >
                             Ta bort mötet
                           </button>
@@ -1137,7 +1137,7 @@ function NyttIntagsmoteModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70  p-4"
       onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="w-full max-w-lg rounded-2xl border border-white/[0.1] bg-card p-8 shadow-2xl">
         <div className="mb-6">
@@ -1252,7 +1252,7 @@ function NyttIntagsmoteModal({
         </div>
 
         <div className="mt-6 flex gap-3">
-          <button onClick={onClose} className="rounded-lg border border-white/10 px-4 py-2.5 text-sm text-muted-foreground hover:bg-white/5">
+          <button onClick={onClose} className="rounded-lg border border-border px-4 py-2.5 text-sm text-muted-foreground hover:bg-white/5">
             Avbryt
           </button>
           <button
@@ -1297,7 +1297,7 @@ function SkapaBostadModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70  p-4"
       onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="w-full max-w-sm rounded-2xl border border-white/[0.1] bg-card p-8 shadow-2xl">
         <div className="mb-6">
@@ -1319,7 +1319,7 @@ function SkapaBostadModal({
                   "rounded-lg border py-3 text-sm font-medium transition-colors",
                   typ === t
                     ? "border-primary bg-primary/15 text-primary"
-                    : "border-white/10 text-muted-foreground hover:border-primary/30 hover:text-foreground",
+                    : "border-border text-muted-foreground hover:border-primary/30 hover:text-foreground",
                 ].join(" ")}
               >
                 {t === "Bostadsrätt" && "🏢 "}
@@ -1335,7 +1335,7 @@ function SkapaBostadModal({
         </div>
 
         <div className="flex gap-3">
-          <button onClick={onClose} className="rounded-lg border border-white/10 px-4 py-2.5 text-sm text-muted-foreground hover:bg-white/5">
+          <button onClick={onClose} className="rounded-lg border border-border px-4 py-2.5 text-sm text-muted-foreground hover:bg-white/5">
             Avbryt
           </button>
           <button
@@ -1513,7 +1513,7 @@ function PrintIntagModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70  p-4"
       onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div ref={printRef} className="w-full max-w-sm rounded-2xl border border-white/[0.1] bg-card p-8 shadow-2xl text-center">
         <div className="mb-4 text-4xl">🖨</div>
@@ -1523,7 +1523,7 @@ function PrintIntagModal({
           Fyll i under mötet och skriv ut eller spara som PDF.
         </p>
         <div className="mt-6 flex gap-3">
-          <button onClick={onClose} className="rounded-lg border border-white/10 px-4 py-2.5 text-sm text-muted-foreground hover:bg-white/5">
+          <button onClick={onClose} className="rounded-lg border border-border px-4 py-2.5 text-sm text-muted-foreground hover:bg-white/5">
             Avbryt
           </button>
           <button
@@ -1621,7 +1621,7 @@ function printFastighetsutdrag(mote: Intagsmote, kontakt: Kontakt) {
 /* ─── Helpers ─── */
 function Card({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <div className="overflow-hidden rounded-xl border border-white/[0.07] bg-card/60 p-5 backdrop-blur-sm">
+    <div className="overflow-hidden rounded-xl border border-border bg-card p-5 ">
       <div className="mb-4 text-[10px] font-semibold uppercase tracking-[0.2em] text-primary/70">{title}</div>
       {children}
     </div>
@@ -1630,7 +1630,7 @@ function Card({ title, children }: { title: string; children: ReactNode }) {
 
 function InfoRow({ label, icon, children }: { label: string; icon: string; children: ReactNode }) {
   return (
-    <div className="flex items-start gap-3 py-2.5 border-b border-white/[0.05] last:border-0">
+    <div className="flex items-start gap-3 py-2.5 border-b border-border/50 last:border-0">
       <span className="mt-px text-sm opacity-60">{icon}</span>
       <div className="min-w-0 flex-1 text-sm text-foreground">{children}</div>
     </div>

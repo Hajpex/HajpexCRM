@@ -205,7 +205,7 @@ function KunderPage() {
               className={`rounded-full px-4 py-1.5 text-xs font-medium transition-all ${
                 roll === r
                   ? "bg-primary text-primary-foreground"
-                  : "border border-white/10 bg-white/[0.04] text-muted-foreground hover:border-white/20 hover:text-foreground"
+                  : "border border-border bg-muted/50 text-muted-foreground hover:border-border hover:text-foreground"
               }`}
             >
               {ROLL_LABELS[r]}
@@ -222,7 +222,7 @@ function KunderPage() {
             placeholder="Sök namn, telefon, e-post eller ort…"
             className="w-full max-w-sm rounded-lg border border-input bg-background px-4 py-2.5 text-sm placeholder:text-muted-foreground/50 focus:border-primary focus:outline-none"
           />
-          <div className="flex items-center gap-0.5 rounded-lg border border-white/[0.08] bg-white/[0.02] p-1">
+          <div className="flex items-center gap-0.5 rounded-lg border border-border bg-muted/30 p-1">
             {(["prioritet", "az", "senast"] as SortMode[]).map((s) => (
               <button
                 key={s}
@@ -236,7 +236,7 @@ function KunderPage() {
         </div>
 
         {kontakter.length === 0 ? (
-          <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-white/10 bg-black/20 py-24 text-center">
+          <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border bg-black/20 py-24 text-center">
             <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full border border-primary/20 bg-primary/10 text-2xl text-primary">
               👤
             </div>
@@ -258,7 +258,7 @@ function KunderPage() {
                   key={k.id}
                   to="/kunder/$id"
                   params={{ id: k.id }}
-                  className="flex items-center gap-4 rounded-xl border border-white/[0.07] bg-card/60 p-4 backdrop-blur-sm transition-all hover:border-primary/30 hover:bg-card/80"
+                  className="flex items-center gap-4 rounded-xl border border-border bg-card p-4  transition-all hover:border-primary/30 hover:bg-card/80"
                 >
                   <div className="relative flex-shrink-0">
                     <div
@@ -389,7 +389,7 @@ function NyKontaktDialog({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 "
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
       <div className="relative w-full max-w-md rounded-2xl border border-white/[0.1] bg-card p-8 shadow-2xl">
@@ -427,8 +427,8 @@ function NyKontaktDialog({
 
           {duplikat && (
             <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-4">
-              <div className="text-sm font-medium text-amber-300">Kontakt finns redan</div>
-              <div className="mt-1 text-xs text-amber-300/80">
+              <div className="text-sm font-medium text-amber-700">Kontakt finns redan</div>
+              <div className="mt-1 text-xs text-amber-700/80">
                 {duplikat.fornamn} {duplikat.efternamn}
                 {duplikat.epost ? ` · ${duplikat.epost}` : ""}
               </div>
@@ -436,7 +436,7 @@ function NyKontaktDialog({
                 to="/kunder/$id"
                 params={{ id: duplikat.id }}
                 onClick={onClose}
-                className="mt-2 block text-xs font-medium text-amber-300 underline"
+                className="mt-2 block text-xs font-medium text-amber-700 underline"
               >
                 Öppna befintlig kontakt →
               </Link>
@@ -503,7 +503,7 @@ function NyKontaktDialog({
           <div className="flex gap-3 pt-1">
             <button
               onClick={onClose}
-              className="rounded-lg border border-white/10 px-4 py-2.5 text-sm text-muted-foreground hover:bg-white/5"
+              className="rounded-lg border border-border px-4 py-2.5 text-sm text-muted-foreground hover:bg-white/5"
             >
               Avbryt
             </button>
