@@ -1561,9 +1561,13 @@ function KopplaKontaktModal({
           />
 
           <div className="max-h-56 divide-y divide-border/40 overflow-y-auto rounded-md border border-border">
-            {filtered.length === 0 ? (
+            {!query ? (
               <div className="px-3 py-5 text-center text-sm text-muted-foreground">
-                {query ? "Ingen kontakt matchar sökningen" : "Inga tillgängliga kontakter"}
+                Skriv för att söka bland kontakter
+              </div>
+            ) : filtered.length === 0 ? (
+              <div className="px-3 py-5 text-center text-sm text-muted-foreground">
+                Ingen kontakt matchar sökningen
               </div>
             ) : (
               filtered.slice(0, 25).map((k) => (
