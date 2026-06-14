@@ -114,14 +114,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 }
 
 function BackgroundGlow() {
-  return (
-    <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
-      <div className="absolute -top-60 left-1/4 h-[700px] w-[900px] -translate-x-1/2 rounded-full opacity-[0.18]"
-        style={{ background: "radial-gradient(closest-side, oklch(0.72 0.12 80), transparent)" }} />
-      <div className="absolute -bottom-20 right-0 h-[600px] w-[600px] opacity-[0.10]"
-        style={{ background: "radial-gradient(closest-side, oklch(0.72 0.12 80), transparent)" }} />
-    </div>
-  );
+  return null;
 }
 
 function DashboardIcon() { return <Svg><path d="M3 3h7v9H3zM14 3h7v5h-7zM14 12h7v9h-7zM3 16h7v5H3z"/></Svg>; }
