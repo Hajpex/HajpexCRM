@@ -1508,11 +1508,13 @@ function KopplaKontaktModal({
       .map((k) => k.id)
   );
   const q = query.toLowerCase();
+  const normTel = (t: string) => t.replace(/[\s\-()+]/g, "");
+  const qTel = normTel(query);
   const filtered = all.filter(
     (k) =>
       !alreadyIds.has(k.id) &&
       (`${k.fornamn} ${k.efternamn}`.toLowerCase().includes(q) ||
-        k.telefon.includes(query) ||
+        normTel(k.telefon).includes(qTel) ||
         k.epost.toLowerCase().includes(q))
   );
 
