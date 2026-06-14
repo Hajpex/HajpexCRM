@@ -286,6 +286,118 @@ function LoggaSamtalModal({ kontaktId, namn, onClose, onSaved }: {
   );
 }
 
+/* ─── Klar med logg modal ─── */
+function KlarMedLoggModal({ ns, kontaktId, namn, onClose, onSaved }: {
+  ns: NastaSteg; kontaktId: string; namn: string; onClose: () => void; onSaved: () => void;
+}) {
+  const [note, setNote] = useState("");
+  const [sattNytt, setSattNytt] = useState(false);
+  const [nyttTyp, setNyttTyp] = useState<NastaStegTyp>("samtal");
+  const [nyttText, setNyttText] = useState("");
+  const [nyttDatum, setNyttDatum] = useState(() => {
+    const d = new Date(); d.setDate(d.getDate() + 3);
+    return d.toISOString().slice(0, 10);
+  });
+
+  const nsIcon = NASTA_STEG_TYPER.find((t) => t.typ === ns.typ)?.icon ?? "📌";
+  const aktTyp: AktivitetTyp = ns.typ === "mejl" ? "mejl" : ns.typ === "annat" ? "anteckning" : "samtal";
+
+  function handleSave() {
+    const parts = ["Avslutat: " + ns.text, note.trim()].filter(Boolean);
+    addAktivitet(kontaktId, { typ: aktTyp, tidpunkt: Date.now(), beskrivning: parts.join(" — ") });
+    if (sattNytt && nyttText.trim()) {
+      setNastaSteg(kontaktId, { typ: nyttTyp, text: nyttText.trim(), datum: new Date(nyttDatum + "T09:00:00").getTime() });
+    } else {
+      setNastaSteg(kontaktId, null);
+    }
+    onSaved();
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4 sm:items-center" onClick={onClose}>
+      <div className="w-full max-w-md rounded-2xl bg-card p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-base font-semibold text-foreground">Klart! — {namn}</h2>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground">✕</button>
+        </div>
+
+        {/* Completed task preview */}
+        <div className="mb-4 flex items-start gap-2.5 rounded-lg border border-emerald-500/20 bg-emerald-500/[0.06] p-3">
+          <span className="text-base">{nsIcon}</span>
+          <p className="text-sm text-foreground">{ns.text}</p>
+          <span className="ml-auto text-emerald-400 text-xs font-medium">✓</span>
+        </div>
+
+        {/* Optional note */}
+        <textarea
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          placeholder="Vad hände? (valfritt)"
+          rows={2}
+          autoFocus
+          className="mb-4 w-full resize-none rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/50 focus:border-primary focus:outline-none"
+        />
+
+        {/* Set next step toggle */}
+        <button
+          onClick={() => setSattNytt((v) => !v)}
+          className={[
+            "mb-3 flex w-full items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors",
+            sattNytt ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:border-primary/30",
+          ].join(" ")}
+        >
+          <span className={["flex h-4 w-4 items-center justify-center rounded border text-[10px] transition-colors",
+            sattNytt ? "border-primary bg-primary text-primary-foreground" : "border-current"].join(" ")}>
+            {sattNytt && "✓"}
+          </span>
+          Sätt nytt nästa steg
+        </button>
+
+        {sattNytt && (
+          <div className="mb-4 space-y-2.5 rounded-lg border border-white/10 bg-white/[0.03] p-3">
+            <div className="flex gap-1.5 flex-wrap">
+              {NASTA_STEG_TYPER.map((t) => (
+                <button
+                  key={t.typ}
+                  onClick={() => setNyttTyp(t.typ)}
+                  className={[
+                    "flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] transition-colors",
+                    nyttTyp === t.typ ? "border-primary bg-primary/15 text-primary" : "border-white/10 text-muted-foreground hover:border-primary/40",
+                  ].join(" ")}
+                >
+                  {t.icon} {t.label}
+                </button>
+              ))}
+            </div>
+            <textarea
+              value={nyttText}
+              onChange={(e) => setNyttText(e.target.value)}
+              placeholder="Vad ska du göra?"
+              rows={2}
+              className="w-full resize-none rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary/50 focus:outline-none"
+            />
+            <input
+              type="date"
+              value={nyttDatum}
+              onChange={(e) => setNyttDatum(e.target.value)}
+              className="w-full rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-foreground focus:border-primary/50 focus:outline-none"
+            />
+          </div>
+        )}
+
+        <div className="flex gap-2">
+          <button onClick={onClose} className="flex-1 rounded-lg border border-border px-4 py-2 text-sm text-muted-foreground hover:bg-muted/50">
+            Avbryt
+          </button>
+          <button onClick={handleSave} className="flex-1 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90">
+            {sattNytt ? "Spara & sätt nästa" : "Spara & stäng"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ─── Info card ─── */
 function InfoCard({ kontakt, editMode, patch }: { kontakt: Kontakt; editMode: boolean; patch: (p: Partial<Kontakt>) => void }) {
   return (
@@ -434,6 +546,7 @@ const NASTA_STEG_TYPER: { typ: NastaStegTyp; label: string; icon: string }[] = [
 function NastaStegCard({ kontakt, onUpdate }: { kontakt: Kontakt; onUpdate: () => void }) {
   const ns = kontakt.nastaSteg ?? null;
   const [adding, setAdding] = useState(false);
+  const [klarOpen, setKlarOpen] = useState(false);
   const [typ, setTyp] = useState<NastaStegTyp>("samtal");
   const [text, setText] = useState("");
   const [datum, setDatum] = useState(() => {
@@ -453,15 +566,11 @@ function NastaStegCard({ kontakt, onUpdate }: { kontakt: Kontakt; onUpdate: () =
     onUpdate();
   }
 
-  function clear() {
-    setNastaSteg(kontakt.id, null);
-    onUpdate();
-  }
-
   const isOverdue = ns && ns.datum < Date.now();
   const icon = NASTA_STEG_TYPER.find((t) => t.typ === (ns?.typ ?? "annat"))?.icon ?? "📌";
 
   return (
+  <>
     <Card title="Nästa steg">
       {ns ? (
         <div className="space-y-3">
@@ -477,7 +586,7 @@ function NastaStegCard({ kontakt, onUpdate }: { kontakt: Kontakt; onUpdate: () =
           </div>
           <div className="flex gap-2">
             <button
-              onClick={clear}
+              onClick={() => setKlarOpen(true)}
               className="flex-1 rounded-lg border border-white/10 py-1.5 text-xs text-muted-foreground hover:border-emerald-500/40 hover:text-emerald-400"
             >
               ✓ Klar
@@ -546,6 +655,16 @@ function NastaStegCard({ kontakt, onUpdate }: { kontakt: Kontakt; onUpdate: () =
         </button>
       )}
     </Card>
+    {klarOpen && ns && (
+      <KlarMedLoggModal
+        ns={ns}
+        kontaktId={kontakt.id}
+        namn={`${kontakt.fornamn} ${kontakt.efternamn}`}
+        onClose={() => setKlarOpen(false)}
+        onSaved={() => { setKlarOpen(false); onUpdate(); }}
+      />
+    )}
+  </>
   );
 }
 

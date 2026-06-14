@@ -4,7 +4,8 @@ import { AppShell } from "../components/AppShell";
 import { listObjekt } from "../lib/objektStore";
 import { OBJEKT } from "../data/objekt";
 import { listKontakter } from "../lib/kontaktStore";
-import { listIntagsmoten } from "../lib/intagsmoteStore";
+import { listIntagsmoten, type Intagsmote } from "../lib/intagsmoteStore";
+import type { Kontakt } from "../lib/kontaktTypes";
 import { listAllaVisningar } from "../lib/visningarStore";
 
 export const Route = createFileRoute("/statistik")({
@@ -326,87 +327,232 @@ function StartTab() {
 
 // ---------- Leads ----------
 function LeadsTab() {
+  const [data, setData] = useState<{
+    total: number; thisMonth: number; thisWeek: number;
+    spek: number; hasMote: number; recent: Kontakt[];
+  } | null>(null);
+
+  useEffect(() => {
+    const ks = listKontakter();
+    const now = Date.now();
+    const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).getTime();
+    const weekStart = now - 7 * 24 * 60 * 60 * 1000;
+    const intagIds = new Set(listIntagsmoten().map((m) => m.kontaktId));
+    setData({
+      total: ks.length,
+      thisMonth: ks.filter((k) => k.skapadAt >= monthStart).length,
+      thisWeek: ks.filter((k) => k.skapadAt >= weekStart).length,
+      spek: ks.filter((k) => k.objektKopplingar.some((kp) => kp.relation === "spekulant")).length,
+      hasMote: ks.filter((k) => intagIds.has(k.id)).length,
+      recent: [...ks].sort((a, b) => b.skapadAt - a.skapadAt).slice(0, 15),
+    });
+  }, []);
+
+  if (!data) return null;
+
+  const moteRate = data.total > 0 ? Math.round((data.hasMote / data.total) * 100) : 0;
+
   return (
-    <Card title="Leads" hint="Per källa · alla typer">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="text-left text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-            <th className="pb-3 font-normal">Källa</th>
-            <th className="pb-3 font-normal">Inkomna</th>
-            <th className="pb-3 font-normal">Hanterad</th>
-            <th className="pb-3 font-normal">Blivit möte</th>
-            <th className="pb-3 font-normal">Affärer</th>
-            <th className="pb-3 font-normal">Totalt arvode</th>
-            <th className="pb-3 font-normal">Snittarvode</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-border/40">
-          <tr className="font-medium"><td className="py-3">Totalt</td><td>7</td><td>7 (100%)</td><td>2 (28,6%)</td><td>0 (0,0%)</td><td>0</td><td>0</td></tr>
-          <tr><td className="py-3">Värdebevakaren</td><td>3</td><td>3</td><td>1</td><td>0</td><td>0</td><td>0</td></tr>
-          <tr><td className="py-3">Spekulantregistret</td><td>2</td><td>2</td><td>1</td><td>0</td><td>0</td><td>0</td></tr>
-          <tr><td className="py-3">Fria värderingar</td><td>1</td><td>1</td><td>0</td><td>0</td><td>0</td><td>0</td></tr>
-          <tr><td className="py-3">Boneo</td><td>1</td><td>1</td><td>0</td><td>0</td><td>0</td><td>0</td></tr>
-        </tbody>
-      </table>
-    </Card>
+    <div className="space-y-6">
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-5">
+        <KpiTile label="Totalt" value={String(data.total)} />
+        <KpiTile label="Denna månad" value={String(data.thisMonth)} tone={data.thisMonth > 0 ? "good" : "default"} />
+        <KpiTile label="Senaste 7 dagar" value={String(data.thisWeek)} tone={data.thisWeek > 0 ? "good" : "default"} />
+        <KpiTile label="Spekulanter" value={String(data.spek)} tone={data.spek > 0 ? "good" : "default"} />
+        <KpiTile label="Blivit möte" value={`${moteRate}%`} sub={`${data.hasMote} av ${data.total}`} tone={moteRate >= 30 ? "good" : moteRate > 0 ? "warn" : "default"} />
+      </div>
+
+      <Card title="Senaste kontakter" hint={data.recent.length === data.total ? "Alla" : `Senaste ${data.recent.length}`}>
+        {data.recent.length === 0 ? (
+          <p className="py-6 text-center text-sm text-muted-foreground">
+            Inga kontakter ännu.{" "}
+            <a href="/kunder" className="text-primary hover:underline">Lägg till din första →</a>
+          </p>
+        ) : (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+                <th className="pb-3 font-normal">Namn</th>
+                <th className="pb-3 font-normal">Telefon</th>
+                <th className="pb-3 font-normal">Ort</th>
+                <th className="pb-3 font-normal">Skapad</th>
+                <th className="pb-3 font-normal">Roll</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border/40">
+              {data.recent.map((k) => {
+                const isSpek = k.objektKopplingar.some((kp) => kp.relation === "spekulant");
+                const isSaljare = k.objektKopplingar.some((kp) => kp.relation === "säljare");
+                return (
+                  <tr key={k.id} className="text-foreground/90">
+                    <td className="py-2.5 font-medium">{k.fornamn} {k.efternamn}</td>
+                    <td className="py-2.5 text-muted-foreground">{k.telefon || "—"}</td>
+                    <td className="py-2.5 text-muted-foreground">{k.ort || "—"}</td>
+                    <td className="py-2.5 text-muted-foreground">{new Date(k.skapadAt).toLocaleDateString("sv-SE")}</td>
+                    <td className="py-2.5">
+                      {isSpek ? <span className="rounded-full bg-sky-500/15 px-2 py-0.5 text-[10px] text-sky-400">Spekulant</span>
+                        : isSaljare ? <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] text-emerald-400">Säljare</span>
+                        : <span className="text-muted-foreground">—</span>}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+      </Card>
+    </div>
   );
 }
 
 // ---------- Intagsmöten ----------
+const INTAG_STATUS_COLORS: Record<string, string> = {
+  Vunnen: "bg-emerald-500",
+  Planerat: "bg-sky-400",
+  Genomfört: "bg-primary",
+  Förlorad: "bg-rose-500",
+};
+
 function IntagTab() {
-  const segs = [
-    { label: "Vunnen", value: 94, color: "bg-emerald-500" },
-    { label: "Värdering", value: 70, color: "bg-sky-400" },
-    { label: "Förlorad", value: 22, color: "bg-rose-500" },
-    { label: "Avbokad", value: 17, color: "bg-rose-400" },
-    { label: "Inväntar svar", value: 14, color: "bg-amber-400" },
-    { label: "Ej rapporterad", value: 4, color: "bg-muted" },
-  ];
-  const total = segs.reduce((s, x) => s + x.value, 0);
+  const [data, setData] = useState<{
+    moten: Intagsmote[];
+    byStatus: { label: string; value: number; color: string }[];
+    vinnRate: number;
+    avgVardering: number | null;
+    byKalla: { kalla: string; total: number; vunna: number }[];
+  } | null>(null);
+
+  useEffect(() => {
+    const moten = listIntagsmoten();
+    const statusMap: Record<string, number> = {};
+    for (const m of moten) statusMap[m.status] = (statusMap[m.status] ?? 0) + 1;
+    const byStatus = Object.entries(statusMap).map(([label, value]) => ({
+      label, value, color: INTAG_STATUS_COLORS[label] ?? "bg-muted",
+    }));
+
+    const vunna = moten.filter((m) => m.status === "Vunnen");
+    const vinnRate = moten.length > 0 ? Math.round((vunna.length / moten.length) * 100) : 0;
+    const valuations = vunna.map((m) => m.vardering).filter((v): v is number => v !== null);
+    const avgVardering = valuations.length > 0 ? Math.round(valuations.reduce((s, v) => s + v, 0) / valuations.length) : null;
+
+    const kallaMap = new Map<string, { total: number; vunna: number }>();
+    for (const m of moten) {
+      const k = m.kalla || "Okänd";
+      const prev = kallaMap.get(k) ?? { total: 0, vunna: 0 };
+      kallaMap.set(k, { total: prev.total + 1, vunna: prev.vunna + (m.status === "Vunnen" ? 1 : 0) });
+    }
+    const byKalla = [...kallaMap.entries()]
+      .map(([kalla, v]) => ({ kalla, ...v }))
+      .sort((a, b) => b.total - a.total);
+
+    setData({ moten, byStatus, vinnRate, avgVardering, byKalla });
+  }, []);
+
+  if (!data) return null;
+
+  const total = data.moten.length;
+
   return (
     <div className="space-y-6">
       <div className="grid gap-6 lg:grid-cols-2">
-        <Card title="Intagsmöte — resultat" hint={`Antal: ${total} · genomsnittlig värdering 4 456 180 kr`}>
-          <div className="flex h-3 w-full overflow-hidden rounded-full">
-            {segs.map((s) => <div key={s.label} className={s.color} style={{ width: `${(s.value/total)*100}%` }} />)}
-          </div>
-          <ul className="mt-5 space-y-2 text-sm">
-            {segs.map((s) => (
-              <li key={s.label} className="flex items-center justify-between">
-                <span className="flex items-center gap-2"><span className={`h-2.5 w-2.5 rounded-full ${s.color}`} />{s.label}</span>
-                <span className="text-muted-foreground">{s.value}</span>
-              </li>
-            ))}
-          </ul>
+        <Card title="Intagsmöten — status" hint={`${total} totalt`}>
+          {total === 0 ? (
+            <p className="py-6 text-center text-sm text-muted-foreground">
+              Inga intagsmöten ännu. Skapa ett via en kontaktsida.
+            </p>
+          ) : (
+            <>
+              <div className="flex h-3 w-full overflow-hidden rounded-full">
+                {data.byStatus.map((s) => (
+                  <div key={s.label} className={s.color} style={{ width: `${(s.value / total) * 100}%` }} />
+                ))}
+              </div>
+              <ul className="mt-5 space-y-2 text-sm">
+                {data.byStatus.map((s) => (
+                  <li key={s.label} className="flex items-center justify-between">
+                    <span className="flex items-center gap-2">
+                      <span className={`h-2.5 w-2.5 rounded-full ${s.color}`} />{s.label}
+                    </span>
+                    <span className="text-muted-foreground">{s.value} ({Math.round(s.value / total * 100)}%)</span>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
         </Card>
 
-        <Card title="Intagsmöte — bokade under perioden" hint="Antal: 19 · vunna 36,8%">
-          <div className="space-y-2">
-            <div><div className="mb-1 flex justify-between text-xs"><span>Bokades</span><span>17</span></div><Bar value={17} max={17} color="bg-sky-400" /></div>
-            <div><div className="mb-1 flex justify-between text-xs"><span>Vunnen</span><span>6</span></div><Bar value={6} max={17} color="bg-emerald-500" /></div>
-            <div><div className="mb-1 flex justify-between text-xs"><span>Avbokad</span><span>1</span></div><Bar value={1} max={17} color="bg-rose-500" /></div>
-          </div>
-        </Card>
+        <div className="grid grid-cols-2 gap-4 content-start">
+          <KpiTile label="Vinnrat" value={`${data.vinnRate}%`} tone={data.vinnRate >= 50 ? "good" : data.vinnRate > 0 ? "warn" : "default"} />
+          <KpiTile label="Totalt möten" value={String(total)} />
+          <KpiTile label="Snitt värdering" value={data.avgVardering ? `${fmtKr(Math.round(data.avgVardering / 1000))} k` : "—"} />
+          <KpiTile label="Vunna" value={String(data.byStatus.find((s) => s.label === "Vunnen")?.value ?? 0)} tone="good" />
+        </div>
       </div>
 
-      <Card title="Källa — bokade under perioden">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="text-left text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-              <th className="pb-3 font-normal">Källa</th>
-              <th className="pb-3 font-normal">Bokades</th>
-              <th className="pb-3 font-normal">Genomförda</th>
-              <th className="pb-3 font-normal">Vunnen</th>
-              <th className="pb-3 font-normal">Vunnen %</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border/40">
-            <tr className="font-medium"><td className="py-3">Totalt</td><td>17</td><td>19</td><td>6</td><td>31,6%</td></tr>
-            {["Tidigare köpare","Tidigare säljare","Värdebevakaren","Spekulantregistret","Fria värderingar","Hemnet","Boneo","Egen kontakt"].map((k, i) => (
-              <tr key={k}><td className="py-3">{k}</td><td>{[3,2,2,2,2,2,1,3][i]}</td><td>{[3,2,2,2,2,2,1,5][i]}</td><td>{[2,1,1,1,0,1,0,0][i]}</td><td>{[67,50,50,50,0,50,0,0][i]}%</td></tr>
-            ))}
-          </tbody>
-        </table>
+      <Card title="Per källa" hint="Baserat på dina intagsmöten">
+        {data.byKalla.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Inga käll-uppgifter registrerade ännu.</p>
+        ) : (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+                <th className="pb-3 font-normal">Källa</th>
+                <th className="pb-3 font-normal">Bokade</th>
+                <th className="pb-3 font-normal">Vunna</th>
+                <th className="pb-3 font-normal">Vinnrat</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border/40">
+              {data.byKalla.map((k) => (
+                <tr key={k.kalla} className="text-foreground/90">
+                  <td className="py-2.5">{k.kalla}</td>
+                  <td className="py-2.5">{k.total}</td>
+                  <td className="py-2.5">{k.vunna}</td>
+                  <td className="py-2.5 text-muted-foreground">
+                    {k.total > 0 ? `${Math.round((k.vunna / k.total) * 100)}%` : "—"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </Card>
+
+      <Card title="Alla intagsmöten" hint="Senaste visas först">
+        {data.moten.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Inga intagsmöten ännu.</p>
+        ) : (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+                <th className="pb-3 font-normal">Adress</th>
+                <th className="pb-3 font-normal">Datum</th>
+                <th className="pb-3 font-normal">Källa</th>
+                <th className="pb-3 font-normal">Värdering</th>
+                <th className="pb-3 font-normal">Status</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border/40">
+              {[...data.moten].sort((a, b) => b.tidpunkt - a.tidpunkt).map((m) => (
+                <tr key={m.id} className="text-foreground/90">
+                  <td className="py-2.5">{m.adress || "—"}</td>
+                  <td className="py-2.5 text-muted-foreground">{new Date(m.tidpunkt).toLocaleDateString("sv-SE")}</td>
+                  <td className="py-2.5 text-muted-foreground">{m.kalla || "—"}</td>
+                  <td className="py-2.5 text-muted-foreground">{m.vardering ? `${fmtKr(m.vardering)} kr` : "—"}</td>
+                  <td className="py-2.5">
+                    <span className={[
+                      "rounded-full px-2 py-0.5 text-[10px] font-medium",
+                      m.status === "Vunnen" ? "bg-emerald-500/15 text-emerald-400"
+                        : m.status === "Förlorad" ? "bg-rose-500/15 text-rose-400"
+                        : m.status === "Planerat" ? "bg-sky-500/15 text-sky-400"
+                        : "bg-primary/15 text-primary",
+                    ].join(" ")}>{m.status}</span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </Card>
     </div>
   );
