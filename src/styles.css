@@ -63,75 +63,75 @@
 
 :root {
   --radius: 0.625rem;
-  /* Solklar — varm krämig bakgrund, honung/amber accent */
-  --background: oklch(0.987 0.007 88);       /* #FDFAF3 varm kräm */
-  --foreground: oklch(0.112 0.022 52);       /* #1C1408 mörk varm */
-  --card: oklch(1 0 0);                       /* #FFFFFF vit */
-  --card-foreground: oklch(0.112 0.022 52);
+  /* Nordic Pro — rent vitt, mörkblå #0F4C81 accent */
+  --background: oklch(1 0 0);                    /* #FFFFFF rent vitt */
+  --foreground: oklch(0.155 0.020 254);           /* #0A1628 mörk navy */
+  --card: oklch(0.985 0.006 240);                 /* #F5F7FA ljust blågrå */
+  --card-foreground: oklch(0.155 0.020 254);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.112 0.022 52);
-  --primary: oklch(0.613 0.158 66);           /* #C8870A honung/amber */
-  --primary-foreground: oklch(1 0 0);         /* vit text på amber */
-  --secondary: oklch(0.968 0.018 86);         /* #FAF5E8 varm ljus */
-  --secondary-foreground: oklch(0.112 0.022 52);
-  --muted: oklch(0.968 0.018 86);
-  --muted-foreground: oklch(0.506 0.048 65);  /* #8B7455 varm mellanbrun */
-  --accent: oklch(0.613 0.158 66);
+  --popover-foreground: oklch(0.155 0.020 254);
+  --primary: oklch(0.362 0.131 254);              /* #0F4C81 mörkblå */
+  --primary-foreground: oklch(1 0 0);             /* vit text på blå */
+  --secondary: oklch(0.963 0.012 248);            /* #EEF2F8 ljusblå */
+  --secondary-foreground: oklch(0.155 0.020 254);
+  --muted: oklch(0.963 0.012 248);
+  --muted-foreground: oklch(0.490 0.028 248);     /* #5B6B8A blågrå */
+  --accent: oklch(0.362 0.131 254);
   --accent-foreground: oklch(1 0 0);
   --destructive: oklch(0.58 0.22 27);
-  --destructive-foreground: oklch(0.98 0.003 247);
-  --border: oklch(0.112 0.022 52 / 8%);
-  --input: oklch(0.112 0.022 52 / 10%);
-  --ring: oklch(0.613 0.158 66);
-  --chart-1: oklch(0.613 0.158 66);
-  --chart-2: oklch(0.580 0.130 155);
-  --chart-3: oklch(0.700 0.130 120);
+  --destructive-foreground: oklch(0.98 0 0);
+  --border: oklch(0.155 0.020 254 / 10%);
+  --input: oklch(0.155 0.020 254 / 8%);
+  --ring: oklch(0.362 0.131 254);
+  --chart-1: oklch(0.362 0.131 254);
+  --chart-2: oklch(0.520 0.140 200);
+  --chart-3: oklch(0.600 0.120 155);
   --chart-4: oklch(0.540 0.150 45);
-  --chart-5: oklch(0.750 0.120 90);
-  --sidebar: oklch(1 0 0);
-  --sidebar-foreground: oklch(0.112 0.022 52);
-  --sidebar-primary: oklch(0.613 0.158 66);
+  --chart-5: oklch(0.650 0.110 290);
+  --sidebar: oklch(0.970 0.010 248);              /* #EDF1F8 sidebar ljusblå */
+  --sidebar-foreground: oklch(0.155 0.020 254);
+  --sidebar-primary: oklch(0.362 0.131 254);
   --sidebar-primary-foreground: oklch(1 0 0);
-  --sidebar-accent: oklch(0.968 0.018 86);
-  --sidebar-accent-foreground: oklch(0.112 0.022 52);
-  --sidebar-border: oklch(0.112 0.022 52 / 8%);
-  --sidebar-ring: oklch(0.613 0.158 66);
+  --sidebar-accent: oklch(0.940 0.018 248);
+  --sidebar-accent-foreground: oklch(0.155 0.020 254);
+  --sidebar-border: oklch(0.155 0.020 254 / 8%);
+  --sidebar-ring: oklch(0.362 0.131 254);
 }
 
 .dark {
-  /* Solklar mörkt — varm brun istället för kall nattblå */
-  --background: oklch(0.148 0.024 52);         /* #1E1408 varm nästan-svart */
-  --foreground: oklch(0.952 0.010 82);          /* #F2EDE0 varm off-white */
-  --card: oklch(0.190 0.025 54);               /* #261A0E något ljusare */
-  --card-foreground: oklch(0.952 0.010 82);
-  --popover: oklch(0.190 0.025 54);
-  --popover-foreground: oklch(0.952 0.010 82);
-  --primary: oklch(0.638 0.155 66);             /* amber, lite ljusare i mörkt */
-  --primary-foreground: oklch(0.112 0.022 52);
-  --secondary: oklch(0.225 0.028 54);
-  --secondary-foreground: oklch(0.952 0.010 82);
-  --muted: oklch(0.225 0.028 54);
-  --muted-foreground: oklch(0.580 0.040 65);
-  --accent: oklch(0.638 0.155 66);
-  --accent-foreground: oklch(0.112 0.022 52);
+  /* Nordic Pro mörkt — djup nattblå, ej kol-svart */
+  --background: oklch(0.163 0.038 258);           /* #0D1B2E djup nattblå */
+  --foreground: oklch(0.938 0.014 248);            /* #E4EBF5 ljusblå off-white */
+  --card: oklch(0.212 0.040 258);                 /* #152338 något ljusare blå */
+  --card-foreground: oklch(0.938 0.014 248);
+  --popover: oklch(0.212 0.040 258);
+  --popover-foreground: oklch(0.938 0.014 248);
+  --primary: oklch(0.530 0.155 254);              /* ljusare blå i mörkt läge */
+  --primary-foreground: oklch(1 0 0);
+  --secondary: oklch(0.255 0.042 258);
+  --secondary-foreground: oklch(0.938 0.014 248);
+  --muted: oklch(0.255 0.042 258);
+  --muted-foreground: oklch(0.600 0.030 248);
+  --accent: oklch(0.530 0.155 254);
+  --accent-foreground: oklch(1 0 0);
   --destructive: oklch(0.65 0.20 22);
-  --destructive-foreground: oklch(0.952 0.010 82);
-  --border: oklch(1 0 0 / 8%);
-  --input: oklch(1 0 0 / 10%);
-  --ring: oklch(0.638 0.155 66);
-  --chart-1: oklch(0.638 0.155 66);
-  --chart-2: oklch(0.620 0.130 155);
-  --chart-3: oklch(0.720 0.130 120);
+  --destructive-foreground: oklch(0.938 0.014 248);
+  --border: oklch(1 0 0 / 9%);
+  --input: oklch(1 0 0 / 8%);
+  --ring: oklch(0.530 0.155 254);
+  --chart-1: oklch(0.530 0.155 254);
+  --chart-2: oklch(0.580 0.140 200);
+  --chart-3: oklch(0.640 0.120 155);
   --chart-4: oklch(0.580 0.150 45);
-  --chart-5: oklch(0.770 0.120 90);
-  --sidebar: oklch(0.190 0.025 54);
-  --sidebar-foreground: oklch(0.952 0.010 82);
-  --sidebar-primary: oklch(0.638 0.155 66);
-  --sidebar-primary-foreground: oklch(0.112 0.022 52);
-  --sidebar-accent: oklch(0.225 0.028 54);
-  --sidebar-accent-foreground: oklch(0.952 0.010 82);
+  --chart-5: oklch(0.680 0.110 290);
+  --sidebar: oklch(0.140 0.036 258);              /* lite mörkare än bg */
+  --sidebar-foreground: oklch(0.938 0.014 248);
+  --sidebar-primary: oklch(0.530 0.155 254);
+  --sidebar-primary-foreground: oklch(1 0 0);
+  --sidebar-accent: oklch(0.212 0.040 258);
+  --sidebar-accent-foreground: oklch(0.938 0.014 248);
   --sidebar-border: oklch(1 0 0 / 8%);
-  --sidebar-ring: oklch(0.638 0.155 66);
+  --sidebar-ring: oklch(0.530 0.155 254);
 }
 
 @layer base {

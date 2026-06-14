@@ -5,6 +5,7 @@ export type BudgetGoals = {
   salda: number;
   intag: number;
   redo: number;
+  provisionPct: number;
 };
 
 const DEFAULTS: BudgetGoals = {
@@ -12,6 +13,7 @@ const DEFAULTS: BudgetGoals = {
   salda: 6,
   intag: 18,
   redo: 4,
+  provisionPct: 0.015,
 };
 
 function read(): BudgetGoals {

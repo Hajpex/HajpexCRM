@@ -229,7 +229,7 @@ function BudgetField({ label, value, onChange }: { label: string; value: number;
 }
 
 function StartTab() {
-  const [budget, setBudget] = useState<BudgetGoals>({ omsattning: 300_000, salda: 6, intag: 18, redo: 4 });
+  const [budget, setBudget] = useState<BudgetGoals>({ omsattning: 300_000, salda: 6, intag: 18, redo: 4, provisionPct: 0.015 });
   const [editBudget, setEditBudget] = useState(false);
   const [draft, setDraft] = useState<BudgetGoals>(budget);
 
@@ -267,8 +267,9 @@ function StartTab() {
       return new Date(k.data.kontraktsdatum).getTime() >= monthStart;
     });
     const saldaThisMonth = signedThisMonth.length;
+    const provPct = getBudget().provisionPct;
     const omsattningMonth = signedThisMonth.reduce((sum, k) => {
-      return sum + Math.round((Number(k.data.slutpris) || 0) * 0.015 * 1.25);
+      return sum + Math.round((Number(k.data.slutpris) || 0) * provPct * 1.25);
     }, 0);
 
     const signed365 = signed.filter((k) => {
@@ -277,7 +278,7 @@ function StartTab() {
     });
     const salda365 = signed365.length;
     const omsattning365 = signed365.reduce((sum, k) => {
-      return sum + Math.round((Number(k.data.slutpris) || 0) * 0.015 * 1.25);
+      return sum + Math.round((Number(k.data.slutpris) || 0) * provPct * 1.25);
     }, 0);
     const avgProvision = salda365 > 0 ? Math.round(omsattning365 / salda365) : 44_000;
 
@@ -330,11 +331,23 @@ function StartTab() {
       >
         {editBudget ? (
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+            <div className="grid grid-cols-2 gap-4 md:grid-cols-4 lg:grid-cols-5">
               <BudgetField label="Omsättning (kr)" value={draft.omsattning} onChange={(v) => setDraft((d) => ({ ...d, omsattning: v }))} />
               <BudgetField label="Sålda objekt" value={draft.salda} onChange={(v) => setDraft((d) => ({ ...d, salda: v }))} />
               <BudgetField label="Intagsmöten" value={draft.intag} onChange={(v) => setDraft((d) => ({ ...d, intag: v }))} />
               <BudgetField label="Redo-objekt" value={draft.redo} onChange={(v) => setDraft((d) => ({ ...d, redo: v }))} />
+              <label className="block text-xs font-medium text-muted-foreground">
+                Provision (%)
+                <input
+                  type="number"
+                  step="0.1"
+                  min={0}
+                  max={10}
+                  value={Number((draft.provisionPct * 100).toFixed(2))}
+                  onChange={(e) => setDraft((d) => ({ ...d, provisionPct: (Number(e.target.value) || 0) / 100 }))}
+                  className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-primary/40 focus:outline-none"
+                />
+              </label>
             </div>
             <div className="flex justify-end gap-2">
               <button
@@ -759,15 +772,16 @@ function KpiTab() {
         const d = new Date(m.tidpunkt);
         return d.getFullYear() === year && d.getMonth() === month;
       });
+      const pp = getBudget().provisionPct;
       if (kpi === "Arvode/provision") {
-        return inMonth.reduce((s, k) => s + Math.round((Number(k.data.slutpris) || 0) * 0.015 * 1.25 / 1000), 0);
+        return inMonth.reduce((s, k) => s + Math.round((Number(k.data.slutpris) || 0) * pp * 1.25 / 1000), 0);
       }
       if (kpi === "Antal sålda objekt") return inMonth.length;
       if (kpi === "Bokade intag") return motenInMonth.length;
       if (kpi === "Vunna intag") return motenInMonth.filter((m) => m.status === "Vunnen").length;
       if (kpi === "Snittarvode") {
         if (inMonth.length === 0) return 0;
-        const total = inMonth.reduce((s, k) => s + Math.round((Number(k.data.slutpris) || 0) * 0.015 * 1.25 / 1000), 0);
+        const total = inMonth.reduce((s, k) => s + Math.round((Number(k.data.slutpris) || 0) * pp * 1.25 / 1000), 0);
         return Math.round(total / inMonth.length);
       }
       return 0;
@@ -977,8 +991,9 @@ function TillvaxtTab() {
     const moten = listIntagsmoten();
     const vunna = moten.filter((m) => m.status === "Vunnen");
 
+    const pp = getBudget().provisionPct;
     const totalSlutpris = signed.reduce((s, k) => s + (Number(k.data.slutpris) || 0), 0);
-    const omsattning = signed.reduce((s, k) => s + Math.round((Number(k.data.slutpris) || 0) * 0.015 * 1.25), 0);
+    const omsattning = signed.reduce((s, k) => s + Math.round((Number(k.data.slutpris) || 0) * pp * 1.25), 0);
     const salda = signed.length;
     const snittprov = salda > 0 && totalSlutpris > 0
       ? ((omsattning / totalSlutpris) * 100).toFixed(2) + "%"

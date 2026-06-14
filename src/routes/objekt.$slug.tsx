@@ -8,6 +8,7 @@ import { generateMarketingText } from "../lib/ai.functions";
 import { listBud, addBud, markeraVinnare, deleteBud, fmtBud, type Bud } from "../lib/budgivningStore";
 import { getKontrakt, saveKontrakt, type KontraktData } from "../lib/kontraktStore";
 import { fmtSweNum, handleNumberInput } from "../lib/formatters";
+import { getBudget } from "../lib/budgetStore";
 import { getDemoSaljare } from "../lib/demoKontakter";
 import { listKontakter, addObjektKoppling, saveKontakt, removeObjektKoppling } from "../lib/kontaktStore";
 import type { KontaktRelation, Kontakt } from "../lib/kontaktTypes";
@@ -3616,7 +3617,7 @@ function KoEfterarbeteBody({ slug }: { slug: string }) {
   }
 
   const slutpris = Number(form.slutpris) || 0;
-  const provisionPct = 0.015;
+  const provisionPct = getBudget().provisionPct;
   const provisionExMoms = Math.round(slutpris * provisionPct);
   const moms = Math.round(provisionExMoms * 0.25);
   const provisionInkMoms = provisionExMoms + moms;
@@ -3669,7 +3670,7 @@ function KoEfterarbeteBody({ slug }: { slug: string }) {
               <span className="font-medium">{slutpris.toLocaleString("sv-SE")} SEK</span>
             </div>
             <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">Provision (1,5 %)</span>
+              <span className="text-muted-foreground">Provision ({(provisionPct * 100).toLocaleString("sv-SE", { maximumFractionDigits: 2 })} %)</span>
               <span className="font-medium">{provisionExMoms.toLocaleString("sv-SE")} SEK</span>
             </div>
             <div className="flex items-center justify-between text-sm">
