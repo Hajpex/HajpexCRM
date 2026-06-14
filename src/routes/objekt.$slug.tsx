@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Fragment, createContext, useContext, useState, useEffect, type ReactNode } from "react";
+import { Fragment, createContext, useContext, useRef, useState, useEffect, type ReactNode } from "react";
 import { AppShell } from "../components/AppShell";
 import { OBJEKT, type Objekt } from "../data/objekt";
 import { listObjekt } from "../lib/objektStore";
@@ -46,6 +46,8 @@ type SavedSizes = [number, number];
 
 const TOP_TABS = ["Översikt", "Spekulanter"] as const;
 
+const TabCtx = createContext<(tab: SideTab) => void>(() => {});
+
 function readPanelSizes(layout: Record<string, number>, firstId: string, secondId: string): SavedSizes {
   return [layout[firstId] ?? 50, layout[secondId] ?? 50];
 }
@@ -89,6 +91,7 @@ function ObjektDetailPage() {
 
   return (
     <AppShell>
+      <TabCtx.Provider value={setTab}>
       <div className="mx-auto max-w-[1500px] px-6 pb-24 pt-8">
         {/* Breadcrumb / header */}
         <div className="mb-4 flex items-center gap-3 text-xs text-muted-foreground">
@@ -134,7 +137,7 @@ function ObjektDetailPage() {
           <div className="flex flex-wrap gap-2">
             <PillBtn onClick={() => setKoppla("säljare")}>+ Koppla säljare</PillBtn>
             <PillBtn onClick={() => setKoppla("köpare")}>+ Koppla köpare</PillBtn>
-            <PillBtn>Marknad</PillBtn>
+            <PillBtn onClick={() => setTab("Marknad")}>Marknad</PillBtn>
             {editLayout && (
               <button
                 onClick={() => {
@@ -261,6 +264,7 @@ function ObjektDetailPage() {
           onLinked={() => setKoppla(null)}
         />
       )}
+      </TabCtx.Provider>
     </AppShell>
   );
 }
@@ -1343,11 +1347,39 @@ function Checkbox({ label, defaultChecked }: { label: string; defaultChecked?: b
   );
 }
 
-function BtnPrimary({ children }: { children: ReactNode }) {
-  return <button className="rounded-md bg-primary px-3 py-2 text-xs font-medium text-primary-foreground hover:opacity-90">{children}</button>;
+function BtnPrimary({ children, onClick, disabled }: { children: ReactNode; onClick?: () => void; disabled?: boolean }) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className="rounded-md bg-primary px-3 py-2 text-xs font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
+    >
+      {children}
+    </button>
+  );
 }
-function BtnGhost({ children }: { children: ReactNode }) {
-  return <button className="rounded-md border border-border bg-card px-3 py-2 text-xs font-medium text-foreground hover:border-primary/40 hover:text-primary">{children}</button>;
+function BtnGhost({ children, onClick, disabled }: { children: ReactNode; onClick?: () => void; disabled?: boolean }) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className="rounded-md border border-border bg-card px-3 py-2 text-xs font-medium text-foreground hover:border-primary/40 hover:text-primary disabled:opacity-50"
+    >
+      {children}
+    </button>
+  );
+}
+
+function QuickNavBar() {
+  const switchTab = useContext(TabCtx);
+  return (
+    <div className="flex flex-wrap items-center justify-end gap-4 border-b border-border pb-3 text-xs">
+      <button onClick={() => switchTab("Marknad")} className="text-primary hover:underline">Publicera</button>
+      <button onClick={() => switchTab("Marknad")} className="text-primary hover:underline">Klippbok</button>
+      <button onClick={() => switchTab("Start")} className="text-primary hover:underline">Anteckningar</button>
+      <button onClick={() => switchTab("Dokument")} className="text-primary hover:underline">Mäklarjournal</button>
+    </div>
+  );
 }
 
 /* ---------- Mäklarjournal ---------- */
@@ -1440,12 +1472,7 @@ function KopareView() {
   const cols = ["Sorteringsordning","Namn","Andel","Pers. nr./Org. nr.","Telefon","E-post","Adress","BankID","Aktivitet"];
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-end gap-4 border-b border-border pb-3 text-xs">
-        <a className="text-primary hover:underline" href="#">Publicera</a>
-        <a className="text-primary hover:underline" href="#">Klippbok</a>
-        <a className="text-primary hover:underline" href="#">Anteckningar</a>
-        <a className="text-primary hover:underline" href="#">Mäklarjournal</a>
-      </div>
+      <QuickNavBar />
 
       <section className="rounded-md border border-border bg-card">
         <button
@@ -1730,16 +1757,54 @@ function FileIcon({ ext }: { ext: "pdf" | "png" }) {
   return <span className={`inline-flex h-7 w-6 items-center justify-center rounded-sm text-[9px] font-bold uppercase ${cls}`}>{ext}</span>;
 }
 
+type UploadedFile = { name: string; ext: string; sizeKb: number; date: string };
+
+function fileExt(name: string): string {
+  return name.split(".").pop()?.toLowerCase() ?? "fil";
+}
+
+function todayStr(): string {
+  return new Date().toLocaleDateString("sv-SE");
+}
+
 function DokumentView({ slug }: { slug: string }) {
   const isBrf = getObjektBySlug(slug)?.typ === "Bostadsrätt";
+  const dokRef = useRef<HTMLInputElement>(null);
+  const filRef = useRef<HTMLInputElement>(null);
+  const [uploadedDok, setUploadedDok] = useState<UploadedFile[]>([]);
+  const [uploadedFil, setUploadedFil] = useState<UploadedFile[]>([]);
+  const [dragOver, setDragOver] = useState(false);
+
+  function addFiles(files: FileList | null, target: "dok" | "fil") {
+    if (!files) return;
+    const mapped: UploadedFile[] = Array.from(files).map((f) => ({
+      name: f.name,
+      ext: fileExt(f.name),
+      sizeKb: Math.round(f.size / 1024),
+      date: todayStr(),
+    }));
+    if (target === "dok") setUploadedDok((prev) => [...prev, ...mapped]);
+    else setUploadedFil((prev) => [...prev, ...mapped]);
+  }
+
+  const allFiles = [...DOK_FILES.map((f, i) => ({ ...f, ord: i + 1 })), ...uploadedFil.map((f, i) => ({
+    ord: DOK_FILES.length + i + 1,
+    ext: (f.ext === "pdf" ? "pdf" : "png") as "pdf" | "png",
+    typ: "Övrigt",
+    titel: f.name,
+    beskrivning: undefined as string | undefined,
+    vInternet: false,
+    vMarknad: false,
+    vKund: false,
+    uppladdad: f.date,
+  }))];
+
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-end gap-4 border-b border-border pb-3 text-xs">
-        <a className="text-primary hover:underline" href="#">Publicera</a>
-        <a className="text-primary hover:underline" href="#">Klippbok</a>
-        <a className="text-primary hover:underline" href="#">Anteckningar</a>
-        <a className="text-primary hover:underline" href="#">Mäklarjournal</a>
-      </div>
+      <input ref={dokRef} type="file" multiple accept=".pdf,.doc,.docx,.jpg,.png" className="hidden" onChange={(e) => addFiles(e.target.files, "dok")} />
+      <input ref={filRef} type="file" multiple className="hidden" onChange={(e) => addFiles(e.target.files, "fil")} />
+
+      <QuickNavBar />
 
       <DokSection
         title="Dokument"
@@ -1752,10 +1817,10 @@ function DokumentView({ slug }: { slug: string }) {
       >
         <div className="mb-4 flex items-start gap-2 rounded-md border border-border bg-background/40 px-3 py-2 text-xs text-muted-foreground">
           <span>ℹ</span>
-          <span>För att lära dig allt om dokumenthanteringen, vänligen titta på <a className="text-primary hover:underline" href="#">dessa filmer</a>.</span>
+          <span>För att lära dig allt om dokumenthanteringen, lägg till dina dokument via knappen nedan.</span>
         </div>
         <div className="mb-4 flex flex-wrap gap-2">
-          <BtnPrimary>+ Lägg till dokument</BtnPrimary>
+          <BtnPrimary onClick={() => dokRef.current?.click()}>+ Lägg till dokument</BtnPrimary>
           <BtnGhost>✉ Brev</BtnGhost>
           <BtnGhost>🧾 Kvitto</BtnGhost>
           <BtnGhost>📅 Faktura</BtnGhost>
@@ -1794,18 +1859,43 @@ function DokumentView({ slug }: { slug: string }) {
                   <td className="px-3 py-2"><input type="checkbox" className="h-4 w-4 accent-primary" /></td>
                 </tr>
               ))}
+              {uploadedDok.map((f, i) => (
+                <tr key={`up-${i}`} className="bg-primary/5">
+                  <td className="px-3 py-2">
+                    <div className="font-medium">{f.name}</div>
+                    <div className="text-xs text-muted-foreground">{f.sizeKb} KB</div>
+                  </td>
+                  <td className="px-3 py-2"><span className="rounded bg-primary/15 px-2 py-0.5 text-[11px] text-primary">Uppladdad</span></td>
+                  <td className="px-3 py-2 text-muted-foreground">{f.date}</td>
+                  <td className="px-3 py-2 text-muted-foreground">{f.date}</td>
+                  <td className="px-3 py-2 text-muted-foreground">✉</td>
+                  <td className="px-3 py-2 text-muted-foreground">📄 ⚙</td>
+                  <td className="px-3 py-2"><input type="checkbox" className="h-4 w-4 accent-primary" /></td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
       </DokSection>
 
       <DokSection title="Filer">
-        <div className="mb-4 flex h-24 items-center justify-center rounded-md border border-dashed border-border bg-background/30 text-sm text-muted-foreground">
-          Dra filer hit för att ladda upp
+        <div
+          onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={(e) => { e.preventDefault(); setDragOver(false); addFiles(e.dataTransfer.files, "fil"); }}
+          onClick={() => filRef.current?.click()}
+          className={[
+            "mb-4 flex h-24 cursor-pointer items-center justify-center rounded-md border border-dashed text-sm transition-colors",
+            dragOver
+              ? "border-primary bg-primary/10 text-primary"
+              : "border-border bg-background/30 text-muted-foreground hover:border-primary/40 hover:text-foreground",
+          ].join(" ")}
+        >
+          {dragOver ? "Släpp filer här" : "Dra filer hit eller klicka för att ladda upp"}
         </div>
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
           <div className="flex flex-wrap gap-2">
-            <BtnPrimary>+ Lägg till</BtnPrimary>
+            <BtnPrimary onClick={() => filRef.current?.click()}>+ Lägg till</BtnPrimary>
             <BtnGhost>🔒 Multiutskrift / E-post</BtnGhost>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -1823,11 +1913,11 @@ function DokumentView({ slug }: { slug: string }) {
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {DOK_FILES.map((f) => (
+              {allFiles.map((f) => (
                 <tr key={f.ord}>
                   <td className="px-3 py-2">
                     <select defaultValue={String(f.ord)} className="w-14 rounded-md border border-border bg-background/40 px-2 py-1 text-xs">
-                      {DOK_FILES.map((_, j) => <option key={j}>{j + 1}</option>)}
+                      {allFiles.map((_, j) => <option key={j}>{j + 1}</option>)}
                     </select>
                   </td>
                   <td className="px-3 py-2"><FileIcon ext={f.ext} /></td>
@@ -2038,12 +2128,7 @@ function MrUppdragskostnaderBody() {
 function MaklarrakenskapView() {
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-end gap-4 border-b border-border pb-3 text-xs">
-        <a className="text-primary hover:underline" href="#">Publicera</a>
-        <a className="text-primary hover:underline" href="#">Klippbok</a>
-        <a className="text-primary hover:underline" href="#">Anteckningar</a>
-        <a className="text-primary hover:underline" href="#">Mäklarjournal</a>
-      </div>
+      <QuickNavBar />
       <DokSection title="Provision"><MrProvisionBody /></DokSection>
       <DokSection title="Delning av provision/arvode" defaultOpen={false}><MrDelningBody /></DokSection>
       <DokSection title="Uppdragskostnader" defaultOpen={false}><MrUppdragskostnaderBody /></DokSection>
@@ -4444,12 +4529,7 @@ function SaljareView() {
   const [open, setOpen] = useState(true);
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-end gap-4 border-b border-border pb-3 text-xs">
-        <a className="text-primary hover:underline" href="#">Publicera</a>
-        <a className="text-primary hover:underline" href="#">Klippbok</a>
-        <a className="text-primary hover:underline" href="#">Anteckningar</a>
-        <a className="text-primary hover:underline" href="#">Mäklarjournal</a>
-      </div>
+      <QuickNavBar />
 
       <section className="rounded-md border border-border bg-card">
         <button

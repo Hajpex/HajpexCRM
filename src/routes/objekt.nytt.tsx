@@ -186,7 +186,7 @@ function ObjektsformularPage() {
     const ortRaw = grund.ort.trim();
     const m = ortRaw.match(/^\s*(\d{3}\s?\d{2})\s+(.+)$/);
     const postnr = m ? m[1].replace(/\s/g, "") : "";
-    const stad = m ? m[2].trim() : ortRaw;
+    const stad = m ? m[2].trim() : (ortRaw || grund.omrade.trim());
     const typMap: Record<ObjektsTyp, Typ> = {
       brf: "Bostadsrätt",
       villa: "Villa",
@@ -377,9 +377,14 @@ function ObjektsformularPage() {
 
           <SectionTitle eyebrow="02" title="Grundinfo" />
           <Grid>
-            <Field label="Adress" value={grund.adress} onChange={(v) => setGrund({ ...grund, adress: v })} />
-            <Field label="Postnummer och ort" value={grund.ort} onChange={(v) => setGrund({ ...grund, ort: v })} />
-            <Field label="Område / stadsdel" value={grund.omrade} onChange={(v) => setGrund({ ...grund, omrade: v })} />
+            <AdressFalt
+              value={grund.adress}
+              onChange={(adress, ort, omrade) =>
+                setGrund((g) => ({ ...g, adress, ort: ort ?? g.ort, omrade: omrade ?? g.omrade }))
+              }
+            />
+            <Field label="Postnummer och ort" value={grund.ort} onChange={(v) => setGrund({ ...grund, ort: v })} placeholder="T.ex. 123 45 Stockholm" />
+            <Field label="Område / stadsdel" value={grund.omrade} onChange={(v) => setGrund({ ...grund, omrade: v })} placeholder="T.ex. Södermalm" />
           </Grid>
           <Grid cols={4} className="mt-6 border-t border-white/[0.06] pt-6">
             <FieldNumber label="Utgångspris (SEK)" value={grund.pris} onChange={(v) => setGrund({ ...grund, pris: v })} />
@@ -919,6 +924,37 @@ function FieldNumber({ label, value, onChange, placeholder }: { label: string; v
       <div className="mb-1.5 text-[11px] uppercase tracking-[0.14em] text-muted-foreground">{label}</div>
       <input type="text" inputMode="numeric" value={formatSwedishNumber(value)} onChange={handleChange} placeholder={placeholder}
         className="w-full rounded-md border border-input bg-background px-3.5 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/50 focus:border-primary focus:bg-background focus:outline-none" />
+    </label>
+  );
+}
+
+function parseFullAdress(raw: string): { adress: string; ort: string; omrade: string } | null {
+  // Match "Storgatan 12, 123 45 Stockholm" or "Storgatan 12 12345 Stockholm"
+  const m = raw.match(/^(.+?),?\s+(\d{3}\s?\d{2})\s+(.+)$/);
+  if (!m) return null;
+  return { adress: m[1].trim(), ort: `${m[2]} ${m[3]}`.trim(), omrade: "" };
+}
+
+function AdressFalt({ value, onChange }: {
+  value: string;
+  onChange: (adress: string, ort?: string, omrade?: string) => void;
+}) {
+  function handleBlur(e: React.FocusEvent<HTMLInputElement>) {
+    const parsed = parseFullAdress(e.target.value);
+    if (parsed) onChange(parsed.adress, parsed.ort, parsed.omrade);
+  }
+  return (
+    <label className="block">
+      <div className="mb-1.5 text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Adress</div>
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onBlur={handleBlur}
+        placeholder="T.ex. Storgatan 12 eller Storgatan 12, 123 45 Stockholm"
+        className="w-full rounded-md border border-input bg-background px-3.5 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/50 focus:border-primary focus:bg-background focus:outline-none"
+      />
+      <p className="mt-1 text-[10px] text-muted-foreground/60">Klistra in en fullständig adress — postnummer och ort fylls i automatiskt.</p>
     </label>
   );
 }
