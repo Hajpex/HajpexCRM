@@ -160,7 +160,8 @@ function ObjektListPage() {
         {viewMode === "pipeline" && <PipelineView objects={filtered} />}
 
         {/* Table */}
-        {viewMode === "lista" && <section className="rounded-xl border border-white/[0.07] bg-card/60 p-6 backdrop-blur-sm shadow-[0_30px_60px_-30px_rgba(0,0,0,0.6)]">
+        {viewMode === "lista" && (
+        <section className="rounded-xl border border-white/[0.07] bg-card/60 p-6 backdrop-blur-sm shadow-[0_30px_60px_-30px_rgba(0,0,0,0.6)]">
           <div className="mb-3 flex items-center justify-between">
             <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">{filtered.length} träffar</div>
             <div className="flex gap-1 text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
@@ -213,7 +214,8 @@ function ObjektListPage() {
               </tbody>
             </table>
           </div>
-        </section>}
+        </section>
+        )}
       </div>
     </AppShell>
   );

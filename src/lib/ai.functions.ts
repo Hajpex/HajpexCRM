@@ -251,3 +251,55 @@ export const finalizeRoomText = createServerFn({ method: "POST" })
     const text = String(json?.choices?.[0]?.message?.content ?? "").trim();
     return { text };
   });
+
+// ── Morning Brief ─────────────────────────────────────────────────────────────
+
+const MorningBriefInput = z.object({
+  overdueCount: z.number(),
+  visningarIdag: z.array(z.object({ tid: z.string(), adress: z.string() })),
+  silentCount: z.number(),
+  activeObjCount: z.number(),
+});
+
+export type MorningBriefResult = { text: string };
+
+export const generateMorningBrief = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) => MorningBriefInput.parse(input))
+  .handler(async ({ data }): Promise<MorningBriefResult> => {
+    const key = process.env.LOVABLE_API_KEY;
+    if (!key) throw new Error("LOVABLE_API_KEY saknas.");
+
+    const parts: string[] = [];
+    if (data.overdueCount > 0)
+      parts.push(`${data.overdueCount} förfalln${data.overdueCount === 1 ? "et" : "a"} nästa steg`);
+    if (data.visningarIdag.length > 0) {
+      const v = data.visningarIdag[0];
+      const extra = data.visningarIdag.length > 1 ? ` och ${data.visningarIdag.length - 1} till` : "";
+      parts.push(`visning på ${v.adress} kl ${v.tid}${extra}`);
+    }
+    if (data.silentCount > 0)
+      parts.push(`${data.silentCount} kontakt${data.silentCount > 1 ? "er" : ""} som inte hörts av på 10+ dagar`);
+
+    const facts = parts.length > 0 ? parts.join(", ") : "inga akuta prioriteringar";
+
+    const userText = `Du är en assistent för en svensk fastighetsmäklare. Skriv en kort daglig sammanfattning.
+
+Fakta idag: ${data.activeObjCount} aktiva uppdrag, ${facts}.
+
+Regler: Exakt 1-2 meningar. Naturlig svenska. Lyft fram siffror och tider om de finns. Börja INTE med "Hej" eller hälsningsfras — börja direkt med innehållet. Ingen formatering. Returnera ENBART texten.`;
+
+    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Lovable-API-Key": key },
+      body: JSON.stringify({
+        model: "google/gemini-3-flash-preview",
+        messages: [{ role: "user", content: userText }],
+      }),
+    });
+    if (res.status === 429) throw new Error("AI-tjänsten är överbelastad.");
+    if (res.status === 402) throw new Error("AI-krediter slut.");
+    if (!res.ok) throw new Error(`AI-fel (${res.status})`);
+    const json = await res.json();
+    const text = String(json?.choices?.[0]?.message?.content ?? "").trim();
+    return { text };
+  });

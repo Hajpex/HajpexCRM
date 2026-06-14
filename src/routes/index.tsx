@@ -9,6 +9,7 @@ import { slugifyAddr, fmtKrShort } from "./objekt.$slug";
 import { listIntagsmoten, type Intagsmote } from "../lib/intagsmoteStore";
 import { listAllaVisningar, type Visning } from "../lib/visningarStore";
 import type { Kontakt, NastaSteg } from "../lib/kontaktTypes";
+import { generateMorningBrief } from "../lib/ai.functions";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -98,6 +99,8 @@ function DashboardPage() {
   const [visningar, setVisningar] = useState<Visning[]>([]);
   const [savedObjCount, setSavedObjCount] = useState(0);
   const [now] = useState(() => new Date());
+  const [briefText, setBriefText] = useState<string | null>(null);
+  const [briefLoading, setBriefLoading] = useState(false);
 
   useEffect(() => {
     const ks = listKontakter();
@@ -116,6 +119,46 @@ function DashboardPage() {
     );
     setVisningar(listAllaVisningar());
   }, []);
+
+  useEffect(() => {
+    if (kontakter.length === 0 && visningar.length === 0) return;
+    const today = new Date().toISOString().slice(0, 10);
+    const cacheKey = `hajpex.brief.${today}`;
+    try {
+      const cached = localStorage.getItem(cacheKey);
+      if (cached) { setBriefText(cached); return; }
+    } catch { /* ignore */ }
+
+    const nowMs = Date.now();
+    const overdueCount = kontakter.filter((k) => k.nastaSteg && k.nastaSteg.datum <= nowMs).length;
+    const tf = (ts: number) => new Date(ts).toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit" });
+    const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+    const todayEnd = new Date(todayStart); todayEnd.setDate(todayStart.getDate() + 1);
+    const visningarIdag = visningar
+      .filter((v) => v.datum >= todayStart.getTime() && v.datum < todayEnd.getTime())
+      .map((v) => ({
+        tid: tf(v.datum),
+        adress: v.slug.split("-").map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(" "),
+      }));
+    const silentCount = kontakter.filter((k) => {
+      if (!k.aktiviteter?.length) return false;
+      const last = Math.max(...k.aktiviteter.map((a: { tidpunkt: number }) => a.tidpunkt));
+      return (nowMs - last) > 10 * 86_400_000;
+    }).length;
+
+    if (overdueCount === 0 && visningarIdag.length === 0 && silentCount === 0) return;
+
+    setBriefLoading(true);
+    generateMorningBrief({
+      data: { overdueCount, visningarIdag, silentCount, activeObjCount: activeObjs.length },
+    })
+      .then((r) => {
+        setBriefText(r.text);
+        try { localStorage.setItem(cacheKey, r.text); } catch { /* ignore */ }
+      })
+      .catch(() => {})
+      .finally(() => setBriefLoading(false));
+  }, [kontakter, visningar]);
 
   /* derived */
   const totalSpek = kontakter.filter((k) =>
@@ -196,6 +239,23 @@ function DashboardPage() {
               </Link>
             </div>
           </div>
+
+          {/* AI Morning Brief */}
+          {(briefLoading || briefText) && (
+            <div className="mt-6 flex items-start gap-3 rounded-xl border border-primary/20 bg-primary/5 px-4 py-3">
+              <span className="mt-0.5 text-base">✦</span>
+              <div className="min-w-0 flex-1">
+                {briefLoading ? (
+                  <div className="space-y-2">
+                    <div className="h-3 w-3/4 animate-pulse rounded bg-primary/20" />
+                    <div className="h-3 w-1/2 animate-pulse rounded bg-primary/15" />
+                  </div>
+                ) : (
+                  <p className="text-[13px] leading-relaxed text-foreground/80">{briefText}</p>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Onboarding — only when no real data yet */}
           {savedObjCount === 0 && kontakter.length === 0 && (
