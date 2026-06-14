@@ -6,6 +6,7 @@ import { listObjekt } from "../lib/objektStore";
 import { getObjektNotes, addObjektNote, setObjektBeskrivning, setObjektStatus, setObjektMarknadText } from "../lib/objektNotesStore";
 import { generateMarketingText } from "../lib/ai.functions";
 import { listBud, addBud, markeraVinnare, deleteBud, fmtBud, type Bud } from "../lib/budgivningStore";
+import { getKontrakt, saveKontrakt, type KontraktData } from "../lib/kontraktStore";
 import { fmtSweNum, handleNumberInput } from "../lib/formatters";
 import { getDemoSaljare } from "../lib/demoKontakter";
 import { listKontakter, addObjektKoppling } from "../lib/kontaktStore";
@@ -46,7 +47,6 @@ type SavedSizes = [number, number];
 
 const TOP_TABS = ["Översikt", "Spekulanter"] as const;
 
-const TabCtx = createContext<(tab: SideTab) => void>(() => {});
 
 function readPanelSizes(layout: Record<string, number>, firstId: string, secondId: string): SavedSizes {
   return [layout[firstId] ?? 50, layout[secondId] ?? 50];
@@ -91,7 +91,6 @@ function ObjektDetailPage() {
 
   return (
     <AppShell>
-      <TabCtx.Provider value={setTab}>
       <div className="mx-auto max-w-[1500px] px-6 pb-24 pt-8">
         {/* Breadcrumb / header */}
         <div className="mb-4 flex items-center gap-3 text-xs text-muted-foreground">
@@ -201,17 +200,17 @@ function ObjektDetailPage() {
               ) : tab === "Budgivning" ? (
                 <BudgivningView slug={slug} />
               ) : tab === "Kontrakt" ? (
-                <KontraktView />
+                <KontraktView slug={slug} onTabChange={setTab} />
               ) : tab === "Tillträde" ? (
                 <TilltradeView />
               ) : tab === "Säljare" ? (
-                <SaljareView />
+                <SaljareView onTabChange={setTab} />
               ) : tab === "Köpare" ? (
-                <KopareView />
+                <KopareView onTabChange={setTab} />
               ) : tab === "Dokument" ? (
-                <DokumentView slug={slug} />
+                <DokumentView slug={slug} onTabChange={setTab} />
               ) : tab === "Mäklarräkenskap" ? (
-                <MaklarrakenskapView />
+                <MaklarrakenskapView onTabChange={setTab} />
               ) : tab === "Objektsbeskrivning" ? (
                 <ObjektsbeskrivningView adress={adress} slug={slug} />
               ) : (
@@ -236,17 +235,17 @@ function ObjektDetailPage() {
               ) : tab === "Budgivning" ? (
                 <BudgivningView slug={slug} />
               ) : tab === "Kontrakt" ? (
-                <KontraktView />
+                <KontraktView slug={slug} onTabChange={setTab} />
               ) : tab === "Tillträde" ? (
                 <TilltradeView />
               ) : tab === "Säljare" ? (
-                <SaljareView />
+                <SaljareView onTabChange={setTab} />
               ) : tab === "Köpare" ? (
-                <KopareView />
+                <KopareView onTabChange={setTab} />
               ) : tab === "Dokument" ? (
-                <DokumentView slug={slug} />
+                <DokumentView slug={slug} onTabChange={setTab} />
               ) : tab === "Mäklarräkenskap" ? (
-                <MaklarrakenskapView />
+                <MaklarrakenskapView onTabChange={setTab} />
               ) : tab === "Objektsbeskrivning" ? (
                 <ObjektsbeskrivningView adress={adress} slug={slug} />
               ) : (
@@ -264,7 +263,6 @@ function ObjektDetailPage() {
           onLinked={() => setKoppla(null)}
         />
       )}
-      </TabCtx.Provider>
     </AppShell>
   );
 }
@@ -1310,15 +1308,17 @@ function Field({ label, children, hint }: { label: string; children: ReactNode; 
 
 const BlankCtx = createContext(false);
 
-function Input({ value, placeholder, suffix, readOnly }: { value?: string; placeholder?: string; suffix?: string; readOnly?: boolean }) {
+function Input({ value, placeholder, suffix, readOnly, onChange }: { value?: string; placeholder?: string; suffix?: string; readOnly?: boolean; onChange?: (v: string) => void }) {
   const blank = useContext(BlankCtx);
   const v = blank ? undefined : value;
+  const controlled = onChange !== undefined;
   return (
     <div className="flex items-center gap-2">
       <input
-        defaultValue={v}
+        {...(controlled ? { value: v ?? "" } : { defaultValue: v })}
         placeholder={placeholder}
         readOnly={readOnly}
+        onChange={onChange ? (e) => onChange(e.target.value) : undefined}
         className="h-9 w-full rounded-md border border-border bg-background px-2.5 text-sm text-foreground placeholder:text-muted-foreground/50 focus:border-primary/40 focus:outline-none"
       />
       {suffix && <span className="shrink-0 text-xs text-muted-foreground">{suffix}</span>}
@@ -1326,22 +1326,32 @@ function Input({ value, placeholder, suffix, readOnly }: { value?: string; place
   );
 }
 
-function Select({ value, options }: { value?: string; options: string[] }) {
+function Select({ value, options, onChange }: { value?: string; options: string[]; onChange?: (v: string) => void }) {
   const blank = useContext(BlankCtx);
   const opts = blank ? ["", ...options.filter((o) => o !== "")] : options;
   const v = blank ? "" : value;
+  const controlled = onChange !== undefined;
   return (
-    <select defaultValue={v} className="h-9 w-full rounded-md border border-border bg-background px-2 text-sm text-foreground focus:border-primary/40 focus:outline-none">
+    <select
+      {...(controlled ? { value: v ?? "" } : { defaultValue: v })}
+      onChange={onChange ? (e) => onChange(e.target.value) : undefined}
+      className="h-9 w-full rounded-md border border-border bg-background px-2 text-sm text-foreground focus:border-primary/40 focus:outline-none"
+    >
       {opts.map((o) => <option key={o} value={o}>{o || "—"}</option>)}
     </select>
   );
 }
 
-function Checkbox({ label, defaultChecked }: { label: string; defaultChecked?: boolean }) {
+function Checkbox({ label, defaultChecked, onChange }: { label: string; defaultChecked?: boolean; onChange?: (v: boolean) => void }) {
   const blank = useContext(BlankCtx);
   return (
     <label className="flex items-center gap-2 text-sm text-foreground">
-      <input type="checkbox" defaultChecked={blank ? false : defaultChecked} className="h-4 w-4 rounded border-border bg-background accent-primary" />
+      <input
+        type="checkbox"
+        defaultChecked={blank ? false : defaultChecked}
+        onChange={(e) => onChange?.(e.target.checked)}
+        className="h-4 w-4 rounded border-border bg-background accent-primary"
+      />
       {label}
     </label>
   );
@@ -1370,14 +1380,13 @@ function BtnGhost({ children, onClick, disabled }: { children: ReactNode; onClic
   );
 }
 
-function QuickNavBar() {
-  const switchTab = useContext(TabCtx);
+function QuickNavBar({ onTabChange }: { onTabChange: (tab: SideTab) => void }) {
   return (
     <div className="flex flex-wrap items-center justify-end gap-4 border-b border-border pb-3 text-xs">
-      <button onClick={() => switchTab("Marknad")} className="text-primary hover:underline">Publicera</button>
-      <button onClick={() => switchTab("Marknad")} className="text-primary hover:underline">Klippbok</button>
-      <button onClick={() => switchTab("Start")} className="text-primary hover:underline">Anteckningar</button>
-      <button onClick={() => switchTab("Dokument")} className="text-primary hover:underline">Mäklarjournal</button>
+      <button onClick={() => onTabChange("Marknad")} className="text-primary hover:underline">Publicera</button>
+      <button onClick={() => onTabChange("Marknad")} className="text-primary hover:underline">Klippbok</button>
+      <button onClick={() => onTabChange("Start")} className="text-primary hover:underline">Anteckningar</button>
+      <button onClick={() => onTabChange("Dokument")} className="text-primary hover:underline">Mäklarjournal</button>
     </div>
   );
 }
@@ -1466,13 +1475,13 @@ function HandlaggareBody() {
   );
 }
 
-function KopareView() {
+function KopareView({ onTabChange }: { onTabChange?: (tab: SideTab) => void }) {
   const [open, setOpen] = useState(true);
   const buyers: SaljarePerson[] = [];
   const cols = ["Sorteringsordning","Namn","Andel","Pers. nr./Org. nr.","Telefon","E-post","Adress","BankID","Aktivitet"];
   return (
     <div className="space-y-6">
-      <QuickNavBar />
+      {onTabChange && <QuickNavBar onTabChange={onTabChange} />}
 
       <section className="rounded-md border border-border bg-card">
         <button
@@ -1767,7 +1776,7 @@ function todayStr(): string {
   return new Date().toLocaleDateString("sv-SE");
 }
 
-function DokumentView({ slug }: { slug: string }) {
+function DokumentView({ slug, onTabChange }: { slug: string; onTabChange: (tab: SideTab) => void }) {
   const isBrf = getObjektBySlug(slug)?.typ === "Bostadsrätt";
   const dokRef = useRef<HTMLInputElement>(null);
   const filRef = useRef<HTMLInputElement>(null);
@@ -1804,7 +1813,7 @@ function DokumentView({ slug }: { slug: string }) {
       <input ref={dokRef} type="file" multiple accept=".pdf,.doc,.docx,.jpg,.png" className="hidden" onChange={(e) => addFiles(e.target.files, "dok")} />
       <input ref={filRef} type="file" multiple className="hidden" onChange={(e) => addFiles(e.target.files, "fil")} />
 
-      <QuickNavBar />
+      <QuickNavBar onTabChange={onTabChange} />
 
       <DokSection
         title="Dokument"
@@ -2125,10 +2134,10 @@ function MrUppdragskostnaderBody() {
   );
 }
 
-function MaklarrakenskapView() {
+function MaklarrakenskapView({ onTabChange }: { onTabChange: (tab: SideTab) => void }) {
   return (
     <div className="space-y-6">
-      <QuickNavBar />
+      <QuickNavBar onTabChange={onTabChange} />
       <DokSection title="Provision"><MrProvisionBody /></DokSection>
       <DokSection title="Delning av provision/arvode" defaultOpen={false}><MrDelningBody /></DokSection>
       <DokSection title="Uppdragskostnader" defaultOpen={false}><MrUppdragskostnaderBody /></DokSection>
@@ -3123,34 +3132,37 @@ type KoSection =
   | "mj" | "publicera" | "saljare" | "kopare"
   | "kontrakt" | "dokument" | "filer" | "efterarbete";
 
-function KontraktView() {
+function KontraktView({ slug, onTabChange }: { slug: string; onTabChange: (tab: SideTab) => void }) {
   const [open, setOpen] = useState<Record<KoSection, boolean>>({
     mj: true, publicera: false, saljare: false, kopare: false,
-    kontrakt: false, dokument: false, filer: true, efterarbete: true,
+    kontrakt: true, dokument: false, filer: false, efterarbete: false,
   });
-  const [done, setDone] = useState<Record<KoSection, boolean>>({
-    mj: false, publicera: true, saljare: true, kopare: true,
-    kontrakt: false, dokument: true, filer: false, efterarbete: false,
+  const [done, setDone] = useState<Record<KoSection, boolean>>(() => {
+    const k = getKontrakt(slug);
+    return {
+      mj: false, publicera: false, saljare: false, kopare: false,
+      kontrakt: k.signerat, dokument: false, filer: false, efterarbete: false,
+    };
   });
   const toggle = (id: KoSection) => setOpen((o) => ({ ...o, [id]: !o[id] }));
   const toggleDone = (id: KoSection) => setDone((d) => ({ ...d, [id]: !d[id] }));
 
   return (
     <div className="flex flex-col gap-2 pl-2">
-      <KoSec id="mj" title="Mäklarjournal" badge="21" open={open.mj} onToggle={toggle} done={done.mj} onToggleDone={toggleDone}>
+      <KoSec id="mj" title="Mäklarjournal" open={open.mj} onToggle={toggle} done={done.mj} onToggleDone={toggleDone}>
         <MaMjBody />
       </KoSec>
       <KoSec id="publicera" title="Publicera" open={open.publicera} onToggle={toggle} done={done.publicera} onToggleDone={toggleDone}>
         <MaPubliceraBody />
       </KoSec>
       <KoSec id="saljare" title="Säljare" open={open.saljare} onToggle={toggle} done={done.saljare} onToggleDone={toggleDone}>
-        <KoPartyBody role="Säljare" />
+        <KoPartyBody role="Säljare" slug={slug} onTabChange={onTabChange} />
       </KoSec>
       <KoSec id="kopare" title="Köpare" open={open.kopare} onToggle={toggle} done={done.kopare} onToggleDone={toggleDone}>
-        <KoPartyBody role="Köpare" />
+        <KoPartyBody role="Köpare" slug={slug} onTabChange={onTabChange} />
       </KoSec>
       <KoSec id="kontrakt" title="Kontraktsinformation" open={open.kontrakt} onToggle={toggle} done={done.kontrakt} onToggleDone={toggleDone}>
-        <KoKontraktinfoBody />
+        <KoKontraktinfoBody slug={slug} onSaved={() => setDone((d) => ({ ...d, kontrakt: true }))} />
       </KoSec>
       <KoSec id="dokument" title="Dokument" open={open.dokument} onToggle={toggle} done={done.dokument} onToggleDone={toggleDone}>
         <DokumentBody />
@@ -3159,7 +3171,7 @@ function KontraktView() {
         <FilerBody />
       </KoSec>
       <KoSec id="efterarbete" title="Efterarbete kontrakt" open={open.efterarbete} onToggle={toggle} done={done.efterarbete} onToggleDone={toggleDone} helpLabel="Hantera handpenningen">
-        <KoEfterarbeteBody />
+        <KoEfterarbeteBody slug={slug} />
       </KoSec>
     </div>
   );
@@ -3210,30 +3222,54 @@ function KoSec({
 }
 
 /* ---------- Säljare / Köpare ---------- */
-function KoPartyBody({ role }: { role: "Säljare" | "Köpare" }) {
+function KoPartyBody({ role, slug, onTabChange }: { role: "Säljare" | "Köpare"; slug: string; onTabChange: (tab: SideTab) => void }) {
+  const relation = role === "Säljare" ? "säljare" : "köpare";
+  const persons = listKontakter().filter((k) =>
+    k.objektKopplingar.some((kp) => kp.slug === slug && kp.relation === relation)
+  );
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="text-xs text-muted-foreground">Parter registrerade som {role.toLowerCase()} på uppdraget.</div>
+        <div className="text-xs text-muted-foreground">
+          {persons.length > 0
+            ? `${persons.length} ${role.toLowerCase()}${persons.length > 1 ? "e" : ""} kopplade till uppdraget.`
+            : `Inga ${role.toLowerCase()} kopplade ännu.`}
+        </div>
         <div className="flex gap-2">
-          <BtnGhost>✎ Redigera</BtnGhost>
-          <BtnPrimary>+ Lägg till {role.toLowerCase()}</BtnPrimary>
+          <BtnGhost onClick={() => onTabChange(role === "Säljare" ? "Säljare" : "Köpare")}>
+            Hantera i {role.toLowerCase()}-fliken →
+          </BtnGhost>
         </div>
       </div>
       <div className="overflow-x-auto rounded-md border border-border">
         <table className="w-full text-sm">
           <thead className="bg-foreground/[0.04] text-left text-xs uppercase tracking-wider text-muted-foreground">
             <tr>
-              {["Namn","Personnummer","Andel","E-post","Telefon","Legitimerad","Aktivitet"].map((h) => (
+              {["Namn","E-post","Telefon","Legitimerad","Aktivitet"].map((h) => (
                 <th key={h} className="px-3 py-2 font-medium">{h}</th>
               ))}
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
-            <tr>
-              <td className="px-3 py-2">— Lägg till {role.toLowerCase()} —</td>
-              <td colSpan={6} className="px-3 py-2 text-muted-foreground"></td>
-            </tr>
+            {persons.length === 0 ? (
+              <tr>
+                <td colSpan={5} className="px-3 py-6 text-center text-sm text-muted-foreground">
+                  Koppla {role.toLowerCase()} via fliken "{role}" i sidomenyn
+                </td>
+              </tr>
+            ) : persons.map((p) => (
+              <tr key={p.id}>
+                <td className="px-3 py-2 font-medium">{p.fornamn} {p.efternamn}</td>
+                <td className="px-3 py-2 text-muted-foreground">{p.epost || "—"}</td>
+                <td className="px-3 py-2 text-muted-foreground">
+                  {p.telefon ? <a href={`tel:${p.telefon}`} className="hover:text-primary">{p.telefon}</a> : "—"}
+                </td>
+                <td className="px-3 py-2">
+                  <span className="rounded bg-emerald-500/15 px-2 py-0.5 text-[10px] text-emerald-400">BankID ✓</span>
+                </td>
+                <td className="px-3 py-2 text-muted-foreground">⚙</td>
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>
@@ -3242,101 +3278,175 @@ function KoPartyBody({ role }: { role: "Säljare" | "Köpare" }) {
 }
 
 /* ---------- Kontraktsinformation ---------- */
-function KoKontraktinfoBody() {
+function KoKontraktinfoBody({ slug, onSaved }: { slug: string; onSaved: () => void }) {
+  const [form, setForm] = useState<KontraktData>(() => {
+    const saved = getKontrakt(slug);
+    if (!saved.slutpris) {
+      const winner = listBud(slug).find((b) => b.vinnare);
+      if (winner) return { ...saved, slutpris: String(winner.belopp) };
+    }
+    return saved;
+  });
+  const [saved, setSavedFlag] = useState(false);
+
+  function set<K extends keyof KontraktData>(key: K, value: KontraktData[K]) {
+    setForm((f) => ({ ...f, [key]: value }));
+    setSavedFlag(false);
+  }
+
+  function handleSave() {
+    saveKontrakt(slug, { ...form, signerat: true });
+    setObjektStatus(slug, "Såld");
+    setSavedFlag(true);
+    onSaved();
+  }
+
   return (
     <div className="space-y-5">
+      {form.signerat && (
+        <div className="flex items-center gap-2 rounded-md border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-400">
+          <span>✓</span>
+          <span>Kontraktet är signerat och sparat. Objektet markerat som Såld.</span>
+        </div>
+      )}
       <div className="grid gap-4 md:grid-cols-3">
-        <Field label="Kontraktsdatum"><Input placeholder="ÅÅÅÅ-MM-DD" /></Field>
-        <Field label="Tillträdesdatum"><Input placeholder="ÅÅÅÅ-MM-DD" /></Field>
-        <Field label="Slutpris"><Input placeholder="0" suffix="SEK" /></Field>
-        <Field label="Handpenning"><Input placeholder="0" suffix="SEK" /></Field>
-        <Field label="Handpenning betalas senast"><Input placeholder="ÅÅÅÅ-MM-DD" /></Field>
-        <Field label="Kontraktstyp"><Select value="Köpekontrakt" options={["Köpekontrakt","Överlåtelseavtal","Skrivuppdrag"]} /></Field>
+        <Field label="Kontraktsdatum">
+          <Input value={form.kontraktsdatum} onChange={(v) => set("kontraktsdatum", v)} placeholder="ÅÅÅÅ-MM-DD" />
+        </Field>
+        <Field label="Tillträdesdatum">
+          <Input value={form.tilltradesdatum} onChange={(v) => set("tilltradesdatum", v)} placeholder="ÅÅÅÅ-MM-DD" />
+        </Field>
+        <Field label="Slutpris" hint={form.slutpris ? `= ${Number(form.slutpris).toLocaleString("sv-SE")} kr` : undefined}>
+          <Input value={form.slutpris} onChange={(v) => set("slutpris", v)} placeholder="0" suffix="SEK" />
+        </Field>
+        <Field label="Handpenning">
+          <Input value={form.handpenning} onChange={(v) => set("handpenning", v)} placeholder="0" suffix="SEK" />
+        </Field>
+        <Field label="Handpenning betalas senast">
+          <Input value={form.handpenningDatum} onChange={(v) => set("handpenningDatum", v)} placeholder="ÅÅÅÅ-MM-DD" />
+        </Field>
+        <Field label="Kontraktstyp">
+          <Select value={form.kontraktstyp} onChange={(v) => set("kontraktstyp", v)} options={["Köpekontrakt","Överlåtelseavtal","Skrivuppdrag"]} />
+        </Field>
       </div>
       <div className="grid gap-4 md:grid-cols-2">
-        <Field label="Besiktningsklausul"><Select value="Nej" options={["Nej","Ja – före tillträde","Ja – återgångsrätt"]} /></Field>
-        <Field label="Finansieringsvillkor"><Select value="Nej" options={["Nej","Ja"]} /></Field>
+        <Field label="Besiktningsklausul">
+          <Select value={form.besiktningsklausul} onChange={(v) => set("besiktningsklausul", v)} options={["Nej","Ja – före tillträde","Ja – återgångsrätt"]} />
+        </Field>
+        <Field label="Finansieringsvillkor">
+          <Select value={form.finansieringsvillkor} onChange={(v) => set("finansieringsvillkor", v)} options={["Nej","Ja"]} />
+        </Field>
       </div>
       <Field label="Övriga villkor / anteckning">
-        <textarea className="h-24 w-full rounded-md border border-border bg-background px-2.5 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 focus:border-primary/40 focus:outline-none" placeholder="Skriv villkor som ska gälla i kontraktet…" />
+        <textarea
+          value={form.ovrigaVillkor}
+          onChange={(e) => set("ovrigaVillkor", e.target.value)}
+          className="h-24 w-full rounded-md border border-border bg-background px-2.5 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 focus:border-primary/40 focus:outline-none"
+          placeholder="Skriv villkor som ska gälla i kontraktet…"
+        />
       </Field>
       <div className="flex flex-wrap gap-4">
-        <Checkbox label="Köparen har erhållit objektsbeskrivning" defaultChecked />
-        <Checkbox label="Köparen har erhållit frågelista" defaultChecked />
-        <Checkbox label="Säljaren har erhållit budgivningslista" />
+        <Checkbox label="Köparen har erhållit objektsbeskrivning" defaultChecked={form.checkObjektsbeskrivning}
+          onChange={(v) => set("checkObjektsbeskrivning", v)} />
+        <Checkbox label="Köparen har erhållit frågelista" defaultChecked={form.checkFragelista}
+          onChange={(v) => set("checkFragelista", v)} />
+        <Checkbox label="Säljaren har erhållit budgivningslista" defaultChecked={form.checkBudgivningslista}
+          onChange={(v) => set("checkBudgivningslista", v)} />
       </div>
-      <div className="flex justify-end gap-2">
+      <div className="flex items-center justify-end gap-2">
+        {saved && <span className="text-[11px] text-emerald-400">✓ Sparat</span>}
         <BtnGhost>Förhandsgranska kontrakt</BtnGhost>
-        <BtnPrimary>Spara kontraktsinformation</BtnPrimary>
+        <BtnPrimary onClick={handleSave}>
+          {form.signerat ? "✓ Uppdatera kontrakt" : "Signera och spara"}
+        </BtnPrimary>
       </div>
     </div>
   );
 }
 
 /* ---------- Efterarbete kontrakt ---------- */
-function KoEfterarbeteBody() {
+function KoEfterarbeteBody({ slug }: { slug: string }) {
+  const [form, setForm] = useState<KontraktData>(() => getKontrakt(slug));
+  const [savedFlag, setSavedFlag] = useState(false);
+
+  function set<K extends keyof KontraktData>(key: K, value: KontraktData[K]) {
+    setForm((f) => { const next = { ...f, [key]: value }; return next; });
+    setSavedFlag(false);
+  }
+
+  function handleSave() {
+    saveKontrakt(slug, form);
+    setSavedFlag(true);
+  }
+
+  const slutpris = Number(form.slutpris) || 0;
+  const provisionPct = 0.015;
+  const provisionExMoms = Math.round(slutpris * provisionPct);
+  const moms = Math.round(provisionExMoms * 0.25);
+  const provisionInkMoms = provisionExMoms + moms;
+
   return (
     <div className="space-y-6">
-      <div className="flex justify-end">
-        <BtnGhost>✉ E-post</BtnGhost>
+      <div className="flex justify-end gap-2">
+        <BtnGhost onClick={() => {
+          const k = getKontrakt(slug);
+          const subject = encodeURIComponent("Handpenning – kontraktsinformation");
+          window.open(`mailto:?subject=${subject}`, "_blank");
+        }}>✉ E-post</BtnGhost>
       </div>
       <div className="grid gap-4 md:grid-cols-2">
-        <Field label="Betalad handpenning (till mäklarens klientmedelskonto eller direkt till säljaren)">
-          <Input placeholder="0" suffix="SEK" />
+        <Field label="Betalad handpenning">
+          <Input value={form.betaladHandpenning} onChange={(v) => set("betaladHandpenning", v)} placeholder="0" suffix="SEK" />
         </Field>
-        <Field label="Betaldatum"><Input placeholder="ÅÅÅÅ-MM-DD" /></Field>
-        <Field label="Provision betaldatum"><Input placeholder="ÅÅÅÅ-MM-DD" /></Field>
+        <Field label="Betaldatum">
+          <Input value={form.betaldatum} onChange={(v) => set("betaldatum", v)} placeholder="ÅÅÅÅ-MM-DD" />
+        </Field>
+        <Field label="Provision betaldatum">
+          <Input value={form.provisionBetaldatum} onChange={(v) => set("provisionBetaldatum", v)} placeholder="ÅÅÅÅ-MM-DD" />
+        </Field>
         <div />
       </div>
-      <Checkbox label="Handpenningen deponeras på mäklarens klientmedelskonto" defaultChecked />
+      <Checkbox
+        label="Handpenningen deponeras på mäklarens klientmedelskonto"
+        defaultChecked={form.deponerasKonto}
+        onChange={(v) => set("deponerasKonto", v)}
+      />
       <Field label="Intern anteckning om handpenning (skrivs ej ut)">
-        <textarea className="h-24 w-full rounded-md border border-border bg-background px-2.5 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 focus:border-primary/40 focus:outline-none" />
+        <textarea
+          value={form.handpenningKommentar}
+          onChange={(e) => set("handpenningKommentar", e.target.value)}
+          className="h-24 w-full rounded-md border border-border bg-background px-2.5 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 focus:border-primary/40 focus:outline-none"
+        />
       </Field>
 
-      <div>
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <h3 className="text-sm font-semibold text-foreground">Utbetalningar av deponerad handpenning</h3>
-          <div className="flex gap-2">
-            <BtnPrimary>+ Lägg till manuellt</BtnPrimary>
-            <BtnPrimary>+ Fördela utifrån andel</BtnPrimary>
-          </div>
-        </div>
-        <div className="overflow-x-auto rounded-md border border-border">
-          <table className="w-full text-sm">
-            <thead className="bg-foreground/[0.04] text-left text-xs uppercase tracking-wider text-muted-foreground">
-              <tr>
-                {["#","Bankkontonummer","Transaktionsdatum","Belopp (SEK)","Kommentar","Aktivitet"].map((h) => (
-                  <th key={h} className="px-3 py-2 font-medium">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              <tr><td colSpan={6} className="px-3 py-6 text-center text-xs text-muted-foreground">Inga utbetalningar registrerade</td></tr>
-            </tbody>
-          </table>
-        </div>
+      <div className="flex items-center justify-end gap-2">
+        {savedFlag && <span className="text-[11px] text-emerald-400">✓ Sparat</span>}
+        <BtnPrimary onClick={handleSave}>Spara efterarbete</BtnPrimary>
       </div>
 
-      <div className="rounded-md border border-orange-500/40 bg-orange-500/15 p-4">
-        <div className="grid gap-3 md:grid-cols-2">
-          <div className="flex items-center justify-between text-sm">
-            <span className="font-medium text-orange-100">Total provision inkl. moms.</span>
-            <span className="text-orange-100">75 000 SEK</span>
-          </div>
-          <div className="flex items-center justify-between text-sm">
-            <span className="font-medium text-orange-100">Moms</span>
-            <span className="text-orange-100">15 000 SEK</span>
-          </div>
-          <div className="flex items-center justify-between text-sm">
-            <span className="font-medium text-orange-100">Provisionen baseras på slutpriset</span>
-            <span className="text-orange-100">4 975 000 SEK</span>
-          </div>
-          <div className="flex items-center justify-between text-sm">
-            <span className="font-medium text-orange-100">Summa exkl. moms.</span>
-            <span className="text-orange-100">60 000 SEK</span>
+      {slutpris > 0 && (
+        <div className="rounded-md border border-primary/30 bg-primary/5 p-4">
+          <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-primary/70">Provisionsberäkning</p>
+          <div className="grid gap-2 md:grid-cols-2">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">Slutpris</span>
+              <span className="font-medium">{slutpris.toLocaleString("sv-SE")} SEK</span>
+            </div>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">Provision (1,5 %)</span>
+              <span className="font-medium">{provisionExMoms.toLocaleString("sv-SE")} SEK</span>
+            </div>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">Moms (25 %)</span>
+              <span className="font-medium">{moms.toLocaleString("sv-SE")} SEK</span>
+            </div>
+            <div className="flex items-center justify-between text-sm font-semibold text-primary">
+              <span>Total provision inkl. moms</span>
+              <span>{provisionInkMoms.toLocaleString("sv-SE")} SEK</span>
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
@@ -4523,13 +4633,13 @@ const SALJARE_CUSTOMER = [
   { k: "Byggnadsinformation", s: "Granskad & importerad", sCls: "bg-emerald-500/20 text-emerald-200", u: "" },
 ];
 
-function SaljareView() {
+function SaljareView({ onTabChange }: { onTabChange: (tab: SideTab) => void }) {
   const { slug } = Route.useParams();
   const persons = getSaljarePersons(slug);
   const [open, setOpen] = useState(true);
   return (
     <div className="space-y-6">
-      <QuickNavBar />
+      <QuickNavBar onTabChange={onTabChange} />
 
       <section className="rounded-md border border-border bg-card">
         <button
