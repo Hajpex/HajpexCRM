@@ -8,6 +8,7 @@ import { listKontrakt } from "../lib/kontraktStore";
 import { listIntagsmoten, type Intagsmote } from "../lib/intagsmoteStore";
 import type { Kontakt } from "../lib/kontaktTypes";
 import { listAllaVisningar } from "../lib/visningarStore";
+import { getBudget, saveBudget, type BudgetGoals } from "../lib/budgetStore";
 
 export const Route = createFileRoute("/statistik")({
   head: () => ({
@@ -205,11 +206,6 @@ function LiveStatusCard() {
 }
 
 // ---------- Start / Översikt ----------
-const BUDGET_OMS = 300_000;
-const BUDGET_SALDA = 6;
-const BUDGET_INTAG = 18;
-const BUDGET_REDO = 4;
-
 function barColor(pct: number) {
   return pct >= 80 ? "bg-emerald-500" : pct >= 50 ? "bg-amber-500" : "bg-rose-500";
 }
@@ -217,7 +213,26 @@ function tileColor(pct: number): "good" | "warn" | "bad" {
   return pct >= 80 ? "good" : pct >= 50 ? "warn" : "bad";
 }
 
+function BudgetField({ label, value, onChange }: { label: string; value: number; onChange: (v: number) => void }) {
+  return (
+    <label className="block">
+      <span className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">{label}</span>
+      <input
+        type="number"
+        value={value}
+        min={0}
+        onChange={(e) => onChange(Number(e.target.value) || 0)}
+        className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-primary/40 focus:outline-none"
+      />
+    </label>
+  );
+}
+
 function StartTab() {
+  const [budget, setBudget] = useState<BudgetGoals>({ omsattning: 300_000, salda: 6, intag: 18, redo: 4 });
+  const [editBudget, setEditBudget] = useState(false);
+  const [draft, setDraft] = useState<BudgetGoals>(budget);
+
   const [live, setLive] = useState<{
     intag: number; vunnaIntag: number;
     saldaThisMonth: number; omsattningMonth: number;
@@ -225,6 +240,12 @@ function StartTab() {
     avgProvision: number;
     statusCounts: Record<string, number>;
   } | null>(null);
+
+  useEffect(() => {
+    const saved = getBudget();
+    setBudget(saved);
+    setDraft(saved);
+  }, []);
 
   useEffect(() => {
     const now = new Date();
@@ -277,13 +298,13 @@ function StartTab() {
   const omsattning365 = live?.omsattning365 ?? 0;
   const avg = live?.avgProvision ?? 44_000;
 
-  const omsPct = Math.round((oms / BUDGET_OMS) * 100);
-  const saldaPct = Math.round((salda / BUDGET_SALDA) * 100);
-  const intagPct = Math.round((intag / BUDGET_INTAG) * 100);
-  const vunnaPct = Math.round((vunna / BUDGET_INTAG) * 100);
+  const omsPct = budget.omsattning > 0 ? Math.round((oms / budget.omsattning) * 100) : 0;
+  const saldaPct = budget.salda > 0 ? Math.round((salda / budget.salda) * 100) : 0;
+  const intagPct = budget.intag > 0 ? Math.round((intag / budget.intag) * 100) : 0;
+  const vunnaPct = budget.intag > 0 ? Math.round((vunna / budget.intag) * 100) : 0;
   const redoCount = live?.statusCounts["Redo (Kommande)"] ?? 0;
   const tillSaluCount = live?.statusCounts["Till salu"] ?? 0;
-  const redoPct = Math.round((redoCount / BUDGET_REDO) * 100);
+  const redoPct = budget.redo > 0 ? Math.round((redoCount / budget.redo) * 100) : 0;
   const overallPct = Math.round((omsPct + saldaPct + intagPct) / 3);
 
   const now = new Date();
@@ -293,16 +314,54 @@ function StartTab() {
     <div className="space-y-6">
       <LiveStatusCard />
 
-      <Card title="Resultat vs säljmål" hint={`${monthName.charAt(0).toUpperCase() + monthName.slice(1)} · Erik Lindqvist`}>
-        <div className="grid grid-cols-2 gap-4 md:grid-cols-4 lg:grid-cols-7">
-          <KpiTile label="Uppnådda säljmål" value={`${overallPct}%`} tone={tileColor(overallPct)} progress={overallPct} />
-          <KpiTile label="Bokade intag" value={String(intag)} sub={`/ ${BUDGET_INTAG}`} tone={tileColor(intagPct)} progress={intagPct} />
-          <KpiTile label="Vunna intag" value={String(vunna)} sub="säljmål saknas" />
-          <KpiTile label="Sålda objekt" value={String(salda)} sub={`/ ${BUDGET_SALDA}`} tone={tileColor(saldaPct)} progress={saldaPct} />
-          <KpiTile label="Omsättning" value={fmtKr(oms)} sub={`/ ${fmtKr(BUDGET_OMS)}`} tone={tileColor(omsPct)} progress={omsPct} />
-          <KpiTile label="Publicerade Redo" value={String(redoCount)} sub={`/ ${BUDGET_REDO}`} tone={tileColor(redoPct)} progress={redoPct} />
-          <KpiTile label="NPS" value="—" sub="Ingen data" />
-        </div>
+      <Card
+        title="Resultat vs säljmål"
+        hint={`${monthName.charAt(0).toUpperCase() + monthName.slice(1)} · Erik Lindqvist`}
+        right={
+          editBudget ? null : (
+            <button
+              onClick={() => { setDraft(budget); setEditBudget(true); }}
+              className="rounded-md border border-border/60 px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+            >
+              ✎ Redigera mål
+            </button>
+          )
+        }
+      >
+        {editBudget ? (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+              <BudgetField label="Omsättning (kr)" value={draft.omsattning} onChange={(v) => setDraft((d) => ({ ...d, omsattning: v }))} />
+              <BudgetField label="Sålda objekt" value={draft.salda} onChange={(v) => setDraft((d) => ({ ...d, salda: v }))} />
+              <BudgetField label="Intagsmöten" value={draft.intag} onChange={(v) => setDraft((d) => ({ ...d, intag: v }))} />
+              <BudgetField label="Redo-objekt" value={draft.redo} onChange={(v) => setDraft((d) => ({ ...d, redo: v }))} />
+            </div>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setEditBudget(false)}
+                className="rounded-md border border-border/60 px-4 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Avbryt
+              </button>
+              <button
+                onClick={() => { saveBudget(draft); setBudget(draft); setEditBudget(false); }}
+                className="rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground hover:bg-primary/90 transition-colors"
+              >
+                Spara mål
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-4 md:grid-cols-4 lg:grid-cols-7">
+            <KpiTile label="Uppnådda säljmål" value={`${overallPct}%`} tone={tileColor(overallPct)} progress={overallPct} />
+            <KpiTile label="Bokade intag" value={String(intag)} sub={`/ ${budget.intag}`} tone={tileColor(intagPct)} progress={intagPct} />
+            <KpiTile label="Vunna intag" value={String(vunna)} sub="säljmål saknas" />
+            <KpiTile label="Sålda objekt" value={String(salda)} sub={`/ ${budget.salda}`} tone={tileColor(saldaPct)} progress={saldaPct} />
+            <KpiTile label="Omsättning" value={fmtKr(oms)} sub={`/ ${fmtKr(budget.omsattning)}`} tone={tileColor(omsPct)} progress={omsPct} />
+            <KpiTile label="Publicerade Redo" value={String(redoCount)} sub={`/ ${budget.redo}`} tone={tileColor(redoPct)} progress={redoPct} />
+            <KpiTile label="NPS" value="—" sub="Ingen data" />
+          </div>
+        )}
       </Card>
 
       <div className="grid gap-6 lg:grid-cols-3">
@@ -317,12 +376,12 @@ function StartTab() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border/40">
-              {([
-                ["Omsättning", fmtKr(oms) + " kr", "—", `${fmtKr(BUDGET_OMS)} (${omsPct}%)`],
-                ["Sålda objekt", String(salda), "—", `${BUDGET_SALDA} (${saldaPct}%)`],
+              {[
+                ["Omsättning", fmtKr(oms) + " kr", "—", `${fmtKr(budget.omsattning)} (${omsPct}%)`],
+                ["Sålda objekt", String(salda), "—", `${budget.salda} (${saldaPct}%)`],
                 ["Vunna intagsmöten", String(vunna), "—", "—"],
-                ["Antal intagsmöten", String(intag), "—", `${BUDGET_INTAG} (${intagPct}%)`],
-              ] as const).map((r) => (
+                ["Antal intagsmöten", String(intag), "—", `${budget.intag} (${intagPct}%)`],
+              ].map((r) => (
                 <tr key={r[0]} className="text-foreground/90">
                   <td className="py-3 text-muted-foreground">{r[0]}</td>
                   <td className="py-3">{r[1]}</td>

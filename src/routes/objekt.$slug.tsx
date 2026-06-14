@@ -37,6 +37,18 @@ export const Route = createFileRoute("/objekt/$slug")({
 
 const serif = { fontFamily: '"Instrument Serif", ui-serif, Georgia, serif', letterSpacing: "-0.01em" } as const;
 
+function buildMailto(to: string[], subject: string, body: string): string {
+  const toStr = to.filter(Boolean).join(",");
+  return `mailto:${toStr}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+}
+
+function getPartyEmails(slug: string, roles: Array<"säljare" | "köpare"> = ["säljare", "köpare"]): string[] {
+  return listKontakter()
+    .filter((k) => k.objektKopplingar.some((kp) => kp.slug === slug && roles.includes(kp.relation as "säljare" | "köpare")))
+    .map((k) => k.epost)
+    .filter((e): e is string => Boolean(e));
+}
+
 const SIDE_TABS = [
   "Start", "Intag", "Objektsinfo", "Marknad", "Visningar", "Budgivning",
   "Kontrakt", "Tillträde", "Säljare", "Köpare", "Dokument",
@@ -1529,7 +1541,9 @@ function KopareView({ onTabChange }: { onTabChange?: (tab: SideTab) => void }) {
                           <td className="px-3 py-2">{s.a}</td>
                           <td className="px-3 py-2 text-muted-foreground">{s.pnr}</td>
                           <td className="px-3 py-2 text-muted-foreground">📞 {s.tel}</td>
-                          <td className="px-3 py-2 text-muted-foreground">{s.mail} ✉</td>
+                          <td className="px-3 py-2 text-muted-foreground">
+                          {s.mail ? <a href={`mailto:${s.mail}`} className="hover:text-primary">{s.mail} ✉</a> : "—"}
+                        </td>
                           <td className="px-3 py-2 text-muted-foreground">{s.adr}</td>
                           <td className="px-3 py-2"><span className="rounded bg-emerald-500/15 px-2 py-0.5 text-[10px] text-emerald-300">BankID ✓</span></td>
                           <td className="px-3 py-2 text-muted-foreground">⚙</td>
@@ -2147,10 +2161,21 @@ function MaklarrakenskapView({ onTabChange }: { onTabChange: (tab: SideTab) => v
 
 /* ---------- Förbered tillträde ---------- */
 function TiForberedBody() {
+  const { slug } = Route.useParams();
+
+  function openKallelse() {
+    const emails = getPartyEmails(slug);
+    const kontrakt = getKontrakt(slug);
+    const adress = listObjekt().find((o) => o.id === slug)?.adress || slug;
+    const subject = `Kallelse till tillträde – ${adress}`;
+    const body = `Hej!\n\nDu kallas härmed till tillträde av ${adress}.\n\nTillträdesdatum: ${kontrakt.tilltradesdatum || "(datum ej satt)"}\n\nMed vänliga hälsningar,\nErik Lindqvist`;
+    window.open(buildMailto(emails, subject, body), "_blank");
+  }
+
   return (
     <div className="space-y-5">
       <div className="flex justify-end">
-        <BtnPrimary>✉ E-post kallelse</BtnPrimary>
+        <BtnPrimary onClick={openKallelse}>✉ E-post kallelse</BtnPrimary>
       </div>
       <div className="grid gap-4 md:grid-cols-2">
         <Field label="Tillträdesplats" hint="(För kallelser, dokument mm)"><Input /></Field>
@@ -2197,7 +2222,17 @@ function TiForberedBody() {
 
 /* ---------- Likvidavräkning ---------- */
 function TiLikvidBody() {
+  const { slug } = Route.useParams();
   const [tab, setTab] = useState<"Gemensam" | "Säljare" | "Köpare">("Gemensam");
+
+  function openLikvidKallelse() {
+    const emails = getPartyEmails(slug);
+    const kontrakt = getKontrakt(slug);
+    const adress = listObjekt().find((o) => o.id === slug)?.adress || slug;
+    const subject = `Tillträdesmöte och likvidavräkning – ${adress}`;
+    const body = `Hej!\n\nHärmed kallas du till tillträdesmöte och likvidavräkning för ${adress}.\n\nTillträdesdatum: ${kontrakt.tilltradesdatum || "(datum ej satt)"}\n\nMed vänliga hälsningar,\nErik Lindqvist`;
+    window.open(buildMailto(emails, subject, body), "_blank");
+  }
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -2219,7 +2254,7 @@ function TiLikvidBody() {
         <div className="flex gap-2">
           <BtnPrimary>🖨 Skriv ut likvid</BtnPrimary>
           <BtnPrimary>✎ E-signatur</BtnPrimary>
-          <BtnPrimary>✉ E-post kallelse och likvid</BtnPrimary>
+          <BtnPrimary onClick={openLikvidKallelse}>✉ E-post kallelse och likvid</BtnPrimary>
         </div>
       </div>
 
@@ -3236,6 +3271,16 @@ function KoPartyBody({ role, slug, onTabChange }: { role: "Säljare" | "Köpare"
             : `Inga ${role.toLowerCase()} kopplade ännu.`}
         </div>
         <div className="flex gap-2">
+          {persons.some((p) => p.epost) && (
+            <BtnGhost onClick={() => {
+              const emails = persons.map((p) => p.epost).filter((e): e is string => Boolean(e));
+              const subject = `Meddelande angående uppdraget`;
+              const body = `Hej!\n\nMed vänliga hälsningar,\nErik Lindqvist`;
+              window.open(buildMailto(emails, subject, body), "_blank");
+            }}>
+              ✉ E-post {role === "Säljare" ? "säljare" : "köpare"}
+            </BtnGhost>
+          )}
           <BtnGhost onClick={() => onTabChange(role === "Säljare" ? "Säljare" : "Köpare")}>
             Hantera i {role.toLowerCase()}-fliken →
           </BtnGhost>
@@ -3260,7 +3305,11 @@ function KoPartyBody({ role, slug, onTabChange }: { role: "Säljare" | "Köpare"
             ) : persons.map((p) => (
               <tr key={p.id}>
                 <td className="px-3 py-2 font-medium">{p.fornamn} {p.efternamn}</td>
-                <td className="px-3 py-2 text-muted-foreground">{p.epost || "—"}</td>
+                <td className="px-3 py-2 text-muted-foreground">
+                  {p.epost ? (
+                    <a href={`mailto:${p.epost}`} className="hover:text-primary">{p.epost}</a>
+                  ) : "—"}
+                </td>
                 <td className="px-3 py-2 text-muted-foreground">
                   {p.telefon ? <a href={`tel:${p.telefon}`} className="hover:text-primary">{p.telefon}</a> : "—"}
                 </td>
@@ -4686,7 +4735,9 @@ function SaljareView({ onTabChange }: { onTabChange: (tab: SideTab) => void }) {
                         <td className="px-3 py-2 text-muted-foreground">{s.pnr}</td>
                         <td className="px-3 py-2">{s.db}</td>
                         <td className="px-3 py-2 text-muted-foreground">📞 {s.tel}</td>
-                        <td className="px-3 py-2 text-muted-foreground">{s.mail} ✉</td>
+                        <td className="px-3 py-2 text-muted-foreground">
+                          {s.mail ? <a href={`mailto:${s.mail}`} className="hover:text-primary">{s.mail} ✉</a> : "—"}
+                        </td>
                         <td className="px-3 py-2 text-muted-foreground">{s.adr}</td>
                         <td className="px-3 py-2"><span className="rounded bg-emerald-500/15 px-2 py-0.5 text-[10px] text-emerald-300">BankID ✓</span></td>
                         <td className="px-3 py-2">{s.ks}</td>
