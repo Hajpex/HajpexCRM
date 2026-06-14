@@ -58,6 +58,25 @@ function fmtDate(ts: number) {
   return new Date(ts).toLocaleDateString("sv-SE", { day: "numeric", month: "short", year: "numeric" });
 }
 
+function nastaStegBadge(k: Kontakt) {
+  const ns = k.nastaSteg;
+  if (!ns) return null;
+  const now = Date.now();
+  const in7 = now + 7 * 86400_000;
+  if (ns.datum < now) {
+    return <span className="rounded-full bg-red-500/15 px-2 py-0.5 text-[10px] font-medium text-red-400">Förfallen</span>;
+  }
+  if (ns.datum <= now + 86400_000) {
+    return <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-medium text-amber-400">Idag</span>;
+  }
+  if (ns.datum <= in7) {
+    return <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
+      {new Date(ns.datum).toLocaleDateString("sv-SE", { weekday: "short", day: "numeric", month: "short" })}
+    </span>;
+  }
+  return null;
+}
+
 function KunderPage() {
   const navigate = useNavigate();
   const [tick, setTick] = useState(0);
@@ -192,6 +211,7 @@ function KunderPage() {
                           {ROLL_LABELS[topRoll].replace(/er$/, "").replace(/are$/, "are")}
                         </span>
                       )}
+                      {nastaStegBadge(k)}
                       {k.objektKopplingar.length > 0 && (
                         <span className="text-[10px] text-muted-foreground/60">
                           {k.objektKopplingar.length} obj.

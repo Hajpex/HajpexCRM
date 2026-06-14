@@ -1,5 +1,13 @@
 export type KontaktRelation = "spekulant" | "säljare" | "köpare" | "kontakt";
 
+export type NastaStegTyp = "samtal" | "möte" | "mejl" | "annat";
+
+export type NastaSteg = {
+  datum: number;
+  text: string;
+  typ: NastaStegTyp;
+};
+
 export type ObjektKoppling = {
   slug: string;
   relation: KontaktRelation;
@@ -41,4 +49,5 @@ export type Kontakt = {
   gdprGodkant: number | null;
   objektKopplingar: ObjektKoppling[];
   aktiviteter: Aktivitet[];
+  nastaSteg?: NastaSteg | null;
 };

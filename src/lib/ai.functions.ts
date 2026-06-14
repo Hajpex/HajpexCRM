@@ -116,6 +116,92 @@ export const analyzeRoomImages = createServerFn({ method: "POST" })
     return parseJson(content);
   });
 
+// ── Marketing text generation ─────────────────────────────────────────────────
+
+const MarketingInput = z.object({
+  adress: z.string(),
+  typ: z.string(),
+  rum: z.number().optional(),
+  boarea: z.number().optional(),
+  pris: z.number().optional(),
+  stad: z.string().optional(),
+  postnr: z.string().optional(),
+  byggAr: z.number().optional(),
+  tomtyta: z.number().optional(),
+  extraInfo: z.string().optional(),
+});
+
+export type MarketingTextResult = {
+  rubrik: string;
+  kort: string;
+  lang: string;
+};
+
+const MARKETING_SYSTEM = `Du är en erfaren svensk fastighetsmäklare som skriver säljande annonstexter till Hemnet och Booli.
+Texterna ska vara naturliga, konkreta och säljande utan att vara överdrivna.
+Inga tomma superlativer. Framhäv det som faktiskt är bra.
+Svara ENDAST med giltig JSON. Inga kodblock, ingen text utanför JSON.`;
+
+export const generateMarketingText = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) => MarketingInput.parse(input))
+  .handler(async ({ data }): Promise<MarketingTextResult> => {
+    const key = process.env.LOVABLE_API_KEY;
+    if (!key) throw new Error("LOVABLE_API_KEY saknas på servern.");
+
+    const facts = [
+      `Adress: ${data.adress}`,
+      data.stad ? `Ort: ${data.stad}` : "",
+      `Objekttyp: ${data.typ}`,
+      data.rum ? `Rum: ${data.rum} rum` : "",
+      data.boarea ? `Boarea: ${data.boarea} m²` : "",
+      data.pris ? `Utropspris: ${data.pris.toLocaleString("sv-SE")} kr` : "",
+      data.byggAr ? `Byggår: ${data.byggAr}` : "",
+      data.tomtyta ? `Tomtyta: ${data.tomtyta} m²` : "",
+      data.extraInfo ? `Övrigt: ${data.extraInfo}` : "",
+    ].filter(Boolean).join("\n");
+
+    const userText = `Skriv annonstexter för denna bostad:\n\n${facts}\n\nReturnera JSON med exakt dessa fält:
+{
+  "rubrik": "Kort lockande rubrik (max 80 tecken)",
+  "kort": "Kort säljande beskrivning (max 300 tecken, 2-3 meningar)",
+  "lang": "Lång säljande beskrivning (400-800 ord, 4-6 stycken, flytande text)"
+}`;
+
+    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Lovable-API-Key": key,
+      },
+      body: JSON.stringify({
+        model: "google/gemini-3-flash-preview",
+        messages: [
+          { role: "system", content: MARKETING_SYSTEM },
+          { role: "user", content: userText },
+        ],
+        response_format: { type: "json_object" },
+      }),
+    });
+
+    if (res.status === 429) throw new Error("AI-tjänsten är överbelastad just nu. Försök igen om en stund.");
+    if (res.status === 402) throw new Error("AI-krediter slut. Lägg till krediter i Lovable-arbetsytan.");
+    if (!res.ok) {
+      const t = await res.text();
+      throw new Error(`AI-fel (${res.status}): ${t.slice(0, 200)}`);
+    }
+
+    const json = await res.json();
+    const content = String(json?.choices?.[0]?.message?.content ?? "").trim()
+      .replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/i, "").trim();
+
+    const parsed = JSON.parse(content);
+    return {
+      rubrik: String(parsed.rubrik ?? "").trim(),
+      kort: String(parsed.kort ?? "").trim(),
+      lang: String(parsed.lang ?? "").trim(),
+    };
+  });
+
 const FinalizeInput = z.object({
   roomName: z.string(),
   floor: z.string().optional().default(""),

@@ -3,7 +3,8 @@ import { Fragment, createContext, useContext, useState, useEffect, type ReactNod
 import { AppShell } from "../components/AppShell";
 import { OBJEKT, type Objekt } from "../data/objekt";
 import { listObjekt } from "../lib/objektStore";
-import { getObjektNotes, addObjektNote, setObjektBeskrivning, setObjektStatus } from "../lib/objektNotesStore";
+import { getObjektNotes, addObjektNote, setObjektBeskrivning, setObjektStatus, setObjektMarknadText } from "../lib/objektNotesStore";
+import { generateMarketingText } from "../lib/ai.functions";
 import { listBud, addBud, markeraVinnare, deleteBud, fmtBud, type Bud } from "../lib/budgivningStore";
 import { fmtSweNum, handleNumberInput } from "../lib/formatters";
 import { getDemoSaljare } from "../lib/demoKontakter";
@@ -1462,11 +1463,14 @@ function TiKopareBody() {
 
 type DokRow = { n: string; meta?: string; tag: string; tagCls: string; created: string; updated: string };
 
-const DOK_DOCUMENTS: DokRow[] = [
-  { n: "Frågelistan", meta: "Import från kundenssida  Import från kundenssida", tag: "Licensdokument", tagCls: "bg-sky-500/15 text-sky-300", created: "2026-06-11", updated: "2026-06-12" },
-  { n: "Förmedlingsuppdrag - Fastighet", meta: "MSF 1.2  1.0", tag: "Licensdokument", tagCls: "bg-sky-500/15 text-sky-300", created: "2026-05-27", updated: "2026-05-27" },
-  { n: "Intag - fastighet", meta: "Mspecs  1.0", tag: "MSF dokument", tagCls: "bg-amber-500/15 text-amber-300", created: "2026-05-27", updated: "2026-05-27" },
-];
+function getDokDocuments(isBrf: boolean): DokRow[] {
+  const typLabel = isBrf ? "Bostadsrätt" : "Fastighet";
+  return [
+    { n: "Frågelistan", meta: "Import från kundenssida  Import från kundenssida", tag: "Licensdokument", tagCls: "bg-sky-500/15 text-sky-300", created: "2026-06-11", updated: "2026-06-12" },
+    { n: `Förmedlingsuppdrag - ${typLabel}`, meta: "MSF 1.2  1.0", tag: "Licensdokument", tagCls: "bg-sky-500/15 text-sky-300", created: "2026-05-27", updated: "2026-05-27" },
+    { n: `Intag - ${typLabel.toLowerCase()}`, meta: "Mspecs  1.0", tag: "MSF dokument", tagCls: "bg-amber-500/15 text-amber-300", created: "2026-05-27", updated: "2026-05-27" },
+  ];
+}
 
 type DokFile = {
   ord: number; typ: string; ext: "pdf" | "png"; kategori: string; titel: string;
@@ -1506,7 +1510,7 @@ function FileIcon({ ext }: { ext: "pdf" | "png" }) {
 }
 
 function DokumentView({ slug }: { slug: string }) {
-  void slug;
+  const isBrf = getObjektBySlug(slug)?.typ === "Bostadsrätt";
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-end gap-4 border-b border-border pb-3 text-xs">
@@ -1555,7 +1559,7 @@ function DokumentView({ slug }: { slug: string }) {
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {DOK_DOCUMENTS.map((d) => (
+              {getDokDocuments(isBrf).map((d) => (
                 <tr key={d.n}>
                   <td className="px-3 py-2">
                     <div className="font-medium">{d.n}</div>
@@ -2166,10 +2170,13 @@ function ProvisionBody() {
 /* ---------- Dokument ---------- */
 
 function DokumentBody() {
+  const { slug } = Route.useParams();
+  const isBrf = getObjektBySlug(slug)?.typ === "Bostadsrätt";
+  const typLabel = isBrf ? "Bostadsrätt" : "Fastighet";
   const docs = [
     { n: "Frågelistan", k: "Licensdokument", c: "2026-06-11", u: "2026-06-12" },
-    { n: "Förmedlingsuppdrag – Fastighet", k: "Licensdokument", c: "2026-05-27", u: "2026-05-27" },
-    { n: "Intag – fastighet", k: "MSF dokument", c: "2026-05-27", u: "2026-05-27" },
+    { n: `Förmedlingsuppdrag – ${typLabel}`, k: "Licensdokument", c: "2026-05-27", u: "2026-05-27" },
+    { n: `Intag – ${typLabel.toLowerCase()}`, k: "MSF dokument", c: "2026-05-27", u: "2026-05-27" },
   ];
   return (
     <div className="space-y-4">
@@ -3693,51 +3700,127 @@ function MaMjBody() {
 /* ---------- Marknad (rubrik + beskrivningar) ---------- */
 
 function MaMarknadBody() {
+  const { slug } = Route.useParams();
+  const obj = getObjektBySlug(slug);
+  const saved = getObjektNotes(slug);
+
+  const [rubrik, setRubrik] = useState(saved.rubrik ?? "");
+  const [kortBeskr, setKortBeskr] = useState(saved.kortBeskrivning ?? "");
+  const [langBeskr, setLangBeskr] = useState(saved.langBeskrivning ?? "");
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+  const [saved_, setSaved_] = useState(false);
+
+  function saveTexts() {
+    setObjektMarknadText(slug, { rubrik, kortBeskrivning: kortBeskr, langBeskrivning: langBeskr });
+    setSaved_(true);
+    setTimeout(() => setSaved_(false), 2000);
+  }
+
+  async function handleAI() {
+    setAiLoading(true);
+    setAiError(null);
+    try {
+      const result = await generateMarketingText({
+        data: {
+          adress: obj?.adress ?? slug,
+          typ: obj?.typ ?? "Bostad",
+          rum: obj?.rum,
+          boarea: obj?.boarea,
+          pris: obj?.pris,
+          stad: obj?.stad,
+          postnr: obj?.postnr,
+          extraInfo: langBeskr ? `Befintlig text att utgå från: ${langBeskr.slice(0, 500)}` : undefined,
+        },
+      });
+      setRubrik(result.rubrik);
+      setKortBeskr(result.kort);
+      setLangBeskr(result.lang);
+      setObjektMarknadText(slug, {
+        rubrik: result.rubrik,
+        kortBeskrivning: result.kort,
+        langBeskrivning: result.lang,
+      });
+    } catch (e: any) {
+      setAiError(e?.message ?? "Okänt fel");
+    } finally {
+      setAiLoading(false);
+    }
+  }
+
   return (
     <div className="space-y-5">
+      {/* AI generate button */}
+      <div className="flex items-center justify-between rounded-md border border-primary/20 bg-primary/5 px-4 py-3">
+        <div>
+          <p className="text-sm font-medium text-foreground">AI-genererade annonstexter</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Generera rubrik + kort + lång beskrivning automatiskt baserat på objektdata
+          </p>
+        </div>
+        <button
+          onClick={handleAI}
+          disabled={aiLoading}
+          className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-xs font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-60"
+        >
+          {aiLoading ? (
+            <>
+              <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-primary-foreground/30 border-t-primary-foreground" />
+              Genererar…
+            </>
+          ) : (
+            <>✨ Generera med AI</>
+          )}
+        </button>
+      </div>
+
+      {aiError && (
+        <div className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-400">
+          {aiError}
+        </div>
+      )}
+
       <Field label="Rubrik till säljande beskrivning">
-        <Input value="Charmigt hus från 1944 i grönskande miljö" />
-      </Field>
-      <Field label="Kort säljande beskrivning (0 / max 300 tecken)">
-        <textarea rows={3} className="w-full rounded-md border border-border bg-background/40 px-3 py-2 text-sm" />
-      </Field>
-      <Field label="Lång säljande beskrivning (max 4000 tecken)">
-        <textarea
-          rows={14}
-          className="w-full rounded-md border border-border bg-background/40 px-3 py-2 text-sm leading-relaxed"
-          defaultValue={`Välkommen till ett trivsamt hus från 1944 med ett rofyllt läge och en fantastisk trädgårdstomt om hela 1 994,5 kvm. Här bor du med gott om utrymme både inne och ute, omgiven av uppvuxen grönska, blommande planteringar och generösa gräsytor som ger tomten en privat och inbjudande karaktär.
-
-Huset erbjuder en totalyta om 134 kvm, varav 69 kvm boarea och 65 kvm biarea. Entréplanet rymmer kök, vardagsrum och matplats tillsammans med två sovrum, hall och gäst-WC. En trappa ner finns källarplanet som kompletterar bostaden med badrum, separat WC, en mindre kontorsplats, förråd, pannrum samt grovingång. Invändigt möts du av en hemtrevlig miljö där husets ursprungliga charm har bevarats samtidigt som flera viktiga investeringar har genomförts under senare år.
-
-Under 2025 installerades en modern och väl dimensionerad bergvärmeanläggning med 260 meters borrdjup, anpassad även för framtida utbyggnadsmöjligheter. Under 2024 tilläggsisolerades vinden med cirka 300 mm cellulosa och under 2025 byttes även källardörren.
-
-Utomhus finns flera trevliga uteplatser att välja mellan. Den rymliga altanen under tak erbjuder plats för både matgrupp och grill medan den stenlagda pergolan längre ner i trädgården skapar en mer avskild miljö för avkoppling. Tomten bjuder på en härlig kombination av öppna ytor, fruktträd, blommande buskar och uppvuxna träd som ger karaktär under årets alla årstider.
-
-I Länna bor du med närhet till både natur och service. I området finns förskola och skola samt fina möjligheter till friluftsliv med närhet till skogsområden, promenadstråk och sjö. På kort avstånd ligger Länna handelsområde med ett brett utbud av butiker, restauranger och vardagsservice. Goda kommunikationer via buss samt närhet till pendeltåg i Skogås och Trångsund underlättar pendlingen mot Stockholm.
-
-För dig som söker ett hus med karaktär, genomförda förbättringar och en ovanligt stor trädgårdstomt finns här ett hem med mycket att uppskatta.
-
-Välkommen hem!`}
+        <input
+          value={rubrik}
+          onChange={(e) => setRubrik(e.target.value)}
+          onBlur={saveTexts}
+          className="w-full rounded-md border border-border bg-background/40 px-3 py-2 text-sm focus:border-primary/50 focus:outline-none"
+          placeholder="Ange rubrik…"
         />
       </Field>
-      <div>
-        <div className="mb-2 flex items-center justify-between">
-          <div className="text-sm font-medium">Övriga säljande beskrivningar</div>
-          <BtnPrimary>+ Lägg till</BtnPrimary>
-        </div>
-        <div className="overflow-hidden rounded-md border border-border">
-          <table className="w-full text-sm">
-            <thead className="bg-foreground/[0.03] text-xs uppercase tracking-wider text-muted-foreground">
-              <tr>
-                <th className="px-3 py-2 text-left">Språk</th>
-                <th className="px-3 py-2 text-left">Rubrik</th>
-                <th className="px-3 py-2 text-left">Kort säljande beskrivning</th>
-                <th className="px-3 py-2 text-left">Lång säljande beskrivning</th>
-              </tr>
-            </thead>
-            <tbody><tr><td colSpan={4} className="px-3 py-3 text-xs text-muted-foreground">Inga poster</td></tr></tbody>
-          </table>
-        </div>
+
+      <Field label={`Kort säljande beskrivning (${kortBeskr.length} / max 300 tecken)`}>
+        <textarea
+          rows={3}
+          value={kortBeskr}
+          onChange={(e) => setKortBeskr(e.target.value)}
+          onBlur={saveTexts}
+          maxLength={300}
+          className="w-full rounded-md border border-border bg-background/40 px-3 py-2 text-sm leading-relaxed focus:border-primary/50 focus:outline-none"
+          placeholder="Kort och säljande intro…"
+        />
+      </Field>
+
+      <Field label={`Lång säljande beskrivning (${langBeskr.length} tecken)`}>
+        <textarea
+          rows={16}
+          value={langBeskr}
+          onChange={(e) => setLangBeskr(e.target.value)}
+          onBlur={saveTexts}
+          className="w-full rounded-md border border-border bg-background/40 px-3 py-2 text-sm leading-relaxed focus:border-primary/50 focus:outline-none"
+          placeholder="Detaljerad beskrivning av bostaden…"
+        />
+      </Field>
+
+      <div className="flex items-center justify-between">
+        <button
+          onClick={saveTexts}
+          className="rounded-md bg-primary px-4 py-2 text-xs font-medium text-primary-foreground hover:opacity-90"
+        >
+          {saved_ ? "✓ Sparat!" : "Spara texter"}
+        </button>
+        <p className="text-[11px] text-muted-foreground">Texterna sparas lokalt och används i objektsbeskrivningen</p>
       </div>
     </div>
   );
@@ -4042,6 +4125,90 @@ function SaljareView() {
 }
 /* ============================== Objektsbeskrivning ============================== */
 
+// ── Innehållspooler för BRF-beskrivningar (slumpas deterministiskt per objekt) ──
+
+const _BRF_TAGLINE_ADJ = ["Välplanerad", "Genomrenoverad", "Modern", "Charmig", "Exklusiv", "Trivsam", "Fräsch", "Rymlig och ljus"] as const;
+const _BRF_TAGLINE_LOC = [
+  "i populärt läge", "nära pendeltåg", "med söderläge", "med utsikt över staden",
+  "nära centrum", "i eftertraktat område", "med härlig innergård", "i lugnt kvarter",
+] as const;
+
+const _BRF_HALL = [
+  "Välkomnande hall med smarta förvaringslösningar och plats för ytterkläder och skor. Naturligt ljusinsläpp och ett trivsamt första intryck som binder samman bostadens rum på ett naturligt sätt.",
+  "Generös entréhall med inbyggda garderober och gott om plats för ytterkläder. Ljusa väggar och ett genomtänkt entréparti skapar ett positivt välkomnande. Hallen leder smidigt vidare till bostadens övriga rum.",
+  "Praktisk och väl disponerad hall med förvaringslösningar för det dagliga. Ljus och luftig med parkett som bär vidare in i bostaden. En naturlig startpunkt för ett funktionellt hem.",
+  "Rymlig hall med trägolv och neutrala, ljusa väggar. Gott om plats för krokar, skor och kompletterande förvaring. Hallen binder samman bostadens rum på ett naturligt och trivsamt sätt.",
+  "Stilren hal med vitmålade väggar och klinker i entrépartiet. Genomtänkta lösningar för avhängning och skoförvaring. Skapar ett luftigt och positivt första intryck.",
+] as const;
+
+const _BRF_VARDAGSRUM = [
+  "Rymligt och ljust vardagsrum med generöst ljusinsläpp från stora fönster. Gott om plats för soffgrupp, tv-möbel och bokhyllor. Öppen och inbjudande känsla med trägolv i välvårdat skick.",
+  "Trivsamt vardagsrum med parkettgolv och välkomnande atmosfär. Fönster mot lugnt väderstreck ger behagligt ljusinsläpp under stora delar av dagen. Rymligt för en generös soffgrupp och ett bra tv-bord.",
+  "Ljust och luftigt vardagsrum med högt i tak och stora fönster. Kombineras naturligt med matplatsen och skapar ett socialt och öppet flöde. Gott om plats för möblemang och personliga detaljer.",
+  "Välproportionerat vardagsrum med genomtänkt planlösning. Trivsam och inbjudande miljö med plats för både avkoppling och umgänge. Fönster mot lugn innergård ger ett rofyllt läge.",
+  "Stilfullt vardagsrum med plats för en generös soffgrupp och ett väl tilltaget tv-bord. Ljust läge med fönster mot söder. Parkett i välvårdat skick och neutrala väggar som ger stor frihet i inredningen.",
+] as const;
+
+const _BRF_KOK = [
+  { stil: "modernt", utr: "induktionshäll, integrerad ugn, köksfläkt, diskmaskin och kylskåp med frys", extra: "Matplatsen vid köket passar perfekt för vardagsmåltiderna." },
+  { stil: "stilrent och funktionellt", utr: "spis med keramikhäll, ugn, köksfläkt, diskmaskin samt separat kylskåp och frys", extra: "Köksön ger extra arbetsyta och är en naturlig samlingsplats." },
+  { stil: "genomrenoverat", utr: "induktionshäll, ugn med pyrolytisk rengöring, köksfläkt, diskmaskin och inbyggda vitvaror", extra: "Öppen planlösning mot vardagsrummet skapar ett socialt kök." },
+  { stil: "välplanerat", utr: "keramikhäll, ugn, köksfläkt, diskmaskin, separat kylskåp och frys i kolonn", extra: "Gott om förvaring i välorganiserade höga skåp och lådor." },
+  { stil: "tidsenligt", utr: "induktionshäll, inbyggd ugn med ångfunktion, köksfläkt, diskmaskin och kombinerad kyl-frys", extra: "Köket bjuder på goda arbetsytor och ett smart utformat förvaringssystem." },
+] as const;
+
+const _BRF_KOK_AR_OFFSET = [0, 2, 4, 7, 11, 15] as const;
+
+const _BRF_SOVRUM1 = [
+  "Rofyllt sovrum med plats för dubbelsäng, sängbord och garderober längs en hel vägg. Lugnt läge med gott om naturligt ljus och rofylld atmosfär.",
+  "Välproportionerat sovrum med genomtänkt förvaring i inbyggda garderober. Rymligt för dubbelsäng med sängbordsmöbler och personliga detaljer. Lugnt och trivsamt.",
+  "Trivsamt sovrum med parkettgolv och neutrala väggar. Plats för dubbelsäng samt garderober med goda förvaringsmöjligheter. Lugnt läge mot innergård.",
+  "Ljust och luftigt sovrum med fönster mot tyst innergård. Rymligt för en dubbelsäng med sängbord på båda sidor. Välvårdad parkettgolv och neutrala väggar.",
+  "Stilrent sovrum med vitmålade väggar och plankgolv. Gott om plats för dubbelsäng och garderober. Rofyllt och inbjudande med bra ljusinsläpp.",
+] as const;
+
+const _BRF_SOVRUM2 = [
+  "Trivsamt sovrum som fungerar utmärkt som barnrum, gästrum eller hemmakontor. Ljus och luftig miljö med parkettgolv och neutrala väggar.",
+  "Flexibelt rum med möjlighet att användas som sovrum, arbetsrum eller hobbyrum. Bra ljusinsläpp och neutral inredning som ger stor frihet.",
+  "Praktiskt sovrum i fint skick. Passar som gäst- eller barnrum, alternativt hemmakontor. Fönster mot innergård ger ett lugnt läge.",
+  "Kompakt men välplanerat sovrum som maximerar ytan. Passar barnrum, hemmakontor eller gästrum. Ljust och funktionellt.",
+  "Genomtänkt sovrum med plats för enkelsäng och kompletterande förvaring. Enkelt att anpassa till barnrum, arbetsrum eller gästvind.",
+] as const;
+
+const _BRF_BADRUM_AR = [2014, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023] as const;
+const _BRF_BADRUM = [
+  (ar: number) => `Helkaklat badrum renoverat ${ar} med klinkersgolv och golvvärme. Utrustat med dusch, WC, handfat med underskåp, spegel med integrerad belysning samt tvättmaskin och torktumlare.`,
+  (ar: number) => `Renoverat badrum (${ar}) med kakel och klinker i genomtänkt design. Glasduschhörna, WC, kommod med handfat, spegelskåp med belysning och plats för tvättmaskin.`,
+  (ar: number) => `Välplanerat badrum renoverat ${ar} med helkaklade väggar och klinkersgolv med golvvärme. Fullt utrustat med duschutrymme, WC, handfat, spegel och tvättutrustning.`,
+  (ar: number) => `Modernt badrum från ${ar} med dusch, WC och handfat i en ren och ljus design. Klinker med golvvärme, helkaklade väggar och plats för tvättmaskin.`,
+  (ar: number) => `Stilrent och helkaklat badrum renoverat ${ar}. Glasdusch med inbyggda hyllor, WC, handfat i kommod, stor spegelyta med backlit belysning och kombinerad tvättmaskin.`,
+] as const;
+
+const _BRF_BALKONG = [
+  { har: true, text: "Inglasad balkong mot sydost med plats för utemöbler och grill. Används som ett extra rum under stora delar av året." },
+  { har: true, text: "Rymlig balkong mot söder med fin utsikt och solexponering under stora delar av dagen. Gott om plats för matgrupp och solstolar." },
+  { har: true, text: "Trivsam balkong mot lugn innergård — ett fridsamt och grönt läge. Passar perfekt för morgonkaffet eller kvällsavkopplingen." },
+  { har: true, text: "Generös terrass med vacker stadsvy. Privat och insynsskyddad med plats för loungemöbler och planteringar." },
+  { har: false, text: "" },
+] as const;
+
+const _BRF_BYGGNAD_VENTILATION = ["Mekanisk frånluft (F)", "FTX-system med värmeåtervinning", "Mekanisk till- och frånluft", "Självdrag med mekanisk tilluft"] as const;
+const _BRF_BYGGNAD_VARME = ["Fjärrvärme", "Bergvärme via föreningen", "Frånluftsvärmepump", "Fjärrvärme med individuell mätning"] as const;
+const _BRF_BYGGNAD_INTERNET = ["Fiber 1 Gbit/s via föreningen", "Fiber via Tele2 (föreningsavtal)", "Bredband via Telia, 500/500 Mbit", "Fiber via Bahnhof"] as const;
+
+const _BRF_OMRADE = [
+  (ort: string) => `${ort} är ett välkänt och omtyckt område med nära tillgång till service, restauranger och kollektivtrafik. Området bjuder på ett trivsamt gatuliv och blandad bebyggelse. Kommunikationerna är goda med pendeltåg och busstrafik som tar dig till city på kort tid.`,
+  (ort: string) => `Området kring ${ort} präglas av en välmående stadsdelskaraktär med butiker, kaféer och grönområden i närheten. God tillgång till skolor och förskolor. Pendeln tar dig smidigt in till central Stockholm på under 30 minuter.`,
+  (ort: string) => `${ort} är ett populärt bostadsområde med ett levande kulturliv och nära till shopping och natur. Cykelvänligt med välskötta cykelbanor. Nära pendeltåg och tunnelbana som tar dig till city bekvämt.`,
+  (ort: string) => `Lugn och trivsam stadsdel nära ${ort} centrum med goda kommunikationer. Nära matbutiker, apotek, restauranger och parker. Kort pendlingsavstånd till Stockholm city.`,
+  (ort: string) => `${ort} erbjuder ett komplett vardagsliv med service, natur och kollektivtrafik inom bekvämt avstånd. Populärt familjeområde med bra skolor och förskolor i närheten.`,
+] as const;
+
+function bpick<T>(arr: readonly T[], h: number, rotBits: number): T {
+  const mixed = ((h >>> rotBits) | (h << (32 - rotBits))) >>> 0;
+  return arr[mixed % arr.length];
+}
+
 function ObjektsbeskrivningView({ adress, slug }: { adress: string; slug: string }) {
   const o = getObjektBySlug(slug);
   const images = pickImages(slug, o?.typ, o?.boarea);
@@ -4054,6 +4221,37 @@ function ObjektsbeskrivningView({ adress, slug }: { adress: string; slug: string
     ? `${o.postnr.slice(0, 3)} ${o.postnr.slice(3)}`
     : "—";
   const typStr = o?.typ ?? "—";
+  const isBrf = o?.typ === "Bostadsrätt";
+
+  // Deterministic BRF-data based on slug
+  const h = hashSlug(slug);
+  const foreningsnamn = `BRF ${adress.split(" ")[0]}`;
+  const orgNr = `7${(h % 10)}${((h >> 3) % 10)}${((h >> 5) % 10)}${((h >> 7) % 10)}${((h >> 9) % 10)}${((h >> 11) % 10)}-${((h >> 13) % 10)}${((h >> 15) % 10)}${((h >> 17) % 10)}${((h >> 19) % 10)}`;
+  const antalLgh = 12 + (h % 60);
+  const skuld = ((3000 + (h % 8000)) * (o?.boarea ?? 60)).toLocaleString("sv-SE");
+  const avgift = (2500 + ((o?.boarea ?? 60) * 35)).toLocaleString("sv-SE");
+  const vaning = 1 + (h % 5);
+  const hiss = (h % 3) !== 0;
+
+  // Per-objekt genererat innehåll för BRF
+  const rum = o?.rum ?? 2;
+  const ort = o?.stad ?? "Stockholm";
+  const typByRum: Record<number, string> = { 1: "etta", 2: "tvåa", 3: "trea", 4: "fyra", 5: "femma", 6: "sexa" };
+  const brfTagline = `${bpick(_BRF_TAGLINE_ADJ, h, 0)} ${typByRum[rum] ?? "bostadsrätt"} ${bpick(_BRF_TAGLINE_LOC, h, 5)}`;
+  const brfHall = bpick(_BRF_HALL, h, 3);
+  const brfVardagsrum = bpick(_BRF_VARDAGSRUM, h, 7);
+  const brfKok = bpick(_BRF_KOK, h, 11);
+  const brfKokAr = 2024 - bpick(_BRF_KOK_AR_OFFSET, h, 13);
+  const brfSovrum1 = bpick(_BRF_SOVRUM1, h, 17);
+  const brfSovrum2 = bpick(_BRF_SOVRUM2, h, 19);
+  const brfBadrumAr = bpick(_BRF_BADRUM_AR, h, 23);
+  const brfBadrum = bpick(_BRF_BADRUM, h, 9)(brfBadrumAr);
+  const brfBalkong = bpick(_BRF_BALKONG, h, 15);
+  const brfByggAr = 1955 + (h % 50);
+  const brfVentilation = bpick(_BRF_BYGGNAD_VENTILATION, h, 21);
+  const brfVarme = bpick(_BRF_BYGGNAD_VARME, h, 27);
+  const brfInternet = bpick(_BRF_BYGGNAD_INTERNET, h, 25);
+  const brfOmrade = bpick(_BRF_OMRADE, h, 29)(ort);
   const [layout, setLayout] = useState("Huvudbild");
   const [logoPos, setLogoPos] = useState("Vänster");
   const [rubrik, setRubrik] = useState("Gatuadress");
@@ -4110,124 +4308,198 @@ function ObjektsbeskrivningView({ adress, slug }: { adress: string; slug: string
           <div className="h-px bg-neutral-200" />
 
           <div className="p-10">
-            <h2 style={serif} className="text-center text-2xl text-neutral-800">Charmigt hus från 1944 i grönskande miljö</h2>
+            {isBrf ? (
+              <>
+                <h2 style={serif} className="text-center text-2xl text-neutral-800">{brfTagline}</h2>
 
-            <h3 style={serif} className="mt-8 text-xl text-neutral-800">Snabbfakta</h3>
-            <div className="mt-3 grid grid-cols-2 gap-x-8 gap-y-2 text-sm">
-              <Pb k="Rum" v={rumStr} /><Pb k="Boarea" v={boareaStr} />
-              <Pb k="Biarea (BIA)" v="65 m²" /><Pb k="Tomtareal/mark" v="1 994,5 m²" />
-              <Pb k="Pris" v={prisStr} /><Pb k="Pristyp" v="Utgångspris" />
-            </div>
+                <h3 style={serif} className="mt-8 text-xl text-neutral-800">Snabbfakta</h3>
+                <div className="mt-3 grid grid-cols-2 gap-x-8 gap-y-2 text-sm">
+                  <Pb k="Rum" v={rumStr} /><Pb k="Boarea" v={boareaStr} />
+                  <Pb k="Månadsavgift" v={`${avgift} kr/mån`} /><Pb k="Pris" v={prisStr} />
+                  <Pb k="Våning" v={`${vaning} tr${hiss ? " (hiss)" : ""}`} /><Pb k="Byggår" v={String(brfByggAr)} />
+                </div>
 
-            <h3 style={serif} className="mt-10 text-xl text-neutral-800">Om bostaden</h3>
-            <div className="mt-3 grid grid-cols-[180px_1fr] gap-y-2 text-sm">
-              <Pr k="Bostadstyp" v={`Objektstyp, ${typStr.toLowerCase()}`} />
-              <Pr k="Fastighetsbeteckning" v="HUDDINGE NYINGEN 5" />
-              <Pr k="Typkod" v="220 - Småhusenhet, bebyggd" />
-              <Pr k="Område" v="Länna" />
-              <Pr k="Gatuadress" v={adress} />
-              <Pr k="Postnummer" v={postnrStr} />
-              <Pr k="Ort" v={ortStr} />
-              <Pr k="Tomtbeskrivning" v="Stor och uppvuxen trädgårdstomt med gott om plats för både lek, odling och avkoppling. Tomten präglas av generösa gräsytor, slingrande gångar och en rik variation av träd, buskar och planteringar som skapar en grönskande och privat miljö." />
-              <Pr k="Tomtarealuppgifter enligt" v="Lantmäteriet" />
-              <Pr k="Tomtareal/mark" v="1 994,5 m²" />
-              <Pr k="Totalareal" v="1 994,5 m²" />
-              <Pr k="Boarea" v={boareaStr} />
-              <Pr k="Biarea (BIA)" v="65 m²" />
-              <Pr k="Areauppgift enligt" v="Mätning" />
-              <Pr k="Antal rum" v={rumStr} />
-              <Pr k="Antal sovrum" v="2" />
-              <Pr k="Max antal sovrum" v="3" />
-              <Pr k="Taxeringsår" v="2024" />
-              <Pr k="Taxeringsvärdet är" v="Fastställt" />
-              <Pr k="Värdeår" v="1944" />
-              <Pr k="Taxeringsvärde byggnad" v="1 511 000 SEK" />
-              <Pr k="Taxeringsvärde mark" v="2 605 000 SEK" />
-              <Pr k="Summa taxeringsvärde" v="4 116 000 SEK" />
-              <Pr k="Pris" v={`${prisStr}, utgångspris`} />
-              <Pr k="Tillträde" v="Enligt överenskommelse" />
-            </div>
+                <h3 style={serif} className="mt-10 text-xl text-neutral-800">Om bostaden</h3>
+                <div className="mt-3 grid grid-cols-[180px_1fr] gap-y-2 text-sm">
+                  <Pr k="Bostadstyp" v="Bostadsrätt" />
+                  <Pr k="Gatuadress" v={adress} />
+                  <Pr k="Postnummer" v={postnrStr} />
+                  <Pr k="Ort" v={ortStr} />
+                  <Pr k="Boarea" v={boareaStr} />
+                  <Pr k="Areauppgift enligt" v="Mätning" />
+                  <Pr k="Antal rum" v={rumStr} />
+                  <Pr k="Våning" v={`${vaning} tr`} />
+                  <Pr k="Hiss" v={hiss ? "Ja" : "Nej"} />
+                  <Pr k="Byggår" v={String(brfByggAr)} />
+                  <Pr k="Typ av uppvärmning" v={brfVarme} />
+                  <Pr k="Ventilation" v={brfVentilation} />
+                  <Pr k="Internet" v={brfInternet} />
+                  <Pr k="Pris" v={`${prisStr}, utgångspris`} />
+                  <Pr k="Tillträde" v="Enligt överenskommelse" />
+                </div>
 
-            <h3 style={serif} className="mt-10 text-xl text-neutral-800">Rumsbeskrivning</h3>
-            <div className="mt-3 space-y-3 text-sm leading-relaxed">
-              <RumP titel="HALL, Entréplan" text="Välkomnande hall med vitmålade väggar och ljust trägolv som är genomgående i stora delar av bostaden. Här finns plats för avhängning av ytterkläder och skor samt utrymme för ytterligare förvaring. Hallen binder samman bostadens rum och ger ett ljust och trivsamt första intryck." />
-              <RumP titel="GÄST-WC, Entréplan" text="Praktisk gäst-WC med fönster som ger naturligt ljusinsläpp. Väggarna är delvis kaklade med vitt kakel och blå dekor. Utrustad med WC, handfat, spegel samt ett väggskåp." />
-              <RumP titel="VARDAGSRUM, Entréplan" text="Rymligt vardagsrum med parkettgolv, ljusgröna väggar och generöst ljusinsläpp från stora fönster i två väderstreck. Här finns gott om plats för en större soffgrupp, tv-möbel och annat möblemang." />
-              <RumP titel="MATRUM, Entréplan" text="Ljust och trivsamt matrum med trägolv, vitmålade väggar och stort fönster. Gott om plats för ett större matbord. Placerat i anslutning till både vardagsrum och kök, vilket skapar ett naturligt flöde." />
-              <RumP titel="KÖK, Entréplan" text="Trivsamt kök från 2003 med gott om arbetsyta och förvaring bakom köksluckor i trä. Utrustat med spis, ugn, fläkt, diskmaskin samt kombinerad kyl och frys. Stort fönster ger fint ljusinsläpp." />
-              <RumP titel="SOVRUM 1, Entréplan" text="Rofyllt sovrum med trägolv och väggar i grå kulör kombinerat med en mönstrad fondtapet. Plats för dubbelsäng samt förvaring i garderober." />
-              <RumP titel="SOVRUM 2, Entréplan" text="Trivsamt sovrum med målade väggar i blågrå kulör och parkettgolv. Passar som barnrum, gästrum eller arbetsrum." />
-              <RumP titel="GROVINGÅNG, Källare" text="Praktisk groventré på källarplanet med egen entré utifrån. Gott om plats för avhängning och kompletterande förvaring." />
-              <RumP titel="WC, Källare" text="WC på källarplanet med målade väggar i grå kulör. Utrustad med WC, handfat, spegel och väggskåp." />
-              <RumP titel="PANNRUM/FÖRVARING, Källare" text="Pannrum med plats för teknisk utrustning samt goda förvaringsmöjligheter. Husets bergvärmepump från Nibe, installerad 2025 (Nibe S1256-13, borrdjup 260 m)." />
-              <RumP titel="BADRUM & TVÄTT, Källare" text="Rymligt badrum, renoverat 2017, med klinkergolv och helkaklade väggar. Utrustat med duschhörna, badkar, kommod, högskåp samt tvättpelare." />
-            </div>
+                <h3 style={serif} className="mt-10 text-xl text-neutral-800">Förening</h3>
+                <div className="mt-3 grid grid-cols-[220px_1fr] gap-y-2 text-sm">
+                  <Pr k="Föreningens namn" v={foreningsnamn} />
+                  <Pr k="Organisationsnummer" v={orgNr} />
+                  <Pr k="Antal lägenheter" v={String(antalLgh)} />
+                  <Pr k="Föreningens skuld" v={`${skuld} SEK`} />
+                  <Pr k="Månadsavgift" v={`${avgift} kr/mån`} />
+                  <Pr k="Avgiften inkluderar" v="Värme, vatten, sopor, kabel-TV" />
+                  <Pr k="Senaste årsredovisning" v="2024" />
+                </div>
 
-            <h3 style={serif} className="mt-10 text-xl text-neutral-800">Inteckningar</h3>
-            <div className="mt-3 grid grid-cols-[180px_1fr] gap-y-2 text-sm">
-              <Pr k="Inteckningar" v="5" />
-              <Pr k="Totalt belopp" v="4 484 000 SEK" />
-            </div>
+                <h3 style={serif} className="mt-10 text-xl text-neutral-800">Rumsbeskrivning</h3>
+                <div className="mt-3 space-y-3 text-sm leading-relaxed">
+                  <RumP titel="HALL" text={brfHall} />
+                  <RumP titel="VARDAGSRUM" text={brfVardagsrum} />
+                  <RumP
+                    titel="KÖK"
+                    text={`${brfKok.stil.charAt(0).toUpperCase() + brfKok.stil.slice(1)} kök renoverat ${brfKokAr} med gott om arbetsyta och välorganiserad förvaring. Utrustat med ${brfKok.utr}. ${brfKok.extra}`}
+                  />
+                  {rum >= 2 && <RumP titel="SOVRUM 1" text={brfSovrum1} />}
+                  {rum >= 3 && <RumP titel="SOVRUM 2" text={brfSovrum2} />}
+                  {rum >= 4 && <RumP titel="SOVRUM 3" text="Ytterligare sovrum med flexibel användning — passar som barnrum, gästrum eller arbetsrum." />}
+                  <RumP titel="BADRUM" text={brfBadrum} />
+                  {brfBalkong.har && <RumP titel="BALKONG" text={brfBalkong.text} />}
+                </div>
 
-            <h3 style={serif} className="mt-10 text-xl text-neutral-800">Kostnader</h3>
-            <div className="mt-3 grid grid-cols-[220px_1fr] gap-y-2 text-sm">
-              <Pr k="Årlig elförbrukning" v="10 393 kWh/år" />
-              <Pr k="Hushållsel" v="13 311 SEK/år" />
-              <Pr k="Uppvärmning" v="12 538 SEK/år" />
-              <Pr k="Vatten och avlopp" v="5 399 SEK/år" />
-              <Pr k="Renhållning" v="3 287 SEK/år" />
-              <Pr k="Sommarvatten" v="500 SEK/år" />
-              <Pr k="Summa driftskostnad" v="35 035 SEK/år" />
-              <Pr k="Antal personer i hushållet" v="3" />
-              <Pr k="Fastighetsskatt/-avgift" v="10 425 SEK/år" />
-              <Pr k="Försäkring" v="Hemförsäkring tillkommer för köpare. (Säljare har Gjensidige villaförsäkring)" />
-            </div>
+                <h3 style={serif} className="mt-10 text-xl text-neutral-800">Kostnader</h3>
+                <div className="mt-3 grid grid-cols-[220px_1fr] gap-y-2 text-sm">
+                  <Pr k="Månadsavgift" v={`${avgift} kr/mån`} />
+                  <Pr k="Avgiften inkluderar" v="Värme, vatten, sopor, kabel-TV" />
+                  <Pr k="Fastighetsskatt/-avgift" v="Ingår i månadsavgiften" />
+                  <Pr k="Energistatus" v="Energideklaration är beställd" />
+                  <Pr k="Internet/TV" v={brfInternet} />
+                </div>
 
-            <h3 style={serif} className="mt-10 text-xl text-neutral-800">Övriga rättigheter och belastningar</h3>
-            <div className="mt-3 grid grid-cols-[220px_1fr] gap-y-2 text-sm">
-              <Pr k="Planer och bestämmelser" v="Länna 4:30 mfl, Detaljplan (1993-11-22, senast ändrad 2022-08-29)" />
-              <Pr k="Rättigheter förmån" v="Officialservitut: VATTENLEDNING" />
-              <Pr k="Rättigheter förmån" v="Officialservitut: AVLOPP" />
-            </div>
+                <h3 style={serif} className="mt-10 text-xl text-neutral-800">Områdesbeskrivning</h3>
+                <div className="mt-3 space-y-3 text-sm leading-relaxed">
+                  <p>{brfOmrade}</p>
+                </div>
+              </>
+            ) : (
+              <>
+                <h2 style={serif} className="text-center text-2xl text-neutral-800">Charmigt hus från 1944 i grönskande miljö</h2>
 
-            <h3 style={serif} className="mt-10 text-xl text-neutral-800">Byggnad</h3>
-            <div className="mt-3 grid grid-cols-[220px_1fr] gap-y-2 text-sm">
-              <Pr k="Byggnadstyp" v="1-planshus med källare" />
-              <Pr k="Byggår" v="1944" />
-              <Pr k="Standardpoäng" v="32" />
-              <Pr k="Utförda renoveringar" v="2025-08 byte källardörr. 2025-02 bergvärmepump driftsattes (Nibe S1256-13, 260 m). 2024-10 tilläggsisolering vind ca 300 mm cellulosa. 2017 badrum källare. 2015 fönster entréplan. 2003 kök. 2000 V/A samt papp på taket." />
-              <Pr k="Grund" v="Källare" />
-              <Pr k="Taktyp/takbeklädnad" v="Papp" />
-              <Pr k="Fasadtyp" v="Träfasad" />
-              <Pr k="Fönster" v="3-glasfönster isoler" />
-              <Pr k="Stomme" v="Trä" />
-              <Pr k="Bjälklag" v="Trä" />
-              <Pr k="Vatten" v="Kommunalt vatten året om" />
-              <Pr k="Avlopp" v="Kommunalt avlopp" />
-              <Pr k="Typ av uppvärmning" v="Bergvärmepump" />
-              <Pr k="Märke på värmeanläggning" v="Nibe" />
-              <Pr k="Typ av ventilation" v="Självdrag" />
-              <Pr k="Huvudsäkring" v="25 A" />
-              <Pr k="Jordat eller ojordat" v="Jordat" />
-              <Pr k="Radon kommentar" v="Korttidsmätning gjord tidigare, se separat protokoll." />
-            </div>
+                <h3 style={serif} className="mt-8 text-xl text-neutral-800">Snabbfakta</h3>
+                <div className="mt-3 grid grid-cols-2 gap-x-8 gap-y-2 text-sm">
+                  <Pb k="Rum" v={rumStr} /><Pb k="Boarea" v={boareaStr} />
+                  <Pb k="Biarea (BIA)" v="65 m²" /><Pb k="Tomtareal/mark" v="1 994,5 m²" />
+                  <Pb k="Pris" v={prisStr} /><Pb k="Pristyp" v="Utgångspris" />
+                </div>
 
-            <h3 style={serif} className="mt-10 text-xl text-neutral-800">Parkering & uteplats</h3>
-            <div className="mt-3 grid grid-cols-[220px_1fr] gap-y-2 text-sm">
-              <Pr k="Parkeringsbeskrivning" v="Carport med plats för två bilar" />
-              <Pr k="Uteplatsbeskrivning" v="Generös altan delvis under tak med plats för matgrupp och grill. I anslutning finns en stenlagd uteplats under pergola för loungemöbler, omgiven av grönska och klätterväxter." />
-              <Pr k="Övriga byggnader" v="Förråd/Vedbod samt äldre hus på baksidan av tomten (dåligt skick)" />
-              <Pr k="TV/internet" v="Fiber – Bundet Telia nov 2026" />
-              <Pr k="Energistatus" v="Energideklaration är beställd" />
-            </div>
+                <h3 style={serif} className="mt-10 text-xl text-neutral-800">Om bostaden</h3>
+                <div className="mt-3 grid grid-cols-[180px_1fr] gap-y-2 text-sm">
+                  <Pr k="Bostadstyp" v={`Objektstyp, ${typStr.toLowerCase()}`} />
+                  <Pr k="Fastighetsbeteckning" v="HUDDINGE NYINGEN 5" />
+                  <Pr k="Typkod" v="220 - Småhusenhet, bebyggd" />
+                  <Pr k="Område" v="Länna" />
+                  <Pr k="Gatuadress" v={adress} />
+                  <Pr k="Postnummer" v={postnrStr} />
+                  <Pr k="Ort" v={ortStr} />
+                  <Pr k="Tomtbeskrivning" v="Stor och uppvuxen trädgårdstomt med gott om plats för både lek, odling och avkoppling. Tomten präglas av generösa gräsytor, slingrande gångar och en rik variation av träd, buskar och planteringar som skapar en grönskande och privat miljö." />
+                  <Pr k="Tomtarealuppgifter enligt" v="Lantmäteriet" />
+                  <Pr k="Tomtareal/mark" v="1 994,5 m²" />
+                  <Pr k="Totalareal" v="1 994,5 m²" />
+                  <Pr k="Boarea" v={boareaStr} />
+                  <Pr k="Biarea (BIA)" v="65 m²" />
+                  <Pr k="Areauppgift enligt" v="Mätning" />
+                  <Pr k="Antal rum" v={rumStr} />
+                  <Pr k="Antal sovrum" v="2" />
+                  <Pr k="Max antal sovrum" v="3" />
+                  <Pr k="Taxeringsår" v="2024" />
+                  <Pr k="Taxeringsvärdet är" v="Fastställt" />
+                  <Pr k="Värdeår" v="1944" />
+                  <Pr k="Taxeringsvärde byggnad" v="1 511 000 SEK" />
+                  <Pr k="Taxeringsvärde mark" v="2 605 000 SEK" />
+                  <Pr k="Summa taxeringsvärde" v="4 116 000 SEK" />
+                  <Pr k="Pris" v={`${prisStr}, utgångspris`} />
+                  <Pr k="Tillträde" v="Enligt överenskommelse" />
+                </div>
 
-            <h3 style={serif} className="mt-10 text-xl text-neutral-800">Områdesbeskrivning</h3>
-            <div className="mt-3 space-y-3 text-sm leading-relaxed">
-              <p><strong>OMRÅDET:</strong> Länna är ett idylliskt villaområde med närhet till sjö och skog. Länna Handelsplats med affärer ligger på nära avstånd, och området har även kort bilavstånd till Farsta och Haninge centrum. Till City tar man sig med bil på endast 20 minuter.</p>
-              <p><strong>SKOLA:</strong> I Länna finns förskola (Blåbärsstället) samt Engelska skolan. Mer information finns på www.huddingekommun.se.</p>
-              <p><strong>FRITID:</strong> I Skogås finns ett stort utbud av aktiviteter; tennis, badminton, basket, dans, fotboll och simhall. Vintertid finns skidspår och långfärdskridskoåkning på Drevviken och Magelungen. Ca 4 km bort ligger Ågesta Friluftsområde.</p>
-              <p><strong>CENTRUM / KOMMUNIKATIONER:</strong> Skogås centrum erbjuder butiker, restauranger, systembolag, apotek och vårdcentral. Pendeltåg går till Stockholm och Västerhaninge/Nynäshamn.</p>
-            </div>
+                <h3 style={serif} className="mt-10 text-xl text-neutral-800">Rumsbeskrivning</h3>
+                <div className="mt-3 space-y-3 text-sm leading-relaxed">
+                  <RumP titel="HALL, Entréplan" text="Välkomnande hall med vitmålade väggar och ljust trägolv som är genomgående i stora delar av bostaden. Här finns plats för avhängning av ytterkläder och skor samt utrymme för ytterligare förvaring. Hallen binder samman bostadens rum och ger ett ljust och trivsamt första intryck." />
+                  <RumP titel="GÄST-WC, Entréplan" text="Praktisk gäst-WC med fönster som ger naturligt ljusinsläpp. Väggarna är delvis kaklade med vitt kakel och blå dekor. Utrustad med WC, handfat, spegel samt ett väggskåp." />
+                  <RumP titel="VARDAGSRUM, Entréplan" text="Rymligt vardagsrum med parkettgolv, ljusgröna väggar och generöst ljusinsläpp från stora fönster i två väderstreck. Här finns gott om plats för en större soffgrupp, tv-möbel och annat möblemang." />
+                  <RumP titel="MATRUM, Entréplan" text="Ljust och trivsamt matrum med trägolv, vitmålade väggar och stort fönster. Gott om plats för ett större matbord. Placerat i anslutning till både vardagsrum och kök, vilket skapar ett naturligt flöde." />
+                  <RumP titel="KÖK, Entréplan" text="Trivsamt kök från 2003 med gott om arbetsyta och förvaring bakom köksluckor i trä. Utrustat med spis, ugn, fläkt, diskmaskin samt kombinerad kyl och frys. Stort fönster ger fint ljusinsläpp." />
+                  <RumP titel="SOVRUM 1, Entréplan" text="Rofyllt sovrum med trägolv och väggar i grå kulör kombinerat med en mönstrad fondtapet. Plats för dubbelsäng samt förvaring i garderober." />
+                  <RumP titel="SOVRUM 2, Entréplan" text="Trivsamt sovrum med målade väggar i blågrå kulör och parkettgolv. Passar som barnrum, gästrum eller arbetsrum." />
+                  <RumP titel="GROVINGÅNG, Källare" text="Praktisk groventré på källarplanet med egen entré utifrån. Gott om plats för avhängning och kompletterande förvaring." />
+                  <RumP titel="WC, Källare" text="WC på källarplanet med målade väggar i grå kulör. Utrustad med WC, handfat, spegel och väggskåp." />
+                  <RumP titel="PANNRUM/FÖRVARING, Källare" text="Pannrum med plats för teknisk utrustning samt goda förvaringsmöjligheter. Husets bergvärmepump från Nibe, installerad 2025 (Nibe S1256-13, borrdjup 260 m)." />
+                  <RumP titel="BADRUM & TVÄTT, Källare" text="Rymligt badrum, renoverat 2017, med klinkergolv och helkaklade väggar. Utrustat med duschhörna, badkar, kommod, högskåp samt tvättpelare." />
+                </div>
+
+                <h3 style={serif} className="mt-10 text-xl text-neutral-800">Inteckningar</h3>
+                <div className="mt-3 grid grid-cols-[180px_1fr] gap-y-2 text-sm">
+                  <Pr k="Inteckningar" v="5" />
+                  <Pr k="Totalt belopp" v="4 484 000 SEK" />
+                </div>
+
+                <h3 style={serif} className="mt-10 text-xl text-neutral-800">Kostnader</h3>
+                <div className="mt-3 grid grid-cols-[220px_1fr] gap-y-2 text-sm">
+                  <Pr k="Årlig elförbrukning" v="10 393 kWh/år" />
+                  <Pr k="Hushållsel" v="13 311 SEK/år" />
+                  <Pr k="Uppvärmning" v="12 538 SEK/år" />
+                  <Pr k="Vatten och avlopp" v="5 399 SEK/år" />
+                  <Pr k="Renhållning" v="3 287 SEK/år" />
+                  <Pr k="Sommarvatten" v="500 SEK/år" />
+                  <Pr k="Summa driftskostnad" v="35 035 SEK/år" />
+                  <Pr k="Antal personer i hushållet" v="3" />
+                  <Pr k="Fastighetsskatt/-avgift" v="10 425 SEK/år" />
+                  <Pr k="Försäkring" v="Hemförsäkring tillkommer för köpare. (Säljare har Gjensidige villaförsäkring)" />
+                </div>
+
+                <h3 style={serif} className="mt-10 text-xl text-neutral-800">Övriga rättigheter och belastningar</h3>
+                <div className="mt-3 grid grid-cols-[220px_1fr] gap-y-2 text-sm">
+                  <Pr k="Planer och bestämmelser" v="Länna 4:30 mfl, Detaljplan (1993-11-22, senast ändrad 2022-08-29)" />
+                  <Pr k="Rättigheter förmån" v="Officialservitut: VATTENLEDNING" />
+                  <Pr k="Rättigheter förmån" v="Officialservitut: AVLOPP" />
+                </div>
+
+                <h3 style={serif} className="mt-10 text-xl text-neutral-800">Byggnad</h3>
+                <div className="mt-3 grid grid-cols-[220px_1fr] gap-y-2 text-sm">
+                  <Pr k="Byggnadstyp" v="1-planshus med källare" />
+                  <Pr k="Byggår" v="1944" />
+                  <Pr k="Standardpoäng" v="32" />
+                  <Pr k="Utförda renoveringar" v="2025-08 byte källardörr. 2025-02 bergvärmepump driftsattes (Nibe S1256-13, 260 m). 2024-10 tilläggsisolering vind ca 300 mm cellulosa. 2017 badrum källare. 2015 fönster entréplan. 2003 kök. 2000 V/A samt papp på taket." />
+                  <Pr k="Grund" v="Källare" />
+                  <Pr k="Taktyp/takbeklädnad" v="Papp" />
+                  <Pr k="Fasadtyp" v="Träfasad" />
+                  <Pr k="Fönster" v="3-glasfönster isoler" />
+                  <Pr k="Stomme" v="Trä" />
+                  <Pr k="Bjälklag" v="Trä" />
+                  <Pr k="Vatten" v="Kommunalt vatten året om" />
+                  <Pr k="Avlopp" v="Kommunalt avlopp" />
+                  <Pr k="Typ av uppvärmning" v="Bergvärmepump" />
+                  <Pr k="Märke på värmeanläggning" v="Nibe" />
+                  <Pr k="Typ av ventilation" v="Självdrag" />
+                  <Pr k="Huvudsäkring" v="25 A" />
+                  <Pr k="Jordat eller ojordat" v="Jordat" />
+                  <Pr k="Radon kommentar" v="Korttidsmätning gjord tidigare, se separat protokoll." />
+                </div>
+
+                <h3 style={serif} className="mt-10 text-xl text-neutral-800">Parkering & uteplats</h3>
+                <div className="mt-3 grid grid-cols-[220px_1fr] gap-y-2 text-sm">
+                  <Pr k="Parkeringsbeskrivning" v="Carport med plats för två bilar" />
+                  <Pr k="Uteplatsbeskrivning" v="Generös altan delvis under tak med plats för matgrupp och grill. I anslutning finns en stenlagd uteplats under pergola för loungemöbler, omgiven av grönska och klätterväxter." />
+                  <Pr k="Övriga byggnader" v="Förråd/Vedbod samt äldre hus på baksidan av tomten (dåligt skick)" />
+                  <Pr k="TV/internet" v="Fiber – Bundet Telia nov 2026" />
+                  <Pr k="Energistatus" v="Energideklaration är beställd" />
+                </div>
+
+                <h3 style={serif} className="mt-10 text-xl text-neutral-800">Områdesbeskrivning</h3>
+                <div className="mt-3 space-y-3 text-sm leading-relaxed">
+                  <p><strong>OMRÅDET:</strong> Länna är ett idylliskt villaområde med närhet till sjö och skog. Länna Handelsplats med affärer ligger på nära avstånd, och området har även kort bilavstånd till Farsta och Haninge centrum. Till City tar man sig med bil på endast 20 minuter.</p>
+                  <p><strong>SKOLA:</strong> I Länna finns förskola (Blåbärsstället) samt Engelska skolan. Mer information finns på www.huddingekommun.se.</p>
+                  <p><strong>FRITID:</strong> I Skogås finns ett stort utbud av aktiviteter; tennis, badminton, basket, dans, fotboll och simhall. Vintertid finns skidspår och långfärdskridskoåkning på Drevviken och Magelungen. Ca 4 km bort ligger Ågesta Friluftsområde.</p>
+                  <p><strong>CENTRUM / KOMMUNIKATIONER:</strong> Skogås centrum erbjuder butiker, restauranger, systembolag, apotek och vårdcentral. Pendeltåg går till Stockholm och Västerhaninge/Nynäshamn.</p>
+                </div>
+              </>
+            )}
 
             <h3 style={serif} className="mt-10 text-xl text-neutral-800">Kontakter</h3>
             <div className="mt-3 text-sm">

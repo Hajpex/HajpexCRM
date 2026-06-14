@@ -37,10 +37,18 @@ export function findByTelefon(telefon: string): Kontakt | undefined {
 
 export function saveKontakt(data: Omit<Kontakt, "id" | "skapadAt">): Kontakt {
   const list = read();
-  const kontakt: Kontakt = { ...data, id: crypto.randomUUID(), skapadAt: Date.now() };
+  const kontakt: Kontakt = { nastaSteg: null, ...data, id: crypto.randomUUID(), skapadAt: Date.now() };
   list.push(kontakt);
   write(list);
   return kontakt;
+}
+
+export function setNastaSteg(id: string, ns: import("./kontaktTypes").NastaSteg | null) {
+  const list = read();
+  const idx = list.findIndex((k) => k.id === id);
+  if (idx < 0) return;
+  list[idx] = { ...list[idx], nastaSteg: ns };
+  write(list);
 }
 
 export function updateKontakt(id: string, patch: Partial<Omit<Kontakt, "id" | "skapadAt">>): Kontakt {

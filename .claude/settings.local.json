@@ -1,12 +1,17 @@
 {
   "permissions": {
     "allow": [
-      "Bash(bun --version)",
-      "Bash(npm --version)",
-      "PowerShell($cmds = \"bun\",\"node\",\"npm\",\"pnpm\",\"yarn\"; foreach \\($c in $cmds\\) { $p = \\(Get-Command $c -ErrorAction SilentlyContinue\\).Source; if \\($p\\) { \"$c -> $p\" } else { \"$c -> NOT FOUND\" } })",
-      "PowerShell(node --version)",
-      "PowerShell(npm --version)",
-      "PowerShell($env:PATH = \"C:\\\\Program Files\\\\nodejs;$env:PATH\"; Set-Location \"C:\\\\Users\\\\stend\\\\Claude\\\\Projects\\\\Hajpex\\\\customer-compass-main\"; & \"C:\\\\Program Files\\\\nodejs\\\\npm.cmd\" run dev)"
+      "Bash(*)",
+      "PowerShell(*)",
+      "Edit",
+      "Write",
+      "Read",
+      "Glob",
+      "Grep",
+      "mcp__Claude_in_Chrome__*",
+      "mcp__computer-use__*",
+      "mcp__ccd_session__*",
+      "mcp__visualize__*"
     ]
   }
 }
