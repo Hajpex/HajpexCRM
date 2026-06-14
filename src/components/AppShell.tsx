@@ -1,6 +1,7 @@
-import { Link, useRouterState } from "@tanstack/react-router";
-import { type ReactNode } from "react";
+import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
+import { type ReactNode, useEffect, useState } from "react";
 import { GlobalSearchTrigger } from "./CommandPalette";
+import { getAuth, logout, type User } from "../lib/authStore";
 
 type Item = { to: string; label: string; icon: ReactNode };
 
@@ -20,6 +21,22 @@ const serifLogo = { fontFamily: '"Instrument Serif", ui-serif, Georgia, serif' }
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const navigate = useNavigate();
+  const [user, setUser] = useState<User | null>(null);
+
+  useEffect(() => {
+    const u = getAuth();
+    if (!u) { navigate({ to: "/login" }); return; }
+    setUser(u);
+  }, [navigate]);
+
+  function handleLogout() {
+    logout();
+    navigate({ to: "/login" });
+  }
+
+  if (!user) return null;
+
   return (
     <div className="min-h-screen w-full bg-background text-foreground" style={fontStyle}>
       <BackgroundGlow />
@@ -68,15 +85,22 @@ export function AppShell({ children }: { children: ReactNode }) {
           </nav>
 
           {/* Footer */}
-          <div className="mt-auto border-t border-border px-5 py-4">
+          <div className="mt-auto border-t border-border px-4 py-3">
             <div className="flex items-center gap-2.5">
-              <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/20 text-[11px] font-semibold text-primary">
-                EL
+              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/15 text-[11px] font-semibold text-primary">
+                {user.initials}
               </div>
-              <div>
-                <div className="text-xs font-medium text-foreground">Erik Lindqvist</div>
-                <div className="text-[10px] text-muted-foreground">Mäklare</div>
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-xs font-medium text-foreground">{user.name}</div>
+                <div className="text-[10px] text-muted-foreground">{user.role}</div>
               </div>
+              <button
+                onClick={handleLogout}
+                title="Logga ut"
+                className="shrink-0 rounded-md p-1.5 text-muted-foreground/50 transition-colors hover:bg-foreground/[0.06] hover:text-foreground"
+              >
+                <LogoutIcon />
+              </button>
             </div>
           </div>
         </aside>
@@ -129,6 +153,16 @@ function Svg({ children }: { children: ReactNode }) {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
       {children}
+    </svg>
+  );
+}
+
+function LogoutIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+      <polyline points="16 17 21 12 16 7" />
+      <line x1="21" y1="12" x2="9" y2="12" />
     </svg>
   );
 }
