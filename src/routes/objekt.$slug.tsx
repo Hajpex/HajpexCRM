@@ -578,6 +578,11 @@ function TrafikCard() {
   );
 }
 
+function toLocalDT(d: Date) {
+  const offset = d.getTimezoneOffset() * 60000;
+  return new Date(d.getTime() - offset).toISOString().slice(0, 16);
+}
+
 function BokaNyVisningModal({ slug, adress, onClose, onSaved }: { slug: string; adress: string; onClose: () => void; onSaved: () => void }) {
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
@@ -585,20 +590,24 @@ function BokaNyVisningModal({ slug, adress, onClose, onSaved }: { slug: string; 
   const tomorrowEnd = new Date(tomorrow);
   tomorrowEnd.setHours(12, 0, 0, 0);
 
-  function toLocal(d: Date) {
-    const offset = d.getTimezoneOffset() * 60000;
-    return new Date(d.getTime() - offset).toISOString().slice(0, 16);
-  }
-
-  const [datum, setDatum] = useState(toLocal(tomorrow));
-  const [sluttid, setSluttid] = useState(toLocal(tomorrowEnd));
+  const [datum, setDatum] = useState(toLocalDT(tomorrow));
+  const [sluttid, setSluttid] = useState(toLocalDT(tomorrowEnd));
   const [typ, setTyp] = useState<VisningTyp>("Öppen");
   const [anteckningar, setAnteckningar] = useState("");
+
+  function handleDatumChange(val: string) {
+    setDatum(val);
+    const newStart = new Date(val).getTime();
+    const currentEnd = new Date(sluttid).getTime();
+    if (!isNaN(newStart) && !isNaN(currentEnd) && currentEnd <= newStart) {
+      setSluttid(toLocalDT(new Date(newStart + 2 * 60 * 60 * 1000)));
+    }
+  }
 
   function handleSave() {
     const datumTs = new Date(datum).getTime();
     const sluttidTs = new Date(sluttid).getTime();
-    if (isNaN(datumTs) || isNaN(sluttidTs) || sluttidTs <= datumTs) return;
+    if (isNaN(datumTs) || isNaN(sluttidTs)) return;
     saveVisning({ slug, datum: datumTs, sluttid: sluttidTs, typ, anteckningar, deltagare: [] });
     onSaved();
   }
@@ -635,7 +644,7 @@ function BokaNyVisningModal({ slug, adress, onClose, onSaved }: { slug: string; 
               <input
                 type="datetime-local"
                 value={datum}
-                onChange={(e) => setDatum(e.target.value)}
+                onChange={(e) => handleDatumChange(e.target.value)}
                 className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none"
               />
             </div>
@@ -4218,6 +4227,159 @@ function MarknadView() {
 /* ============================================================
    VISNINGAR VIEW (sidomeny → Visningar)
    ============================================================ */
+function _visTimeFmt(ts: number) {
+  return new Date(ts).toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit" });
+}
+function _visFullDateFmt(ts: number) {
+  return new Date(ts).toLocaleDateString("sv-SE", { weekday: "long", day: "numeric", month: "long" });
+}
+
+function VisningRow({ v, slug, adress, now, expandedId, onToggleExpand, newDeltagare, kontaktSuggestions, suggForId, onNamnChange, onPickKontakt, onPhoneChange, onAddDeltagare, onDeleteVisning, onLoad }: {
+  v: Visning; slug: string; adress: string; now: number;
+  expandedId: string | null; onToggleExpand: (id: string | null) => void;
+  newDeltagare: Record<string, { namn: string; telefon: string; kontaktId?: string }>;
+  kontaktSuggestions: { id: string; namn: string; telefon: string }[];
+  suggForId: string | null;
+  onNamnChange: (visningId: string, val: string) => void;
+  onPickKontakt: (visningId: string, k: { id: string; namn: string; telefon: string }) => void;
+  onPhoneChange: (visningId: string, val: string) => void;
+  onAddDeltagare: (visningId: string) => void;
+  onDeleteVisning: (visningId: string) => void;
+  onLoad: () => void;
+}) {
+  const isExpanded = expandedId === v.id;
+  const isPast = v.datum < now;
+
+  return (
+    <div className={`rounded-xl border transition-colors ${isPast ? "border-border/50 bg-card/40" : "border-border bg-card/80"}`}>
+      <button
+        className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
+        onClick={() => onToggleExpand(isExpanded ? null : v.id)}
+      >
+        <div className="flex items-center gap-3">
+          <span className={`flex h-8 w-8 items-center justify-center rounded-full text-sm ${
+            isPast ? "bg-muted/50 text-muted-foreground" : "bg-primary/10 text-primary"
+          }`}>
+            {v.typ === "Öppen" ? "🏠" : v.typ === "Privat" ? "🔑" : "⚖️"}
+          </span>
+          <div>
+            <p className={`text-sm font-medium ${isPast ? "text-muted-foreground" : "text-foreground"}`}>
+              {_visFullDateFmt(v.datum)}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {_visTimeFmt(v.datum)}–{_visTimeFmt(v.sluttid)} · {v.typ} · {v.deltagare.length} anmälda
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          {!isPast && (
+            <button
+              onClick={(e) => { e.stopPropagation(); exportVisningToICS(v, adress); }}
+              className="rounded-md border border-border px-2 py-1 text-[10px] text-muted-foreground hover:border-primary/50 hover:text-primary"
+            >
+              → Kalender
+            </button>
+          )}
+          <span className={`text-xs text-muted-foreground transition-transform ${isExpanded ? "rotate-90" : ""}`}>›</span>
+        </div>
+      </button>
+
+      {isExpanded && (
+        <div className="border-t border-border px-4 py-4">
+          {v.anteckningar && (
+            <p className="mb-3 text-xs text-muted-foreground">{v.anteckningar}</p>
+          )}
+
+          <p className="mb-2 text-[11px] font-semibold uppercase tracking-widest text-primary/60">
+            Deltagare ({v.deltagare.length})
+          </p>
+
+          {v.deltagare.length > 0 ? (
+            <div className="mb-3 divide-y divide-border rounded-lg border border-border">
+              {v.deltagare.map((d) => (
+                <div key={d.id} className="flex items-center justify-between px-3 py-2">
+                  <div>
+                    <p className="text-sm text-foreground">{d.namn}</p>
+                    {d.telefon && <p className="text-xs text-muted-foreground">{d.telefon}</p>}
+                  </div>
+                  {isPast && (
+                    <button
+                      onClick={() => { toggleDeltog(slug, v.id, d.id); onLoad(); }}
+                      className={`rounded-full px-2 py-0.5 text-[10px] font-medium transition-colors ${
+                        d.deltog
+                          ? "bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30"
+                          : "bg-muted/60 text-muted-foreground hover:bg-muted"
+                      }`}
+                    >
+                      {d.deltog ? "Deltog ✓" : "Ej deltog"}
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="mb-3 text-xs text-muted-foreground">Inga deltagare registrerade ännu.</p>
+          )}
+
+          <div className="space-y-1.5">
+            <div className="relative flex gap-2">
+              <div className="relative flex-1">
+                <input
+                  type="text"
+                  placeholder="Namn eller sök kontakt…"
+                  value={newDeltagare[v.id]?.namn ?? ""}
+                  onChange={(e) => onNamnChange(v.id, e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && onAddDeltagare(v.id)}
+                  className="w-full rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
+                />
+                {suggForId === v.id && kontaktSuggestions.length > 0 && (
+                  <div className="absolute left-0 top-full z-10 mt-1 w-full rounded-lg border border-border bg-card shadow-lg">
+                    {kontaktSuggestions.map((k) => (
+                      <button
+                        key={k.id}
+                        onMouseDown={() => onPickKontakt(v.id, k)}
+                        className="flex w-full items-center justify-between px-3 py-2 text-left text-xs hover:bg-foreground/[0.04]"
+                      >
+                        <span className="font-medium text-foreground">{k.namn}</span>
+                        <span className="text-muted-foreground">{k.telefon}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <input
+                type="tel"
+                placeholder="Telefon"
+                value={newDeltagare[v.id]?.telefon ?? ""}
+                onChange={(e) => onPhoneChange(v.id, e.target.value)}
+                className="w-28 rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
+              />
+              <button
+                onClick={() => onAddDeltagare(v.id)}
+                className="rounded-lg bg-primary/10 px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/20"
+              >
+                + Lägg till
+              </button>
+            </div>
+            {newDeltagare[v.id]?.kontaktId && (
+              <p className="text-[10px] text-emerald-500">✓ Kopplad till befintlig kontakt</p>
+            )}
+          </div>
+
+          <div className="mt-3 flex justify-end">
+            <button
+              onClick={() => onDeleteVisning(v.id)}
+              className="text-[11px] text-red-400/60 hover:text-red-400"
+            >
+              Ta bort visning
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function VisningarView() {
   const { slug } = Route.useParams();
   const adress = prettyAddr(slug);
@@ -4235,13 +4397,6 @@ function VisningarView() {
   const kommande = visningar.filter((v) => v.datum >= now);
   const genomforda = visningar.filter((v) => v.datum < now);
 
-  function timeFmt(ts: number) {
-    return new Date(ts).toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit" });
-  }
-  function fullDateFmt(ts: number) {
-    return new Date(ts).toLocaleDateString("sv-SE", { weekday: "long", day: "numeric", month: "long" });
-  }
-
   function onNamnChange(visningId: string, val: string) {
     setNewDeltagare((p) => ({ ...p, [visningId]: { ...p[visningId], namn: val, kontaktId: undefined } }));
     const q = val.toLowerCase().trim();
@@ -4255,10 +4410,14 @@ function VisningarView() {
     setSuggForId(matches.length > 0 ? visningId : null);
   }
 
-  function pickKontakt(visningId: string, k: { id: string; namn: string; telefon: string }) {
+  function onPickKontakt(visningId: string, k: { id: string; namn: string; telefon: string }) {
     setNewDeltagare((p) => ({ ...p, [visningId]: { namn: k.namn, telefon: k.telefon, kontaktId: k.id } }));
     setKontaktSuggestions([]);
     setSuggForId(null);
+  }
+
+  function onPhoneChange(visningId: string, val: string) {
+    setNewDeltagare((p) => ({ ...p, [visningId]: { ...p[visningId], telefon: val } }));
   }
 
   function handleAddDeltagare(visningId: string) {
@@ -4277,140 +4436,6 @@ function VisningarView() {
   function handleDeleteVisning(visningId: string) {
     deleteVisning(slug, visningId);
     load();
-  }
-
-  function VisningRow({ v }: { v: Visning }) {
-    const isExpanded = expandedId === v.id;
-    const isPast = v.datum < now;
-
-    return (
-      <div className={`rounded-xl border transition-colors ${isPast ? "border-border/50 bg-card/40" : "border-border bg-card/80"}`}>
-        <button
-          className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
-          onClick={() => setExpandedId(isExpanded ? null : v.id)}
-        >
-          <div className="flex items-center gap-3">
-            <span className={`flex h-8 w-8 items-center justify-center rounded-full text-sm ${
-              isPast ? "bg-muted/50 text-muted-foreground" : "bg-primary/10 text-primary"
-            }`}>
-              {v.typ === "Öppen" ? "🏠" : v.typ === "Privat" ? "🔑" : "⚖️"}
-            </span>
-            <div>
-              <p className={`text-sm font-medium ${isPast ? "text-muted-foreground" : "text-foreground"}`}>
-                {fullDateFmt(v.datum)}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                {timeFmt(v.datum)}–{timeFmt(v.sluttid)} · {v.typ} · {v.deltagare.length} anmälda
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            {!isPast && (
-              <button
-                onClick={(e) => { e.stopPropagation(); exportVisningToICS(v, adress); }}
-                className="rounded-md border border-border px-2 py-1 text-[10px] text-muted-foreground hover:border-primary/50 hover:text-primary"
-              >
-                → Kalender
-              </button>
-            )}
-            <span className={`text-xs text-muted-foreground transition-transform ${isExpanded ? "rotate-90" : ""}`}>›</span>
-          </div>
-        </button>
-
-        {isExpanded && (
-          <div className="border-t border-border px-4 py-4">
-            {v.anteckningar && (
-              <p className="mb-3 text-xs text-muted-foreground">{v.anteckningar}</p>
-            )}
-
-            <p className="mb-2 text-[11px] font-semibold uppercase tracking-widest text-primary/60">
-              Deltagare ({v.deltagare.length})
-            </p>
-
-            {v.deltagare.length > 0 ? (
-              <div className="mb-3 divide-y divide-border rounded-lg border border-border">
-                {v.deltagare.map((d) => (
-                  <div key={d.id} className="flex items-center justify-between px-3 py-2">
-                    <div>
-                      <p className="text-sm text-foreground">{d.namn}</p>
-                      {d.telefon && <p className="text-xs text-muted-foreground">{d.telefon}</p>}
-                    </div>
-                    {isPast && (
-                      <button
-                        onClick={() => { toggleDeltog(slug, v.id, d.id); load(); }}
-                        className={`rounded-full px-2 py-0.5 text-[10px] font-medium transition-colors ${
-                          d.deltog
-                            ? "bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30"
-                            : "bg-muted/60 text-muted-foreground hover:bg-muted"
-                        }`}
-                      >
-                        {d.deltog ? "Deltog ✓" : "Ej deltog"}
-                      </button>
-                    )}
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="mb-3 text-xs text-muted-foreground">Inga deltagare registrerade ännu.</p>
-            )}
-
-            <div className="space-y-1.5">
-              <div className="relative flex gap-2">
-                <div className="relative flex-1">
-                  <input
-                    type="text"
-                    placeholder="Namn eller sök kontakt…"
-                    value={newDeltagare[v.id]?.namn ?? ""}
-                    onChange={(e) => onNamnChange(v.id, e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && handleAddDeltagare(v.id)}
-                    className="w-full rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
-                  />
-                  {suggForId === v.id && kontaktSuggestions.length > 0 && (
-                    <div className="absolute left-0 top-full z-10 mt-1 w-full rounded-lg border border-border bg-card shadow-lg">
-                      {kontaktSuggestions.map((k) => (
-                        <button
-                          key={k.id}
-                          onMouseDown={() => pickKontakt(v.id, k)}
-                          className="flex w-full items-center justify-between px-3 py-2 text-left text-xs hover:bg-foreground/[0.04]"
-                        >
-                          <span className="font-medium text-foreground">{k.namn}</span>
-                          <span className="text-muted-foreground">{k.telefon}</span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                <input
-                  type="tel"
-                  placeholder="Telefon"
-                  value={newDeltagare[v.id]?.telefon ?? ""}
-                  onChange={(e) => setNewDeltagare((p) => ({ ...p, [v.id]: { ...p[v.id], telefon: e.target.value } }))}
-                  className="w-28 rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
-                />
-                <button
-                  onClick={() => handleAddDeltagare(v.id)}
-                  className="rounded-lg bg-primary/10 px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/20"
-                >
-                  + Lägg till
-                </button>
-              </div>
-              {newDeltagare[v.id]?.kontaktId && (
-                <p className="text-[10px] text-emerald-500">✓ Kopplad till befintlig kontakt</p>
-              )}
-            </div>
-
-            <div className="mt-3 flex justify-end">
-              <button
-                onClick={() => handleDeleteVisning(v.id)}
-                className="text-[11px] text-red-400/60 hover:text-red-400"
-              >
-                Ta bort visning
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-    );
   }
 
   return (
@@ -4445,13 +4470,29 @@ function VisningarView() {
           {kommande.length > 0 && (
             <div className="space-y-2">
               <p className="text-[11px] font-semibold uppercase tracking-widest text-primary/60">Kommande ({kommande.length})</p>
-              {kommande.map((v) => <VisningRow key={v.id} v={v} />)}
+              {kommande.map((v) => (
+                <VisningRow
+                  key={v.id} v={v} slug={slug} adress={adress} now={now}
+                  expandedId={expandedId} onToggleExpand={(id) => setExpandedId(id)}
+                  newDeltagare={newDeltagare} kontaktSuggestions={kontaktSuggestions} suggForId={suggForId}
+                  onNamnChange={onNamnChange} onPickKontakt={onPickKontakt} onPhoneChange={onPhoneChange}
+                  onAddDeltagare={handleAddDeltagare} onDeleteVisning={handleDeleteVisning} onLoad={load}
+                />
+              ))}
             </div>
           )}
           {genomforda.length > 0 && (
             <div className="space-y-2">
               <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/60">Genomförda ({genomforda.length})</p>
-              {genomforda.map((v) => <VisningRow key={v.id} v={v} />)}
+              {genomforda.map((v) => (
+                <VisningRow
+                  key={v.id} v={v} slug={slug} adress={adress} now={now}
+                  expandedId={expandedId} onToggleExpand={(id) => setExpandedId(id)}
+                  newDeltagare={newDeltagare} kontaktSuggestions={kontaktSuggestions} suggForId={suggForId}
+                  onNamnChange={onNamnChange} onPickKontakt={onPickKontakt} onPhoneChange={onPhoneChange}
+                  onAddDeltagare={handleAddDeltagare} onDeleteVisning={handleDeleteVisning} onLoad={load}
+                />
+              ))}
             </div>
           )}
         </>
