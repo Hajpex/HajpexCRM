@@ -1,6 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState, type ReactNode } from "react";
+import { useState, useEffect, type ReactNode } from "react";
 import { AppShell } from "../components/AppShell";
+import { listObjekt } from "../lib/objektStore";
+import { OBJEKT } from "../data/objekt";
+import { listKontakter } from "../lib/kontaktStore";
+import { listIntagsmoten } from "../lib/intagsmoteStore";
+import { listAllaVisningar } from "../lib/visningarStore";
 
 export const Route = createFileRoute("/statistik")({
   head: () => ({
@@ -156,10 +161,54 @@ function Bar({ value, max, color = "bg-primary" }: { value: number; max: number;
   );
 }
 
+// ---------- Live status card ----------
+function LiveStatusCard() {
+  const [stats, setStats] = useState<{
+    aktiva: number; kontakter: number; visningar: number; moten: number;
+    saldaThisMonth: number; spek: number;
+  } | null>(null);
+
+  useEffect(() => {
+    const saved = listObjekt();
+    const savedAddrs = new Set(saved.map((o) => o.adress));
+    const all = [...saved, ...OBJEKT.filter((o) => !savedAddrs.has(o.adress))];
+    const ks = listKontakter();
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+
+    setStats({
+      aktiva: all.filter((o) => ["Till salu", "Redo (Kommande)", "Under intag", "Intaget"].includes(o.status)).length,
+      kontakter: ks.length,
+      spek: ks.filter((k) => k.objektKopplingar.some((kp) => kp.relation === "spekulant")).length,
+      visningar: listAllaVisningar().filter((v) => v.datum >= Date.now()).length,
+      moten: listIntagsmoten().filter((m) => m.status !== "Förlorad" && m.tidpunkt >= Date.now()).length,
+      saldaThisMonth: all.filter((o) => o.status === "Såld").length,
+    });
+  }, []);
+
+  if (!stats) return null;
+
+  return (
+    <Card title="Din portfölj just nu" hint="Realtidsdata från systemet">
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6">
+        <KpiTile label="Aktiva objekt" value={String(stats.aktiva)} />
+        <KpiTile label="Kontakter" value={String(stats.kontakter)} />
+        <KpiTile label="Spekulanter" value={String(stats.spek)} tone={stats.spek > 0 ? "good" : "default"} />
+        <KpiTile label="Kommande visningar" value={String(stats.visningar)} tone={stats.visningar > 0 ? "good" : "default"} />
+        <KpiTile label="Kommande möten" value={String(stats.moten)} tone={stats.moten > 0 ? "good" : "default"} />
+        <KpiTile label="Sålda objekt" value={String(stats.saldaThisMonth)} tone={stats.saldaThisMonth > 0 ? "good" : "default"} />
+      </div>
+    </Card>
+  );
+}
+
 // ---------- Start / Översikt ----------
 function StartTab() {
   return (
     <div className="space-y-6">
+      {/* Live data */}
+      <LiveStatusCard />
+
       {/* Säljmål */}
       <Card title="Resultat vs säljmål" hint="Juni 2026 · Erik Lindqvist">
         <div className="grid grid-cols-2 gap-4 md:grid-cols-4 lg:grid-cols-7">
