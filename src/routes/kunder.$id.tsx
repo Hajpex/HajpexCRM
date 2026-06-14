@@ -116,6 +116,25 @@ function KontaktDetailPage() {
                 {kontakt.telefon || "Inget nummer"}
                 {kontakt.ort ? ` · ${kontakt.ort}` : ""}
               </p>
+              {/* Quick actions — extra handy on mobile */}
+              <div className="mt-2 flex gap-2">
+                {kontakt.telefon && (
+                  <a
+                    href={`tel:${kontakt.telefon.replace(/\s/g, "")}`}
+                    className="inline-flex items-center gap-1 rounded-lg bg-emerald-500/10 px-3 py-1.5 text-[11px] font-medium text-emerald-500 hover:bg-emerald-500/20"
+                  >
+                    📞 Ring
+                  </a>
+                )}
+                {kontakt.email && (
+                  <a
+                    href={`mailto:${kontakt.email}`}
+                    className="inline-flex items-center gap-1 rounded-lg bg-primary/10 px-3 py-1.5 text-[11px] font-medium text-primary hover:bg-primary/20"
+                  >
+                    ✉️ Mejl
+                  </a>
+                )}
+              </div>
             </div>
           </div>
           <div className="flex gap-2">
@@ -141,16 +160,16 @@ function KontaktDetailPage() {
 
         {/* Body */}
         <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
-          {/* Left sidebar */}
-          <aside className="space-y-4">
+          {/* Left sidebar — second on mobile, first on desktop */}
+          <aside className="order-last space-y-4 lg:order-first">
             <InfoCard kontakt={kontakt} editMode={editMode} patch={patch} />
             <NastaStegCard kontakt={kontakt} onUpdate={load} />
             <IntresseCard kontakt={kontakt} editMode={editMode} patch={patch} />
             <GdprCard kontakt={kontakt} patch={patch} />
           </aside>
 
-          {/* Right main */}
-          <div>
+          {/* Right main — first on mobile, second on desktop */}
+          <div className="order-first lg:order-last">
             <div className="mb-5 flex border-b border-white/[0.08]">
               {(["intagsmoten", "historik", "objekt", "anteckningar"] as Tab[]).map((t) => (
                 <button
