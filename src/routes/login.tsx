@@ -47,6 +47,7 @@ function LoginPage() {
             Hajpex<span className="text-primary">·</span>
           </div>
           <div className="text-[11px] uppercase tracking-[0.22em] text-muted-foreground">CRM</div>
+          <p className="mt-3 text-[12px] text-muted-foreground/60 italic">Skapad av mäklare för mäklare</p>
         </div>
 
         {/* Card */}
