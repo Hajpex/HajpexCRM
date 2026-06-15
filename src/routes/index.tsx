@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState, useEffect, useCallback, type ReactNode } from "react";
+import { useState, useEffect, useCallback, useRef, type ReactNode } from "react";
 import { AppShell } from "../components/AppShell";
 import { OBJEKT } from "../data/objekt";
 import { listObjekt } from "../lib/objektStore";
@@ -10,26 +10,18 @@ import { listIntagsmoten, type Intagsmote } from "../lib/intagsmoteStore";
 import { listAllaVisningar, type Visning } from "../lib/visningarStore";
 import type { Kontakt, NastaSteg } from "../lib/kontaktTypes";
 import { generateMorningBrief } from "../lib/ai.functions";
+import { listKontrakt } from "../lib/kontraktStore";
 
 /* ═══════════════════════════════════════════════════════════
    WIDGET STORE
 ══════════════════════════════════════════════════════════════ */
 
-const WIDGET_KEY = "hajpex.widgets.v1";
-
-type WidgetId =
-  | "idag"
-  | "kommande"
-  | "aktiva-objekt"
-  | "budgivning"
-  | "nasta-steg"
-  | "att-gora"
-  | "vader"
-  | "snabblänkar";
+const WIDGET_KEY = "hajpex.widgets.v2";
 
 type QuickLink = { label: string; url: string };
 
 type WidgetSettings = {
+  /* toggles */
   idag: boolean;
   kommande: boolean;
   "aktiva-objekt": boolean;
@@ -40,33 +32,50 @@ type WidgetSettings = {
   vaderOrt: string;
   "snabblänkar": boolean;
   links: QuickLink[];
+  rantekollen: boolean;
+  tilltraden: boolean;
+  nyaSpekulanter: boolean;
+  klisterlapp: boolean;
+  /* order */
+  leftOrder: string[];
+  rightOrder: string[];
+  /* post-it */
+  klisterlappText: string;
+  klisterlappX: number;
+  klisterlappY: number;
 };
 
+const DEFAULT_LEFT_ORDER  = ["idag", "kommande", "aktiva-objekt", "vader", "rantekollen", "tilltraden"];
+const DEFAULT_RIGHT_ORDER = ["snabblänkar", "budgivning", "nasta-steg", "att-gora", "nyaSpekulanter"];
+
 const DEFAULT_WIDGETS: WidgetSettings = {
-  idag: true,
-  kommande: true,
-  "aktiva-objekt": true,
-  budgivning: true,
-  "nasta-steg": true,
-  "att-gora": true,
-  vader: false,
-  vaderOrt: "Stockholm",
-  "snabblänkar": false,
-  links: [
+  idag: true, kommande: true, "aktiva-objekt": true,
+  budgivning: true, "nasta-steg": true, "att-gora": true,
+  vader: false, vaderOrt: "Stockholm",
+  "snabblänkar": false, links: [
     { label: "Hemnet", url: "https://hemnet.se" },
     { label: "Lantmäteriet", url: "https://lantmateriet.se" },
     { label: "Vitec", url: "https://vitec.net" },
   ],
+  rantekollen: false, tilltraden: false, nyaSpekulanter: false,
+  klisterlapp: false,
+  leftOrder: DEFAULT_LEFT_ORDER,
+  rightOrder: DEFAULT_RIGHT_ORDER,
+  klisterlappText: "", klisterlappX: 80, klisterlappY: 180,
 };
 
 function readWidgets(): WidgetSettings {
   try {
     const raw = localStorage.getItem(WIDGET_KEY);
     if (!raw) return DEFAULT_WIDGETS;
-    return { ...DEFAULT_WIDGETS, ...JSON.parse(raw) };
-  } catch {
-    return DEFAULT_WIDGETS;
-  }
+    const parsed = JSON.parse(raw);
+    return {
+      ...DEFAULT_WIDGETS,
+      ...parsed,
+      leftOrder: parsed.leftOrder?.length ? parsed.leftOrder : DEFAULT_LEFT_ORDER,
+      rightOrder: parsed.rightOrder?.length ? parsed.rightOrder : DEFAULT_RIGHT_ORDER,
+    };
+  } catch { return DEFAULT_WIDGETS; }
 }
 
 function writeWidgets(w: WidgetSettings) {
@@ -165,6 +174,8 @@ function DashboardPage() {
   const [briefLoading, setBriefLoading] = useState(false);
   const [widgets, setWidgets] = useState<WidgetSettings>(DEFAULT_WIDGETS);
   const [editingLayout, setEditingLayout] = useState(false);
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [dragOverId, setDragOverId] = useState<string | null>(null);
 
   useEffect(() => {
     setWidgets(readWidgets());
@@ -174,6 +185,23 @@ function DashboardPage() {
     setWidgets(next);
     writeWidgets(next);
   }, []);
+
+  function handleDragStart(id: string) { setDraggingId(id); }
+  function handleDragOver(id: string)  { setDragOverId(id); }
+  function handleDragEnd()             { setDraggingId(null); setDragOverId(null); }
+
+  function handleDrop(targetId: string, column: "left" | "right") {
+    if (!draggingId || draggingId === targetId) { handleDragEnd(); return; }
+    const key = column === "left" ? "leftOrder" : "rightOrder";
+    const order = [...widgets[key]];
+    const fromIdx = order.indexOf(draggingId);
+    const toIdx   = order.indexOf(targetId);
+    if (fromIdx === -1 || toIdx === -1) { handleDragEnd(); return; }
+    order.splice(fromIdx, 1);
+    order.splice(toIdx, 0, draggingId);
+    saveWidgets({ ...widgets, [key]: order });
+    handleDragEnd();
+  }
 
   useEffect(() => {
     const ks = listKontakter();
@@ -357,242 +385,148 @@ function DashboardPage() {
 
           {/* ── LEFT (2/3) ── */}
           <div className="md:col-span-2 space-y-6">
-
-            {/* Idag */}
-            {widgets.idag && (
-              <DashCard
-                title="Idag"
-                eyebrow="Agenda"
-                action={
-                  <Link
-                    to="/kunder"
-                    search={{ q: undefined, roll: undefined }}
-                    className="rounded-md bg-primary/10 px-3 py-1.5 text-[11px] font-medium text-primary transition-colors hover:bg-primary/20"
-                  >
-                    + Nytt möte
-                  </Link>
-                }
-              >
-                {pastPlannerMoten.length === 0 && todayMoten.length === 0 && todayVisningar.length === 0 ? (
-                  <EmptySlot icon="📅" text="Inga möten eller visningar idag" hint="Skapa ett nytt möte från en kontakt" />
-                ) : (
+            {widgets.leftOrder.map((id) => {
+              let card: ReactNode = null;
+              if (id === "idag" && widgets.idag) card = (
+                <DashCard title="Idag" eyebrow="Agenda" action={
+                  <Link to="/kunder" search={{ q: undefined, roll: undefined }} className="rounded-md bg-primary/10 px-3 py-1.5 text-[11px] font-medium text-primary transition-colors hover:bg-primary/20">+ Nytt möte</Link>
+                }>
+                  {pastPlannerMoten.length === 0 && todayMoten.length === 0 && todayVisningar.length === 0 ? (
+                    <EmptySlot icon="📅" text="Inga möten eller visningar idag" hint="Skapa ett nytt möte från en kontakt" />
+                  ) : (
+                    <div className="divide-y divide-border">
+                      {pastPlannerMoten.slice(0, 2).map((m) => <MoteRow key={m.id} mote={m} kontakter={kontakter} variant="overdue" now={now} />)}
+                      {todayMoten.map((m) => <MoteRow key={m.id} mote={m} kontakter={kontakter} variant="today" now={now} />)}
+                      {todayVisningar.map((v) => <VisningDashRow key={v.id} visning={v} />)}
+                    </div>
+                  )}
+                </DashCard>
+              );
+              if (id === "kommande" && widgets.kommande && (upcomingMoten.length > 0 || upcomingVisningar.length > 0)) card = (
+                <DashCard title="Kommande" eyebrow="Nästa 7 dagar">
                   <div className="divide-y divide-border">
-                    {pastPlannerMoten.slice(0, 2).map((m) => (
-                      <MoteRow key={m.id} mote={m} kontakter={kontakter} variant="overdue" now={now} />
-                    ))}
-                    {todayMoten.map((m) => (
-                      <MoteRow key={m.id} mote={m} kontakter={kontakter} variant="today" now={now} />
-                    ))}
-                    {todayVisningar.map((v) => (
-                      <VisningDashRow key={v.id} visning={v} />
-                    ))}
-                  </div>
-                )}
-              </DashCard>
-            )}
-
-            {/* Kommande */}
-            {widgets.kommande && (upcomingMoten.length > 0 || upcomingVisningar.length > 0) && (
-              <DashCard title="Kommande" eyebrow="Nästa 7 dagar">
-                <div className="divide-y divide-border">
-                  {[
-                    ...upcomingMoten.map((m) => ({ type: "mote" as const, ts: m.tidpunkt, item: m })),
-                    ...upcomingVisningar.map((v) => ({ type: "visning" as const, ts: v.datum, item: v })),
-                  ]
-                    .sort((a, b) => a.ts - b.ts)
-                    .slice(0, 7)
-                    .map((e) =>
-                      e.type === "mote"
+                    {[...upcomingMoten.map((m) => ({ type: "mote" as const, ts: m.tidpunkt, item: m })), ...upcomingVisningar.map((v) => ({ type: "visning" as const, ts: v.datum, item: v }))]
+                      .sort((a, b) => a.ts - b.ts).slice(0, 7)
+                      .map((e) => e.type === "mote"
                         ? <MoteRow key={e.item.id} mote={e.item as Intagsmote} kontakter={kontakter} variant="upcoming" now={now} />
-                        : <VisningDashRow key={e.item.id} visning={e.item as Visning} />
-                    )}
-                </div>
-              </DashCard>
-            )}
-
-            {/* Aktiva objekt */}
-            {widgets["aktiva-objekt"] && (
-              <DashCard
-                title="Aktiva objekt"
-                eyebrow="Portfölj"
-                action={
-                  <Link to="/objekt" className="text-[11px] text-primary hover:underline">
-                    Visa alla →
-                  </Link>
-                }
-              >
-                {activeObjs.length === 0 ? (
-                  <EmptySlot icon="🏠" text="Inga aktiva uppdrag" hint="Lägg till ditt första objekt" />
-                ) : (
-                  <div className="overflow-x-auto -mx-1">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="text-left text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
+                        : <VisningDashRow key={e.item.id} visning={e.item as Visning} />)}
+                  </div>
+                </DashCard>
+              );
+              if (id === "aktiva-objekt" && widgets["aktiva-objekt"]) card = (
+                <DashCard title="Aktiva objekt" eyebrow="Portfölj" action={<Link to="/objekt" className="text-[11px] text-primary hover:underline">Visa alla →</Link>}>
+                  {activeObjs.length === 0 ? <EmptySlot icon="🏠" text="Inga aktiva uppdrag" hint="Lägg till ditt första objekt" /> : (
+                    <div className="overflow-x-auto -mx-1">
+                      <table className="w-full text-sm">
+                        <thead><tr className="text-left text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
                           <th className="pb-3 pl-1 pr-4 font-normal">Adress</th>
                           <th className="pb-3 pr-4 font-normal hidden sm:table-cell">Typ</th>
                           <th className="pb-3 pr-4 font-normal">Utrop</th>
                           <th className="pb-3 pr-3 font-normal">Status</th>
                           <th className="pb-3 pr-3 text-right font-normal hidden md:table-cell">Spek</th>
                           <th className="pb-3 text-right font-normal">Bud</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {activeObjs.map((o) => {
+                        </tr></thead>
+                        <tbody>{activeObjs.map((o) => {
                           const slug = slugifyAddr(o.adress);
-                          const spekCount = kontakter.filter((k) =>
-                            k.objektKopplingar.some((kp) => kp.slug === slug && kp.relation === "spekulant")
-                          ).length;
+                          const spekCount = kontakter.filter((k) => k.objektKopplingar.some((kp) => kp.slug === slug && kp.relation === "spekulant")).length;
                           const budCount = (budMap[slug] ?? []).length;
                           return (
                             <tr key={o.adress} className="group border-t border-border">
-                              <td className="py-2.5 pl-1 pr-4">
-                                <Link
-                                  to="/objekt/$slug"
-                                  params={{ slug }}
-                                  search={{ tab: undefined, q: undefined }}
-                                  className="font-medium text-foreground hover:text-primary"
-                                >
-                                  {o.adress}
-                                </Link>
-                                <div className="text-[10px] text-muted-foreground">{o.stad}</div>
-                              </td>
-                              <td className="py-2.5 pr-4 text-xs text-muted-foreground hidden sm:table-cell">
-                                {o.typ}
-                              </td>
+                              <td className="py-2.5 pl-1 pr-4"><Link to="/objekt/$slug" params={{ slug }} search={{ tab: undefined, q: undefined }} className="font-medium text-foreground hover:text-primary">{o.adress}</Link><div className="text-[10px] text-muted-foreground">{o.stad}</div></td>
+                              <td className="py-2.5 pr-4 text-xs text-muted-foreground hidden sm:table-cell">{o.typ}</td>
                               <td className="py-2.5 pr-4 font-mono text-sm">{fmtKrShort(o.pris)}</td>
-                              <td className="py-2.5 pr-3">
-                                <StatusBadge status={o.status} />
-                              </td>
-                              <td className="py-2.5 pr-3 text-right font-mono text-sm hidden md:table-cell">
-                                {spekCount || <span className="text-muted-foreground">—</span>}
-                              </td>
-                              <td className="py-2.5 text-right">
-                                {budCount > 0 ? (
-                                  <Link
-                                    to="/objekt/$slug"
-                                    params={{ slug }}
-                                    search={{ tab: "Budgivning", q: undefined }}
-                                    className="inline-block rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary hover:bg-primary/20"
-                                  >
-                                    {budCount}
-                                  </Link>
-                                ) : (
-                                  <span className="text-muted-foreground text-xs">—</span>
-                                )}
-                              </td>
+                              <td className="py-2.5 pr-3"><StatusBadge status={o.status} /></td>
+                              <td className="py-2.5 pr-3 text-right font-mono text-sm hidden md:table-cell">{spekCount || <span className="text-muted-foreground">—</span>}</td>
+                              <td className="py-2.5 text-right">{budCount > 0 ? <Link to="/objekt/$slug" params={{ slug }} search={{ tab: "Budgivning", q: undefined }} className="inline-block rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary hover:bg-primary/20">{budCount}</Link> : <span className="text-muted-foreground text-xs">—</span>}</td>
                             </tr>
                           );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </DashCard>
-            )}
-
-            {/* Väder widget */}
-            {widgets.vader && <VaderWidget ort={widgets.vaderOrt} />}
+                        })}</tbody>
+                      </table>
+                    </div>
+                  )}
+                </DashCard>
+              );
+              if (id === "vader" && widgets.vader) card = <VaderWidget ort={widgets.vaderOrt} />;
+              if (id === "rantekollen" && widgets.rantekollen) card = <RantekollenWidget />;
+              if (id === "tilltraden" && widgets.tilltraden) card = <TilltrádenWidget />;
+              if (!card) return null;
+              return (
+                <DraggableCard key={id} id={id} column="left" editMode={editingLayout}
+                  draggingId={draggingId} dragOverId={dragOverId}
+                  onDragStart={handleDragStart} onDragOver={handleDragOver}
+                  onDrop={handleDrop} onDragEnd={handleDragEnd}>
+                  {card}
+                </DraggableCard>
+              );
+            })}
           </div>
 
           {/* ── RIGHT SIDEBAR (1/3) ── */}
           <div className="space-y-6">
-
-            {/* Snabblänkar widget */}
-            {widgets["snabblänkar"] && widgets.links.length > 0 && (
-              <SnabblänkarWidget links={widgets.links} />
-            )}
-
-            {/* Aktiv budgivning */}
-            {widgets.budgivning && (
-              <DashCard
-                title="Aktiv budgivning"
-                eyebrow="Live"
-                action={
-                  objsWithBids.length > 0 ? (
-                    <span className="flex items-center gap-1.5 text-[10px] font-medium text-emerald-500">
-                      <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
-                      {objsWithBids.length} aktiva
-                    </span>
-                  ) : undefined
-                }
-              >
-                {objsWithBids.length === 0 ? (
-                  <EmptySlot icon="🔨" text="Inga pågående bud" />
-                ) : (
+            {widgets.rightOrder.map((id) => {
+              let card: ReactNode = null;
+              if (id === "snabblänkar" && widgets["snabblänkar"] && widgets.links.length > 0) card = <SnabblänkarWidget links={widgets.links} />;
+              if (id === "budgivning" && widgets.budgivning) card = (
+                <DashCard title="Aktiv budgivning" eyebrow="Live" action={objsWithBids.length > 0 ? (
+                  <span className="flex items-center gap-1.5 text-[10px] font-medium text-emerald-500">
+                    <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />{objsWithBids.length} aktiva
+                  </span>) : undefined}>
+                  {objsWithBids.length === 0 ? <EmptySlot icon="🔨" text="Inga pågående bud" /> : (
+                    <div className="divide-y divide-border">
+                      {objsWithBids.slice(0, 6).map(({ o, slug, bids }) => {
+                        const highest = bids[0];
+                        const hasWinner = bids.some((b) => b.vinnare);
+                        return (
+                          <Link key={slug} to="/objekt/$slug" params={{ slug }} search={{ tab: "Budgivning", q: undefined }} className="group block py-3">
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="min-w-0"><p className="truncate text-sm font-medium text-foreground group-hover:text-primary">{o.adress}</p><p className="text-[10px] text-muted-foreground">{bids.length} bud · {relTime(highest.tidpunkt ?? Date.now())}</p></div>
+                              <div className="flex-shrink-0 text-right"><p className="font-mono text-sm font-semibold text-primary">{fmtBud(highest.belopp)}</p>{hasWinner && <span className="text-[9px] font-medium text-emerald-500">✓ Klar</span>}</div>
+                            </div>
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  )}
+                </DashCard>
+              );
+              if (id === "nasta-steg" && widgets["nasta-steg"] && (overdueTasks.length > 0 || upcomingTasks.length > 0)) card = (
+                <DashCard title="Att följa upp" eyebrow="Nästa steg" action={<Link to="/kunder" search={{ q: undefined, roll: undefined }} className="text-[11px] text-primary hover:underline">Alla →</Link>}>
                   <div className="divide-y divide-border">
-                    {objsWithBids.slice(0, 6).map(({ o, slug, bids }) => {
-                      const highest = bids[0];
-                      const hasWinner = bids.some((b) => b.vinnare);
-                      const latestBidAge = relTime(highest.tidpunkt ?? Date.now());
-                      return (
-                        <Link
-                          key={slug}
-                          to="/objekt/$slug"
-                          params={{ slug }}
-                          search={{ tab: "Budgivning", q: undefined }}
-                          className="group block py-3"
-                        >
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="min-w-0">
-                              <p className="truncate text-sm font-medium text-foreground group-hover:text-primary">
-                                {o.adress}
-                              </p>
-                              <p className="text-[10px] text-muted-foreground">
-                                {bids.length} bud · {latestBidAge}
-                              </p>
-                            </div>
-                            <div className="flex-shrink-0 text-right">
-                              <p className="font-mono text-sm font-semibold text-primary">
-                                {fmtBud(highest.belopp)}
-                              </p>
-                              {hasWinner && (
-                                <span className="text-[9px] font-medium text-emerald-500">✓ Klar</span>
-                              )}
-                            </div>
-                          </div>
-                        </Link>
-                      );
-                    })}
+                    {overdueTasks.map(({ k, ns }) => <NastaStegRow key={k.id} kontakt={k} ns={ns} overdue now={now} />)}
+                    {upcomingTasks.map(({ k, ns }) => <NastaStegRow key={k.id} kontakt={k} ns={ns} now={now} />)}
                   </div>
-                )}
-              </DashCard>
-            )}
-
-            {/* Nästa steg — förfallna */}
-            {widgets["nasta-steg"] && (overdueTasks.length > 0 || upcomingTasks.length > 0) && (
-              <DashCard
-                title="Att följa upp"
-                eyebrow="Nästa steg"
-                action={
-                  <Link to="/kunder" search={{ q: undefined, roll: undefined }} className="text-[11px] text-primary hover:underline">
-                    Alla →
-                  </Link>
-                }
-              >
-                <div className="divide-y divide-border">
-                  {overdueTasks.map(({ k, ns }) => (
-                    <NastaStegRow key={k.id} kontakt={k} ns={ns} overdue now={now} />
-                  ))}
-                  {upcomingTasks.map(({ k, ns }) => (
-                    <NastaStegRow key={k.id} kontakt={k} ns={ns} now={now} />
-                  ))}
-                </div>
-              </DashCard>
-            )}
-
-            {/* Smart att-göra */}
-            {widgets["att-gora"] && <SmartAttGora objs={objs} kontakter={kontakter} budMap={budMap} />}
+                </DashCard>
+              );
+              if (id === "att-gora" && widgets["att-gora"]) card = <SmartAttGora objs={objs} kontakter={kontakter} budMap={budMap} />;
+              if (id === "nyaSpekulanter" && widgets.nyaSpekulanter) card = <NyaSpekulanterWidget kontakter={kontakter} />;
+              if (!card) return null;
+              return (
+                <DraggableCard key={id} id={id} column="right" editMode={editingLayout}
+                  draggingId={draggingId} dragOverId={dragOverId}
+                  onDragStart={handleDragStart} onDragOver={handleDragOver}
+                  onDrop={handleDrop} onDragEnd={handleDragEnd}>
+                  {card}
+                </DraggableCard>
+              );
+            })}
           </div>
         </div>
       </div>
 
+      {/* ── Floating post-it ── */}
+      {widgets.klisterlapp && (
+        <KlisterlappFloat
+          text={widgets.klisterlappText}
+          x={widgets.klisterlappX}
+          y={widgets.klisterlappY}
+          onTextChange={(t) => saveWidgets({ ...widgets, klisterlappText: t })}
+          onPosChange={(x, y) => saveWidgets({ ...widgets, klisterlappX: x, klisterlappY: y })}
+        />
+      )}
+
       {/* ── Layout editor panel ── */}
       {editingLayout && (
-        <LayoutEditor
-          widgets={widgets}
-          onChange={saveWidgets}
-          onClose={() => setEditingLayout(false)}
-        />
+        <LayoutEditor widgets={widgets} onChange={saveWidgets} onClose={() => setEditingLayout(false)} />
       )}
     </AppShell>
   );
@@ -782,6 +716,242 @@ function SmartAttGora({
   );
 }
 
+/* ── Draggable card wrapper ── */
+
+function DraggableCard({ id, column, editMode, draggingId, dragOverId, onDragStart, onDragOver, onDrop, onDragEnd, children }: {
+  id: string; column: "left" | "right"; editMode: boolean;
+  draggingId: string | null; dragOverId: string | null;
+  onDragStart: (id: string) => void; onDragOver: (id: string) => void;
+  onDrop: (id: string, col: "left" | "right") => void; onDragEnd: () => void;
+  children: ReactNode;
+}) {
+  const isBeingDragged = draggingId === id;
+  const isDropTarget   = dragOverId === id && draggingId !== id;
+
+  return (
+    <div
+      draggable={editMode}
+      onDragStart={(e) => { e.stopPropagation(); onDragStart(id); }}
+      onDragOver={(e) => { e.preventDefault(); onDragOver(id); }}
+      onDrop={(e) => { e.preventDefault(); onDrop(id, column); }}
+      onDragEnd={onDragEnd}
+      className={[
+        "relative transition-all duration-150",
+        editMode ? "cursor-grab select-none" : "",
+        isBeingDragged ? "opacity-40 scale-[0.98]" : "",
+      ].join(" ")}
+    >
+      {/* snap-line indicator */}
+      {isDropTarget && (
+        <div className="pointer-events-none absolute inset-x-0 -top-[3px] z-20 h-[3px] rounded-full bg-primary shadow-[0_0_8px_2px_oklch(var(--primary)/0.4)]" />
+      )}
+      {/* drag handle */}
+      {editMode && (
+        <div className="absolute right-3 top-3 z-10 flex items-center gap-1 rounded-md bg-card/80 px-1.5 py-1 text-[11px] text-muted-foreground/50 shadow-sm backdrop-blur-sm select-none hover:text-muted-foreground">
+          <span className="text-base leading-none">⠿</span>
+        </div>
+      )}
+      {children}
+    </div>
+  );
+}
+
+/* ── Räntekollen widget ── */
+
+function RantekollenWidget() {
+  const [rate, setRate] = useState<{ value: number; date: string } | null>(null);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    const cacheKey = `hajpex.ranta.${new Date().toISOString().slice(0, 10)}`;
+    try {
+      const cached = localStorage.getItem(cacheKey);
+      if (cached) { setRate(JSON.parse(cached)); return; }
+    } catch { /* ignore */ }
+
+    fetch("https://api.riksbank.se/swea/v1/Rates/Latest?seriesid=SECBREPO", {
+      headers: { Accept: "application/json" },
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        const entry = Array.isArray(data) ? data[0] : data?.rates?.[0];
+        if (!entry) throw new Error("no data");
+        const result = { value: parseFloat(entry.value ?? entry.rata ?? entry.rate), date: entry.date };
+        setRate(result);
+        try { localStorage.setItem(cacheKey, JSON.stringify(result)); } catch { /* ignore */ }
+      })
+      .catch(() => setError(true));
+  }, []);
+
+  return (
+    <section className="rounded-xl border border-border bg-card/70 p-5 shadow-[0_8px_30px_-12px_rgba(0,0,0,0.15)]">
+      <p className="text-[10px] uppercase tracking-[0.2em] text-primary/60">Mäklarsaker</p>
+      <h2 className="mt-0.5 mb-3 text-base font-medium text-foreground" style={serif}>Räntekollen</h2>
+      {error ? (
+        <p className="text-xs text-muted-foreground">Riksbank-data ej tillgänglig just nu</p>
+      ) : !rate ? (
+        <div className="space-y-2"><div className="h-8 w-1/3 animate-pulse rounded bg-muted" /><div className="h-3 w-1/2 animate-pulse rounded bg-muted" /></div>
+      ) : (
+        <div>
+          <div className="flex items-end gap-2">
+            <p className="text-3xl font-medium" style={serif}>{rate.value.toFixed(2)}<span className="text-lg">%</span></p>
+          </div>
+          <p className="mt-1 text-[11px] text-muted-foreground">Riksbankens styrränta · per {rate.date}</p>
+          <p className="mt-2 text-[10px] text-muted-foreground/60">Källa: Riksbanken SWEA API</p>
+        </div>
+      )}
+    </section>
+  );
+}
+
+/* ── Tillträden snart widget ── */
+
+function TilltrádenWidget() {
+  const [items, setItems] = useState<Array<{ slug: string; adress: string; datum: string; dagar: number }>>([]);
+
+  useEffect(() => {
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const in60 = new Date(today); in60.setDate(today.getDate() + 60);
+    const result: typeof items = [];
+    for (const { slug, data } of listKontrakt()) {
+      if (!data.tilltradesdatum) continue;
+      const d = new Date(data.tilltradesdatum);
+      if (isNaN(d.getTime()) || d < today || d > in60) continue;
+      const dagar = Math.round((d.getTime() - today.getTime()) / 86400000);
+      const adress = slug.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+      result.push({ slug, adress, datum: data.tilltradesdatum, dagar });
+    }
+    setItems(result.sort((a, b) => a.dagar - b.dagar));
+  }, []);
+
+  return (
+    <section className="rounded-xl border border-border bg-card/70 p-5 shadow-[0_8px_30px_-12px_rgba(0,0,0,0.15)]">
+      <p className="text-[10px] uppercase tracking-[0.2em] text-primary/60">Mäklarsaker</p>
+      <h2 className="mt-0.5 mb-3 text-base font-medium text-foreground" style={serif}>Tillträden snart</h2>
+      {items.length === 0 ? (
+        <p className="text-xs text-muted-foreground">Inga tillträden inom 60 dagar</p>
+      ) : (
+        <div className="space-y-2.5">
+          {items.map((it) => (
+            <Link key={it.slug} to="/objekt/$slug" params={{ slug: it.slug }} search={{ tab: "Kontrakt", q: undefined }} className="group flex items-center justify-between gap-2">
+              <div className="min-w-0">
+                <p className="truncate text-sm font-medium text-foreground group-hover:text-primary">{it.adress}</p>
+                <p className="text-[10px] text-muted-foreground">{it.datum}</p>
+              </div>
+              <span className={["flex-shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium",
+                it.dagar <= 7 ? "bg-red-500/10 text-red-500" : it.dagar <= 14 ? "bg-amber-500/10 text-amber-600" : "bg-primary/10 text-primary"
+              ].join(" ")}>
+                {it.dagar === 0 ? "Idag" : `${it.dagar} d`}
+              </span>
+            </Link>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+/* ── Nya spekulanter widget ── */
+
+function NyaSpekulanterWidget({ kontakter }: { kontakter: Kontakt[] }) {
+  const cutoff = Date.now() - 7 * 86_400_000;
+  const nya = kontakter
+    .filter((k) => k.skapadAt >= cutoff && k.objektKopplingar.some((kp) => kp.relation === "spekulant"))
+    .sort((a, b) => b.skapadAt - a.skapadAt)
+    .slice(0, 6);
+
+  return (
+    <section className="rounded-xl border border-border bg-card/70 p-5 shadow-[0_8px_30px_-12px_rgba(0,0,0,0.15)]">
+      <p className="text-[10px] uppercase tracking-[0.2em] text-primary/60">CRM</p>
+      <h2 className="mt-0.5 mb-3 text-base font-medium text-foreground" style={serif}>Nya spekulanter</h2>
+      {nya.length === 0 ? (
+        <p className="text-xs text-muted-foreground">Inga nya spekulanter senaste 7 dagarna</p>
+      ) : (
+        <div className="divide-y divide-border">
+          {nya.map((k) => {
+            const slug = k.objektKopplingar.find((kp) => kp.relation === "spekulant")?.slug ?? "";
+            return (
+              <Link key={k.id} to="/kunder/$id" params={{ id: k.id }} className="group flex items-center gap-3 py-2.5">
+                <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-primary/10 text-[11px] font-semibold text-primary">
+                  {k.fornamn[0]}{k.efternamn[0]}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium text-foreground group-hover:text-primary">{k.fornamn} {k.efternamn}</p>
+                  <p className="text-[10px] text-muted-foreground">{slug.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}</p>
+                </div>
+              </Link>
+            );
+          })}
+        </div>
+      )}
+    </section>
+  );
+}
+
+/* ── Klisterlapp (floating post-it) ── */
+
+function KlisterlappFloat({ text, x, y, onTextChange, onPosChange }: {
+  text: string; x: number; y: number;
+  onTextChange: (t: string) => void;
+  onPosChange: (x: number, y: number) => void;
+}) {
+  const dragRef = useRef<{ active: boolean; startX: number; startY: number; origX: number; origY: number }>({
+    active: false, startX: 0, startY: 0, origX: x, origY: y,
+  });
+  const divRef = useRef<HTMLDivElement>(null);
+
+  function startDrag(e: React.MouseEvent) {
+    e.preventDefault();
+    dragRef.current = { active: true, startX: e.clientX, startY: e.clientY, origX: x, origY: y };
+
+    function onMove(e: MouseEvent) {
+      if (!dragRef.current.active) return;
+      const nx = Math.max(0, dragRef.current.origX + e.clientX - dragRef.current.startX);
+      const ny = Math.max(0, dragRef.current.origY + e.clientY - dragRef.current.startY);
+      if (divRef.current) { divRef.current.style.left = `${nx}px`; divRef.current.style.top = `${ny}px`; }
+    }
+    function onUp(e: MouseEvent) {
+      dragRef.current.active = false;
+      const nx = Math.max(0, dragRef.current.origX + e.clientX - dragRef.current.startX);
+      const ny = Math.max(0, dragRef.current.origY + e.clientY - dragRef.current.startY);
+      onPosChange(nx, ny);
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    }
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  }
+
+  return (
+    <div
+      ref={divRef}
+      className="fixed z-50 w-52 shadow-2xl"
+      style={{ left: x, top: y, filter: "drop-shadow(0 4px 12px rgba(0,0,0,0.25))" }}
+    >
+      {/* Pin header — drag area */}
+      <div
+        onMouseDown={startDrag}
+        className="flex cursor-grab items-center justify-center gap-1 rounded-t-md bg-amber-300 py-1.5 active:cursor-grabbing select-none"
+        title="Dra för att flytta"
+      >
+        <span className="text-base">📌</span>
+      </div>
+      {/* Note body */}
+      <div className="rounded-b-md bg-amber-100 px-3 pb-3 pt-2"
+        style={{ background: "linear-gradient(180deg,#fef3c7 0%,#fde68a 100%)" }}>
+        <textarea
+          value={text}
+          onChange={(e) => onTextChange(e.target.value)}
+          placeholder="Skriv din anteckning…"
+          rows={6}
+          className="w-full resize-none bg-transparent text-[13px] leading-relaxed text-amber-900 placeholder:text-amber-400/80 focus:outline-none"
+          style={{ fontFamily: "'Instrument Serif', Georgia, serif" }}
+        />
+      </div>
+    </div>
+  );
+}
+
 /* ── Väder widget ── */
 
 type VaderData = { temp: number; feels: number; emoji: string; desc: string; ort: string };
@@ -888,15 +1058,19 @@ function SnabblänkarWidget({ links }: { links: QuickLink[] }) {
 
 /* ── Layout editor panel ── */
 
-const WIDGET_META: Array<{ id: WidgetId; label: string; desc: string; category: string }> = [
-  { id: "idag",          label: "Idag",            desc: "Dagens möten och visningar",         category: "Dashboard" },
-  { id: "kommande",      label: "Kommande",         desc: "Möten och visningar nästa 7 dagar",  category: "Dashboard" },
-  { id: "aktiva-objekt", label: "Aktiva objekt",    desc: "Portföljöversikt",                   category: "Dashboard" },
-  { id: "budgivning",    label: "Aktiv budgivning", desc: "Live budgivningsstatus",              category: "Dashboard" },
-  { id: "nasta-steg",    label: "Att följa upp",    desc: "Förfallna och kommande nästa steg",  category: "Dashboard" },
-  { id: "att-gora",      label: "Kräver åtgärd",   desc: "Automatiska påminnelser",            category: "Dashboard" },
-  { id: "vader",         label: "Väder",            desc: "Aktuellt väder för din ort",         category: "Widgets" },
-  { id: "snabblänkar",   label: "Snabblänkar",      desc: "Hemnet, Lantmäteriet m.fl.",         category: "Widgets" },
+const WIDGET_META: Array<{ id: string; label: string; desc: string; category: string }> = [
+  { id: "idag",           label: "Idag",              desc: "Dagens möten och visningar",          category: "Dashboard" },
+  { id: "kommande",       label: "Kommande",           desc: "Möten och visningar nästa 7 dagar",   category: "Dashboard" },
+  { id: "aktiva-objekt",  label: "Aktiva objekt",      desc: "Portföljöversikt",                    category: "Dashboard" },
+  { id: "budgivning",     label: "Aktiv budgivning",   desc: "Live budgivningsstatus",               category: "Dashboard" },
+  { id: "nasta-steg",     label: "Att följa upp",      desc: "Förfallna och kommande nästa steg",   category: "Dashboard" },
+  { id: "att-gora",       label: "Kräver åtgärd",     desc: "Automatiska påminnelser",             category: "Dashboard" },
+  { id: "vader",          label: "Väder",              desc: "Aktuellt väder för din ort",          category: "Widgets" },
+  { id: "rantekollen",    label: "Räntekollen",        desc: "Riksbankens styrränta live",          category: "Widgets" },
+  { id: "tilltraden",     label: "Tillträden snart",   desc: "Objekt med tillträde inom 60 dagar",  category: "Widgets" },
+  { id: "nyaSpekulanter", label: "Nya spekulanter",    desc: "Spekulanter tillagda senaste 7 dagar", category: "Widgets" },
+  { id: "snabblänkar",    label: "Snabblänkar",        desc: "Hemnet, Lantmäteriet m.fl.",          category: "Widgets" },
+  { id: "klisterlapp",    label: "Klisterlapp",        desc: "Fri anteckning, dra vart du vill",    category: "Widgets" },
 ];
 
 function LayoutEditor({
@@ -910,8 +1084,8 @@ function LayoutEditor({
   const [newLinkLabel, setNewLinkLabel] = useState("");
   const [newLinkUrl, setNewLinkUrl] = useState("");
 
-  function toggle(id: WidgetId) {
-    setLocal((prev) => ({ ...prev, [id]: !prev[id] }));
+  function toggle(id: string) {
+    setLocal((prev) => ({ ...prev, [id]: !(prev as Record<string, unknown>)[id] }));
   }
 
   function addLink() {
@@ -968,12 +1142,14 @@ function LayoutEditor({
                     onClick={() => toggle(meta.id)}
                     className="flex w-full items-center gap-3 rounded-lg border border-border bg-background/50 p-3 text-left transition-colors hover:border-primary/30"
                   >
-                    <div className={[
-                      "flex h-5 w-5 flex-shrink-0 items-center justify-center rounded",
-                      local[meta.id] ? "bg-primary text-primary-foreground" : "border border-border bg-background",
-                    ].join(" ")}>
-                      {local[meta.id] && <span className="text-[10px] font-bold">✓</span>}
-                    </div>
+                    {(() => {
+                      const on = !!(local as Record<string, unknown>)[meta.id];
+                      return (
+                        <div className={["flex h-5 w-5 flex-shrink-0 items-center justify-center rounded", on ? "bg-primary text-primary-foreground" : "border border-border bg-background"].join(" ")}>
+                          {on && <span className="text-[10px] font-bold">✓</span>}
+                        </div>
+                      );
+                    })()}
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium text-foreground">{meta.label}</p>
                       <p className="text-[11px] text-muted-foreground">{meta.desc}</p>
