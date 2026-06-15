@@ -1157,7 +1157,7 @@ function NyttIntagsmoteModal({
               autoFocus
               value={adress}
               onChange={(e) => setAdress(e.target.value)}
-              placeholder="Springarvägen 5"
+              placeholder=""
               className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm focus:border-primary focus:outline-none"
             />
           </div>
@@ -1168,7 +1168,7 @@ function NyttIntagsmoteModal({
               <input
                 value={postnr}
                 onChange={(e) => setPostnr(e.target.value)}
-                placeholder="123 45"
+                placeholder=""
                 className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm focus:border-primary focus:outline-none"
               />
             </div>
@@ -1234,7 +1234,7 @@ function NyttIntagsmoteModal({
               inputMode="numeric"
               value={vardering}
               onChange={(e) => setVardering(e.target.value)}
-              placeholder="1 900 000"
+              placeholder=""
               className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm focus:border-primary focus:outline-none"
             />
           </div>
