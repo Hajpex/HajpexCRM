@@ -64,6 +64,68 @@ const DEFAULT_WIDGETS: WidgetSettings = {
   klisterlappText: "", klisterlappX: 80, klisterlappY: 180,
 };
 
+/* ══════════════════════════════════════════════
+   KLISTERLAPP STORE
+══════════════════════════════════════════════ */
+
+const KLISTRAR_KEY = "hajpex.klistrar.v1";
+
+export type KlisterlappColor = "yellow" | "pink" | "blue" | "green" | "lavender";
+
+export type Klisterlapp = {
+  id: string;
+  text: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  color: KlisterlappColor;
+  rotation: number;
+};
+
+const KLISTER_COLORS: Record<KlisterlappColor, { header: string; bg1: string; bg2: string; text: string; placeholder: string }> = {
+  yellow:   { header: "#fbbf24", bg1: "#fef3c7", bg2: "#fde68a", text: "#78350f",  placeholder: "#d97706" },
+  pink:     { header: "#f472b6", bg1: "#fce7f3", bg2: "#fbcfe8", text: "#831843",  placeholder: "#db2777" },
+  blue:     { header: "#60a5fa", bg1: "#dbeafe", bg2: "#bfdbfe", text: "#1e3a5f",  placeholder: "#3b82f6" },
+  green:    { header: "#34d399", bg1: "#d1fae5", bg2: "#a7f3d0", text: "#064e3b",  placeholder: "#059669" },
+  lavender: { header: "#a78bfa", bg1: "#ede9fe", bg2: "#ddd6fe", text: "#4c1d95",  placeholder: "#7c3aed" },
+};
+
+function readKlistrar(): Klisterlapp[] {
+  try {
+    const raw = localStorage.getItem(KLISTRAR_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch { return []; }
+}
+
+function writeKlistrar(list: Klisterlapp[]) {
+  try { localStorage.setItem(KLISTRAR_KEY, JSON.stringify(list)); } catch { /* ignore */ }
+}
+
+function addKlisterlapp(): Klisterlapp {
+  const list = readKlistrar();
+  const lapp: Klisterlapp = {
+    id: crypto.randomUUID(),
+    text: "",
+    x: 80 + list.length * 24,
+    y: 180 + list.length * 24,
+    w: 220,
+    h: 180,
+    color: (["yellow", "pink", "blue", "green", "lavender"] as KlisterlappColor[])[list.length % 5],
+    rotation: (Math.random() * 6 - 3),
+  };
+  writeKlistrar([...list, lapp]);
+  return lapp;
+}
+
+function updateKlisterlapp(id: string, patch: Partial<Klisterlapp>) {
+  writeKlistrar(readKlistrar().map((k) => k.id === id ? { ...k, ...patch } : k));
+}
+
+function deleteKlisterlapp(id: string) {
+  writeKlistrar(readKlistrar().filter((k) => k.id !== id));
+}
+
 function readWidgets(): WidgetSettings {
   try {
     const raw = localStorage.getItem(WIDGET_KEY);
@@ -176,9 +238,11 @@ function DashboardPage() {
   const [editingLayout, setEditingLayout] = useState(false);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
+  const [klistrar, setKlistrar] = useState<Klisterlapp[]>([]);
 
   useEffect(() => {
     setWidgets(readWidgets());
+    setKlistrar(readKlistrar());
   }, []);
 
   const saveWidgets = useCallback((next: WidgetSettings) => {
@@ -513,15 +577,24 @@ function DashboardPage() {
         </div>
       </div>
 
-      {/* ── Floating post-it ── */}
-      {widgets.klisterlapp && (
+      {/* ── Klistrar ── */}
+      {widgets.klisterlapp && klistrar.map((lapp) => (
         <KlisterlappFloat
-          text={widgets.klisterlappText}
-          x={widgets.klisterlappX}
-          y={widgets.klisterlappY}
-          onTextChange={(t) => saveWidgets({ ...widgets, klisterlappText: t })}
-          onPosChange={(x, y) => saveWidgets({ ...widgets, klisterlappX: x, klisterlappY: y })}
+          key={lapp.id}
+          lapp={lapp}
+          onUpdate={(patch) => { updateKlisterlapp(lapp.id, patch); setKlistrar(readKlistrar()); }}
+          onDelete={() => { deleteKlisterlapp(lapp.id); setKlistrar(readKlistrar()); }}
         />
+      ))}
+      {/* Add-knapp */}
+      {widgets.klisterlapp && (
+        <button
+          onClick={() => { addKlisterlapp(); setKlistrar(readKlistrar()); }}
+          className="fixed bottom-6 right-6 z-40 flex h-11 w-11 items-center justify-center rounded-full bg-amber-400 text-xl shadow-lg transition-transform hover:scale-105 active:scale-95"
+          title="Ny klisterlapp"
+        >
+          +
+        </button>
       )}
 
       {/* ── Layout editor panel ── */}
@@ -890,31 +963,57 @@ function NyaSpekulanterWidget({ kontakter }: { kontakter: Kontakt[] }) {
 
 /* ── Klisterlapp (floating post-it) ── */
 
-function KlisterlappFloat({ text, x, y, onTextChange, onPosChange }: {
-  text: string; x: number; y: number;
-  onTextChange: (t: string) => void;
-  onPosChange: (x: number, y: number) => void;
+function KlisterlappFloat({ lapp, onUpdate, onDelete }: {
+  lapp: Klisterlapp;
+  onUpdate: (patch: Partial<Klisterlapp>) => void;
+  onDelete: () => void;
 }) {
-  const dragRef = useRef<{ active: boolean; startX: number; startY: number; origX: number; origY: number }>({
-    active: false, startX: 0, startY: 0, origX: x, origY: y,
-  });
-  const divRef = useRef<HTMLDivElement>(null);
+  const divRef  = useRef<HTMLDivElement>(null);
+  const dragRef = useRef({ active: false, sx: 0, sy: 0, ox: 0, oy: 0 });
+  const resRef  = useRef({ active: false, sx: 0, sy: 0, ow: 0, oh: 0 });
+  const c = KLISTER_COLORS[lapp.color];
 
+  /* ── Drag (move) ── */
   function startDrag(e: React.MouseEvent) {
+    if ((e.target as HTMLElement).closest("[data-no-drag]")) return;
     e.preventDefault();
-    dragRef.current = { active: true, startX: e.clientX, startY: e.clientY, origX: x, origY: y };
-
+    dragRef.current = { active: true, sx: e.clientX, sy: e.clientY, ox: lapp.x, oy: lapp.y };
     function onMove(e: MouseEvent) {
-      if (!dragRef.current.active) return;
-      const nx = Math.max(0, dragRef.current.origX + e.clientX - dragRef.current.startX);
-      const ny = Math.max(0, dragRef.current.origY + e.clientY - dragRef.current.startY);
-      if (divRef.current) { divRef.current.style.left = `${nx}px`; divRef.current.style.top = `${ny}px`; }
+      if (!dragRef.current.active || !divRef.current) return;
+      const nx = Math.max(0, dragRef.current.ox + e.clientX - dragRef.current.sx);
+      const ny = Math.max(0, dragRef.current.oy + e.clientY - dragRef.current.sy);
+      divRef.current.style.left = `${nx}px`;
+      divRef.current.style.top  = `${ny}px`;
     }
     function onUp(e: MouseEvent) {
       dragRef.current.active = false;
-      const nx = Math.max(0, dragRef.current.origX + e.clientX - dragRef.current.startX);
-      const ny = Math.max(0, dragRef.current.origY + e.clientY - dragRef.current.startY);
-      onPosChange(nx, ny);
+      const nx = Math.max(0, dragRef.current.ox + e.clientX - dragRef.current.sx);
+      const ny = Math.max(0, dragRef.current.oy + e.clientY - dragRef.current.sy);
+      onUpdate({ x: nx, y: ny });
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    }
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  }
+
+  /* ── Resize (bottom-right corner) ── */
+  function startResize(e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    resRef.current = { active: true, sx: e.clientX, sy: e.clientY, ow: lapp.w, oh: lapp.h };
+    function onMove(e: MouseEvent) {
+      if (!resRef.current.active || !divRef.current) return;
+      const nw = Math.max(160, resRef.current.ow + e.clientX - resRef.current.sx);
+      const nh = Math.max(120, resRef.current.oh + e.clientY - resRef.current.sy);
+      divRef.current.style.width  = `${nw}px`;
+      divRef.current.style.height = `${nh}px`;
+    }
+    function onUp(e: MouseEvent) {
+      resRef.current.active = false;
+      const nw = Math.max(160, resRef.current.ow + e.clientX - resRef.current.sx);
+      const nh = Math.max(120, resRef.current.oh + e.clientY - resRef.current.sy);
+      onUpdate({ w: nw, h: nh });
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
     }
@@ -925,28 +1024,77 @@ function KlisterlappFloat({ text, x, y, onTextChange, onPosChange }: {
   return (
     <div
       ref={divRef}
-      className="fixed z-50 w-52 shadow-2xl"
-      style={{ left: x, top: y, filter: "drop-shadow(0 4px 12px rgba(0,0,0,0.25))" }}
+      onMouseDown={startDrag}
+      className="fixed z-50 flex flex-col overflow-hidden rounded-sm select-none"
+      style={{
+        left: lapp.x, top: lapp.y,
+        width: lapp.w, height: lapp.h,
+        transform: `rotate(${lapp.rotation}deg)`,
+        boxShadow: "0 6px 24px rgba(0,0,0,0.22), 0 2px 6px rgba(0,0,0,0.12)",
+      }}
     >
-      {/* Pin header — drag area */}
+      {/* ── Header strip: pin + color swatches + delete ── */}
       <div
-        onMouseDown={startDrag}
-        className="flex cursor-grab items-center justify-center gap-1 rounded-t-md bg-amber-300 py-1.5 active:cursor-grabbing select-none"
-        title="Dra för att flytta"
+        className="flex flex-shrink-0 cursor-grab items-center gap-1.5 px-2.5 py-1.5 active:cursor-grabbing"
+        style={{ background: c.header }}
       >
-        <span className="text-base">📌</span>
+        <span className="text-sm leading-none">📌</span>
+
+        {/* Color swatches */}
+        <div className="flex gap-1" data-no-drag="1">
+          {(Object.keys(KLISTER_COLORS) as KlisterlappColor[]).map((col) => (
+            <button
+              key={col}
+              data-no-drag="1"
+              onClick={(e) => { e.stopPropagation(); onUpdate({ color: col }); }}
+              className="h-3 w-3 rounded-full border border-white/40 transition-transform hover:scale-110"
+              style={{ background: KLISTER_COLORS[col].header }}
+              title={col}
+            />
+          ))}
+        </div>
+
+        {/* Delete */}
+        <button
+          data-no-drag="1"
+          onClick={(e) => { e.stopPropagation(); onDelete(); }}
+          className="ml-auto flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-bold opacity-60 transition-opacity hover:opacity-100"
+          style={{ color: c.text }}
+          title="Ta bort"
+        >
+          ×
+        </button>
       </div>
-      {/* Note body */}
-      <div className="rounded-b-md bg-amber-100 px-3 pb-3 pt-2"
-        style={{ background: "linear-gradient(180deg,#fef3c7 0%,#fde68a 100%)" }}>
+
+      {/* ── Note body ── */}
+      <div
+        className="relative flex-1"
+        style={{ background: `linear-gradient(160deg,${c.bg1} 0%,${c.bg2} 100%)` }}
+      >
         <textarea
-          value={text}
-          onChange={(e) => onTextChange(e.target.value)}
-          placeholder="Skriv din anteckning…"
-          rows={6}
-          className="w-full resize-none bg-transparent text-[13px] leading-relaxed text-amber-900 placeholder:text-amber-400/80 focus:outline-none"
-          style={{ fontFamily: "'Instrument Serif', Georgia, serif" }}
+          value={lapp.text}
+          onChange={(e) => onUpdate({ text: e.target.value })}
+          onMouseDown={(e) => e.stopPropagation()}
+          placeholder="Skriv här…"
+          className="absolute inset-0 w-full h-full resize-none bg-transparent px-3 py-2 text-[13px] leading-relaxed focus:outline-none"
+          style={{
+            color: c.text,
+            fontFamily: "'Instrument Serif', Georgia, serif",
+            caretColor: c.header,
+          }}
         />
+
+        {/* Resize handle */}
+        <div
+          onMouseDown={startResize}
+          className="absolute bottom-0 right-0 cursor-se-resize p-1.5"
+          title="Dra för att ändra storlek"
+          data-no-drag="1"
+        >
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+            <path d="M9 1L1 9M9 5L5 9M9 9H9" stroke={c.header} strokeWidth="1.5" strokeLinecap="round"/>
+          </svg>
+        </div>
       </div>
     </div>
   );
