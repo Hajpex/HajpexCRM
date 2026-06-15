@@ -339,6 +339,116 @@ function KunderPage() {
   );
 }
 
+/* ══════════════════════════════════════════
+   TELEFON MED LANDSVÄLJARE
+══════════════════════════════════════════ */
+
+const COUNTRIES = [
+  { code: "+46",  flag: "🇸🇪", name: "Sverige",         placeholder: "070 000 00 00" },
+  { code: "+47",  flag: "🇳🇴", name: "Norge",           placeholder: "000 00 000" },
+  { code: "+45",  flag: "🇩🇰", name: "Danmark",         placeholder: "00 00 00 00" },
+  { code: "+358", flag: "🇫🇮", name: "Finland",         placeholder: "040 000 0000" },
+  { code: "+44",  flag: "🇬🇧", name: "Storbritannien",  placeholder: "07700 000000" },
+  { code: "+1",   flag: "🇺🇸", name: "USA / Kanada",    placeholder: "000 000 0000" },
+  { code: "+49",  flag: "🇩🇪", name: "Tyskland",        placeholder: "0151 00000000" },
+  { code: "+33",  flag: "🇫🇷", name: "Frankrike",       placeholder: "06 00 00 00 00" },
+  { code: "+34",  flag: "🇪🇸", name: "Spanien",         placeholder: "600 000 000" },
+  { code: "+31",  flag: "🇳🇱", name: "Nederländerna",   placeholder: "06 00000000" },
+  { code: "+48",  flag: "🇵🇱", name: "Polen",           placeholder: "500 000 000" },
+] as const;
+
+function detectCountryIdx(val: string): number {
+  if (!val.startsWith("+")) return 0;
+  const sorted = COUNTRIES.map((c, i) => ({ ...c, i }))
+    .sort((a, b) => b.code.length - a.code.length);
+  return sorted.find((c) => val.startsWith(c.code))?.i ?? 0;
+}
+
+function PhoneInput({
+  value, onChange, onBlur,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  onBlur?: () => void;
+}) {
+  const [idx, setIdx]     = useState(() => detectCountryIdx(value));
+  const [open, setOpen]   = useState(false);
+  const wrapRef           = useRef<HTMLDivElement>(null);
+
+  useEffect(() => { setIdx(detectCountryIdx(value)); }, [value]);
+
+  useEffect(() => {
+    if (!open) return;
+    const h = (e: MouseEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, [open]);
+
+  function pick(i: number) {
+    const newCode = COUNTRIES[i].code;
+    setIdx(i);
+    setOpen(false);
+    if (!value) {
+      onChange(newCode + " ");
+    } else if (value.startsWith("+")) {
+      const cur = COUNTRIES.find((c) => value.startsWith(c.code));
+      onChange(cur ? newCode + value.slice(cur.code.length) : newCode + " " + value.replace(/^\+\S*\s*/, ""));
+    } else {
+      onChange(newCode + " " + value);
+    }
+  }
+
+  const c = COUNTRIES[idx];
+
+  return (
+    <div ref={wrapRef} className="relative flex">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="flex h-[46px] shrink-0 items-center gap-1.5 rounded-l-lg border border-r-0 border-input bg-background px-3 transition-colors hover:bg-white/5"
+        title="Välj land"
+      >
+        <span className="text-xl leading-none">{c.flag}</span>
+        <svg width="10" height="6" viewBox="0 0 10 6" fill="none" className="shrink-0 text-muted-foreground/40">
+          <path d="M1 1L5 5L9 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      </button>
+
+      <input
+        type="tel"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onBlur={onBlur}
+        placeholder={c.placeholder}
+        autoFocus
+        className="w-full rounded-r-lg border border-input bg-background px-4 py-3 text-sm focus:border-primary focus:outline-none"
+      />
+
+      {open && (
+        <div className="absolute left-0 top-full z-[60] mt-1 w-60 overflow-hidden rounded-xl border border-border bg-card shadow-2xl">
+          {COUNTRIES.map((country, i) => (
+            <button
+              key={country.code + country.name}
+              type="button"
+              onClick={() => pick(i)}
+              className={[
+                "flex w-full items-center gap-3 px-4 py-2.5 text-sm transition-colors hover:bg-white/5",
+                i === idx ? "bg-primary/10 text-primary" : "text-foreground",
+              ].join(" ")}
+            >
+              <span className="shrink-0 text-xl leading-none">{country.flag}</span>
+              <span className="flex-1 text-left">{country.name}</span>
+              <span className="text-xs text-muted-foreground/50">{country.code}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 type FormState = {
   fornamn: string;
   efternamn: string;
@@ -424,21 +534,17 @@ function NyKontaktDialog({
 
         <div className="space-y-4">
           {/* Telefon — valfritt, dedup-check on blur */}
-          <label className="block">
+          <div>
             <div className="mb-1.5 flex items-center justify-between text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
               <span>Mobilnummer</span>
               <span className="normal-case tracking-normal text-muted-foreground/60">valfritt</span>
             </div>
-            <input
-              type="tel"
+            <PhoneInput
               value={telefon}
-              onChange={(e) => { setTelefon(e.target.value); setDuplikat(null); }}
+              onChange={(v) => { setTelefon(v); setDuplikat(null); }}
               onBlur={handleTelefonBlur}
-              placeholder="070 000 00 00"
-              className="w-full rounded-lg border border-input bg-background px-4 py-3 text-sm focus:border-primary focus:outline-none"
-              autoFocus
             />
-          </label>
+          </div>
 
           {duplikat && (
             <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-4">
@@ -465,7 +571,7 @@ function NyKontaktDialog({
                 type="text"
                 value={form.fornamn}
                 onChange={(e) => setForm((f) => ({ ...f, fornamn: e.target.value }))}
-                placeholder="Mikael"
+                placeholder="Förnamn"
                 className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm focus:border-primary focus:outline-none"
               />
             </label>
@@ -475,7 +581,7 @@ function NyKontaktDialog({
                 type="text"
                 value={form.efternamn}
                 onChange={(e) => setForm((f) => ({ ...f, efternamn: e.target.value }))}
-                placeholder="Svensson"
+                placeholder="Efternamn"
                 className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm focus:border-primary focus:outline-none"
               />
             </label>
@@ -487,7 +593,7 @@ function NyKontaktDialog({
               type="email"
               value={form.epost}
               onChange={(e) => setForm((f) => ({ ...f, epost: e.target.value }))}
-              placeholder="mikael@example.se"
+              placeholder="namn@exempel.se"
               className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm focus:border-primary focus:outline-none"
             />
           </label>
