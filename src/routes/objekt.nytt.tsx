@@ -19,6 +19,7 @@ import { slugifyAddr, type Typ } from "../data/objekt";
 import { listKontakter, addObjektKoppling } from "../lib/kontaktStore";
 import { getAuth } from "../lib/authStore";
 import type { Kontakt } from "../lib/kontaktTypes";
+import { AddressInput } from "../components/AddressInput";
 
 export const Route = createFileRoute("/objekt/nytt")({
   head: () => ({
@@ -1017,22 +1018,22 @@ function AdressFalt({ value, onChange }: {
   value: string;
   onChange: (adress: string, ort?: string, omrade?: string) => void;
 }) {
-  function handleBlur(e: React.FocusEvent<HTMLInputElement>) {
-    const parsed = parseFullAdress(e.target.value);
+  function handleBlur(raw: string) {
+    const parsed = parseFullAdress(raw);
     if (parsed) onChange(parsed.adress, parsed.ort, parsed.omrade);
   }
   return (
     <label className="block">
       <div className="mb-1.5 text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Adress</div>
-      <input
-        type="text"
+      <AddressInput
         value={value}
-        onChange={(e) => onChange(e.target.value)}
-        onBlur={handleBlur}
-        placeholder="T.ex. Storgatan 12 eller Storgatan 12, 123 45 Stockholm"
-        className="w-full rounded-md border border-input bg-background px-3.5 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/50 focus:border-primary focus:bg-background focus:outline-none"
+        onChange={(v) => { onChange(v); handleBlur(v); }}
+        onSelect={(road, postcode, city) => {
+          const ort = [postcode, city].filter(Boolean).join(" ");
+          onChange(road, ort || undefined);
+        }}
+        placeholder="Sök adress…"
       />
-      <p className="mt-1 text-[10px] text-muted-foreground/60">Klistra in en fullständig adress — postnummer och ort fylls i automatiskt.</p>
     </label>
   );
 }

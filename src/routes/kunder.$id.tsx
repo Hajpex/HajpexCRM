@@ -12,6 +12,7 @@ import {
 } from "../lib/intagsmoteStore";
 import { saveObjekt } from "../lib/objektStore";
 import type { Typ } from "../data/objekt";
+import { AddressInput } from "../components/AddressInput";
 
 const serif = { fontFamily: '"Instrument Serif", ui-serif, Georgia, serif', letterSpacing: "-0.01em" } as const;
 
@@ -1153,11 +1154,15 @@ function NyttIntagsmoteModal({
             <label className="mb-1 block text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
               Adress *
             </label>
-            <input
-              autoFocus
+            <AddressInput
               value={adress}
-              onChange={(e) => setAdress(e.target.value)}
-              placeholder=""
+              onChange={setAdress}
+              onSelect={(road, postcode, city) => {
+                setAdress(road);
+                setPostnr(postcode);
+                setOrt(city);
+              }}
+              autoFocus
               className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm focus:border-primary focus:outline-none"
             />
           </div>
