@@ -1476,6 +1476,214 @@ function Input({ value, placeholder, suffix, readOnly, onChange }: { value?: str
   );
 }
 
+/* ---------- Swedish holiday helpers ---------- */
+function _easterDate(year: number): Date {
+  const a = year % 19, b = Math.floor(year / 100), c = year % 100;
+  const d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25);
+  const g = Math.floor((b - f + 1) / 3);
+  const h = (19 * a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4), k = c % 4;
+  const l = (32 + 2 * e + 2 * i - h - k) % 7;
+  const m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const month = Math.floor((h + l - 7 * m + 114) / 31);
+  const day = ((h + l - 7 * m + 114) % 31) + 1;
+  return new Date(year, month - 1, day);
+}
+
+function sweHolidays(year: number): Set<string> {
+  const s = new Set<string>();
+  const fmt = (dt: Date) =>
+    `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
+  const fixed = (m: number, d: number) => s.add(fmt(new Date(year, m - 1, d)));
+  const off = (base: Date, n: number) =>
+    s.add(fmt(new Date(base.getFullYear(), base.getMonth(), base.getDate() + n)));
+
+  fixed(1, 1); fixed(1, 6); fixed(5, 1); fixed(6, 6); fixed(12, 25); fixed(12, 26);
+
+  const e = _easterDate(year);
+  off(e, -2); off(e, 0); off(e, 1); off(e, 39); off(e, 49);
+
+  for (let d = 20; d <= 26; d++) { const dt = new Date(year, 5, d); if (dt.getDay() === 6) { s.add(fmt(dt)); break; } }
+  for (let o = 0; o < 7; o++) { const dt = new Date(year, 9, 31 + o); if (dt.getDay() === 6) { s.add(fmt(dt)); break; } }
+
+  return s;
+}
+
+const _MONTH_SV = ["Januari","Februari","Mars","April","Maj","Juni","Juli","Augusti","September","Oktober","November","December"];
+const _DAY_SV   = ["Mån","Tis","Ons","Tor","Fre","Lör","Sön"];
+
+/* ---------- DatePickerInput ---------- */
+function DatePickerInput({ value, onChange }: { value?: string; onChange?: (v: string) => void }) {
+  const blank  = useContext(BlankCtx);
+  const val    = blank ? "" : (value ?? "");
+  const today  = new Date();
+
+  const toYMD  = (dt: Date) =>
+    `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
+
+  const todayStr = toYMD(today);
+
+  const parsed = val.match(/^\d{4}-\d{2}-\d{2}$/) ? new Date(val + "T12:00:00") : null;
+
+  const [open,      setOpen]      = useState(false);
+  const [viewYear,  setViewYear]  = useState(() => parsed?.getFullYear()  ?? today.getFullYear());
+  const [viewMonth, setViewMonth] = useState(() => parsed?.getMonth()     ?? today.getMonth());
+  const wrapRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (val.match(/^\d{4}-\d{2}-\d{2}$/)) {
+      const d = new Date(val + "T12:00:00");
+      setViewYear(d.getFullYear());
+      setViewMonth(d.getMonth());
+    }
+  }, [val]);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  const holidays = sweHolidays(viewYear);
+
+  /* Build 6×7 grid starting on Monday */
+  const firstDay = new Date(viewYear, viewMonth, 1);
+  const startOffset = (firstDay.getDay() + 6) % 7; // 0=Mon … 6=Sun
+  const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+  const prevDays = new Date(viewYear, viewMonth, 0).getDate();
+
+  const cells: { day: number; month: number; year: number; cur: boolean }[] = [];
+  for (let i = startOffset - 1; i >= 0; i--) {
+    const m = viewMonth === 0 ? 11 : viewMonth - 1;
+    cells.push({ day: prevDays - i, month: m, year: viewMonth === 0 ? viewYear - 1 : viewYear, cur: false });
+  }
+  for (let d = 1; d <= daysInMonth; d++) cells.push({ day: d, month: viewMonth, year: viewYear, cur: true });
+  const rem = 42 - cells.length;
+  for (let d = 1; d <= rem; d++) {
+    const m = viewMonth === 11 ? 0 : viewMonth + 1;
+    cells.push({ day: d, month: m, year: viewMonth === 11 ? viewYear + 1 : viewYear, cur: false });
+  }
+
+  const weeks = Array.from({ length: 6 }, (_, i) => cells.slice(i * 7, i * 7 + 7));
+
+  function pickDate(y: number, m: number, d: number) {
+    onChange?.(`${y}-${String(m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`);
+    setOpen(false);
+  }
+  function prevMonth() { if (viewMonth === 0) { setViewMonth(11); setViewYear(y => y - 1); } else setViewMonth(m => m - 1); }
+  function nextMonth() { if (viewMonth === 11) { setViewMonth(0);  setViewYear(y => y + 1); } else setViewMonth(m => m + 1); }
+
+  return (
+    <div ref={wrapRef} className="relative">
+      {/* Input row */}
+      <div className="flex">
+        <input
+          type="text"
+          value={val}
+          onChange={(e) => onChange?.(e.target.value)}
+          placeholder="ÅÅÅÅ-MM-DD"
+          readOnly={!onChange}
+          className="h-9 w-full min-w-0 rounded-md rounded-r-none border border-r-0 border-border bg-background px-2.5 text-sm text-foreground placeholder:text-muted-foreground/50 focus:border-primary/40 focus:outline-none"
+        />
+        <button
+          type="button"
+          onClick={() => setOpen(o => !o)}
+          className="flex h-9 shrink-0 items-center rounded-md rounded-l-none border border-border bg-background px-2.5 text-muted-foreground/50 transition-colors hover:text-foreground"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="4" width="18" height="18" rx="2"/>
+            <line x1="16" y1="2" x2="16" y2="6"/>
+            <line x1="8" y1="2" x2="8" y2="6"/>
+            <line x1="3" y1="10" x2="21" y2="10"/>
+          </svg>
+        </button>
+      </div>
+
+      {/* Calendar dropdown */}
+      {open && (
+        <div className="absolute left-0 top-full z-50 mt-1.5 w-72 overflow-hidden rounded-xl border border-border bg-card shadow-2xl">
+          {/* Header */}
+          <div className="flex items-center justify-between border-b border-border px-4 py-3">
+            <button type="button" onClick={prevMonth} className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-white/5 hover:text-foreground">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="15 18 9 12 15 6"/></svg>
+            </button>
+            <span className="text-sm font-medium">{_MONTH_SV[viewMonth]} {viewYear}</span>
+            <button type="button" onClick={nextMonth} className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-white/5 hover:text-foreground">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 18 15 12 9 6"/></svg>
+            </button>
+          </div>
+
+          {/* Weekday labels */}
+          <div className="grid grid-cols-7 px-3 pt-2">
+            {_DAY_SV.map((d, i) => (
+              <div key={d} className={["py-1 text-center text-[10px] font-medium uppercase tracking-wide", i >= 5 ? "text-red-400/60" : "text-muted-foreground/50"].join(" ")}>
+                {d}
+              </div>
+            ))}
+          </div>
+
+          {/* Days grid */}
+          <div className="px-3 pb-3">
+            {weeks.map((week, wi) => (
+              <div key={wi} className="grid grid-cols-7">
+                {week.map((cell, ci) => {
+                  const ds = `${cell.year}-${String(cell.month + 1).padStart(2, "0")}-${String(cell.day).padStart(2, "0")}`;
+                  const isSel     = val === ds;
+                  const isToday   = ds === todayStr;
+                  const isHoliday = holidays.has(ds);
+                  const isSun     = ci === 6;
+                  const isSat     = ci === 5;
+                  const isRed     = isHoliday || isSun;
+
+                  return (
+                    <button
+                      key={ci}
+                      type="button"
+                      onClick={() => pickDate(cell.year, cell.month, cell.day)}
+                      className={[
+                        "relative flex h-8 w-full items-center justify-center rounded-md text-[13px] transition-colors",
+                        isSel
+                          ? "bg-primary text-primary-foreground font-medium"
+                          : isRed && cell.cur
+                          ? "text-red-400 hover:bg-red-500/10"
+                          : isSat && cell.cur
+                          ? "text-muted-foreground hover:bg-white/5"
+                          : cell.cur
+                          ? "text-foreground hover:bg-white/5"
+                          : "text-muted-foreground/25 hover:bg-white/5",
+                      ].join(" ")}
+                    >
+                      {cell.day}
+                      {isToday && !isSel && (
+                        <span className="absolute bottom-1 left-1/2 h-0.5 w-3 -translate-x-1/2 rounded-full bg-primary/60" />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+
+          {/* Legend */}
+          <div className="flex items-center gap-3 border-t border-border px-4 py-2">
+            <span className="flex items-center gap-1.5 text-[10px] text-muted-foreground/60">
+              <span className="h-2 w-2 rounded-full bg-red-400/70" />
+              Röd dag
+            </span>
+            <span className="flex items-center gap-1.5 text-[10px] text-muted-foreground/60">
+              <span className="h-0.5 w-3 rounded-full bg-primary/60" />
+              Idag
+            </span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Select({ value, options, onChange }: { value?: string; options: string[]; onChange?: (v: string) => void }) {
   const blank = useContext(BlankCtx);
   const opts = blank ? ["", ...options.filter((o) => o !== "")] : options;
@@ -3709,10 +3917,10 @@ function KoKontraktinfoBody({ slug, onSaved }: { slug: string; onSaved: () => vo
       )}
       <div className="grid gap-4 md:grid-cols-3">
         <Field label="Kontraktsdatum">
-          <Input value={form.kontraktsdatum} onChange={(v) => set("kontraktsdatum", v)} placeholder="ÅÅÅÅ-MM-DD" />
+          <DatePickerInput value={form.kontraktsdatum} onChange={(v) => set("kontraktsdatum", v)} />
         </Field>
         <Field label="Tillträdesdatum">
-          <Input value={form.tilltradesdatum} onChange={(v) => set("tilltradesdatum", v)} placeholder="ÅÅÅÅ-MM-DD" />
+          <DatePickerInput value={form.tilltradesdatum} onChange={(v) => set("tilltradesdatum", v)} />
         </Field>
         <Field label="Slutpris" hint={form.slutpris ? `= ${Number(form.slutpris).toLocaleString("sv-SE")} kr` : undefined}>
           <Input value={form.slutpris} onChange={(v) => set("slutpris", v)} placeholder="0" suffix="SEK" />
@@ -3721,7 +3929,7 @@ function KoKontraktinfoBody({ slug, onSaved }: { slug: string; onSaved: () => vo
           <Input value={form.handpenning} onChange={(v) => set("handpenning", v)} placeholder="0" suffix="SEK" />
         </Field>
         <Field label="Handpenning betalas senast">
-          <Input value={form.handpenningDatum} onChange={(v) => set("handpenningDatum", v)} placeholder="ÅÅÅÅ-MM-DD" />
+          <DatePickerInput value={form.handpenningDatum} onChange={(v) => set("handpenningDatum", v)} />
         </Field>
         <Field label="Kontraktstyp">
           <Select value={form.kontraktstyp} onChange={(v) => set("kontraktstyp", v)} options={["Köpekontrakt","Överlåtelseavtal","Skrivuppdrag"]} />
@@ -3797,10 +4005,10 @@ function KoEfterarbeteBody({ slug }: { slug: string }) {
           <Input value={form.betaladHandpenning} onChange={(v) => set("betaladHandpenning", v)} placeholder="0" suffix="SEK" />
         </Field>
         <Field label="Betaldatum">
-          <Input value={form.betaldatum} onChange={(v) => set("betaldatum", v)} placeholder="ÅÅÅÅ-MM-DD" />
+          <DatePickerInput value={form.betaldatum} onChange={(v) => set("betaldatum", v)} />
         </Field>
         <Field label="Provision betaldatum">
-          <Input value={form.provisionBetaldatum} onChange={(v) => set("provisionBetaldatum", v)} placeholder="ÅÅÅÅ-MM-DD" />
+          <DatePickerInput value={form.provisionBetaldatum} onChange={(v) => set("provisionBetaldatum", v)} />
         </Field>
         <div />
       </div>
