@@ -736,12 +736,21 @@ function VisningarCard() {
                     {timeFmt(v.datum)}–{timeFmt(v.sluttid)} · {v.typ} · {v.deltagare.length} anmälda
                   </p>
                 </div>
-                <button
-                  onClick={() => exportVisningToICS(v, adress)}
-                  className="text-[10px] text-primary hover:underline"
-                >
-                  → Kalender
-                </button>
+                <div className="flex items-center gap-2">
+                  <Link
+                    to="/visning/$id"
+                    params={{ id: v.id }}
+                    className="rounded-md bg-primary px-2.5 py-1 text-[11px] font-medium text-primary-foreground hover:opacity-90"
+                  >
+                    Starta ▶
+                  </Link>
+                  <button
+                    onClick={() => exportVisningToICS(v, adress)}
+                    className="text-[10px] text-primary hover:underline"
+                  >
+                    → Kalender
+                  </button>
+                </div>
               </div>
             ))}
             {past.length > 0 && (
@@ -4528,12 +4537,22 @@ function VisningRow({ v, slug, adress, now, expandedId, onToggleExpand, newDelta
         </div>
         <div className="flex items-center gap-2">
           {!isPast && (
-            <button
-              onClick={(e) => { e.stopPropagation(); exportVisningToICS(v, adress); }}
-              className="rounded-md border border-border px-2 py-1 text-[10px] text-muted-foreground hover:border-primary/50 hover:text-primary"
-            >
-              → Kalender
-            </button>
+            <>
+              <Link
+                to="/visning/$id"
+                params={{ id: v.id }}
+                onClick={(e) => e.stopPropagation()}
+                className="rounded-md bg-primary px-2.5 py-1 text-[11px] font-medium text-primary-foreground hover:opacity-90"
+              >
+                Starta ▶
+              </Link>
+              <button
+                onClick={(e) => { e.stopPropagation(); exportVisningToICS(v, adress); }}
+                className="rounded-md border border-border px-2 py-1 text-[10px] text-muted-foreground hover:border-primary/50 hover:text-primary"
+              >
+                → Kalender
+              </button>
+            </>
           )}
           <span className={`text-xs text-muted-foreground transition-transform ${isExpanded ? "rotate-90" : ""}`}>›</span>
         </div>

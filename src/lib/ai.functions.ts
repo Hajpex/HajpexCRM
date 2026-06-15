@@ -252,6 +252,76 @@ export const finalizeRoomText = createServerFn({ method: "POST" })
     return { text };
   });
 
+// ── Visnings-fusklapp ────────────────────────────────────────────────────────
+
+const VisningsFusklappInput = z.object({
+  adress: z.string(),
+  stad: z.string(),
+  postnr: z.string(),
+  typ: z.string(),
+  rum: z.number().optional(),
+  boarea: z.number().optional(),
+  pris: z.number().optional(),
+  extra: z.string().optional(),
+});
+
+export type VisningsFusklappResult = {
+  omradet: string;
+  fragaTips: string[];
+};
+
+export const generateVisningsFusklapp = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) => VisningsFusklappInput.parse(input))
+  .handler(async ({ data }): Promise<VisningsFusklappResult> => {
+    const key = process.env.LOVABLE_API_KEY;
+    if (!key) throw new Error("LOVABLE_API_KEY saknas.");
+
+    const facts = [
+      `Adress: ${data.adress}, ${data.postnr} ${data.stad}`,
+      `Typ: ${data.typ}`,
+      data.rum ? `Rum: ${data.rum}` : "",
+      data.boarea ? `Boarea: ${data.boarea} m²` : "",
+      data.pris ? `Utropspris: ${data.pris.toLocaleString("sv-SE")} kr` : "",
+      data.extra ? `Mäklarens anteckningar: ${data.extra}` : "",
+    ].filter(Boolean).join("\n");
+
+    const userText = `Du är assistent åt en svensk fastighetsmäklare som ska ha visning.
+
+Objektet:
+${facts}
+
+Ge en kort beskrivning av OMRÅDET (2-3 meningar om kommunikationer, karaktär och vad som generellt finns i närheten baserat på stad och postnummer — nämn INTE specifika skolnamn eller busstider, bara den allmänna bilden).
+
+Ge också 5 vanliga frågor som spekulanter brukar ställa på visningar av denna bostadstyp (kortfattade, som en checklista).
+
+Returnera JSON:
+{
+  "omradet": "...",
+  "fragaTips": ["...", "...", "...", "...", "..."]
+}`;
+
+    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Lovable-API-Key": key },
+      body: JSON.stringify({
+        model: "google/gemini-3-flash-preview",
+        messages: [{ role: "user", content: userText }],
+        response_format: { type: "json_object" },
+      }),
+    });
+    if (res.status === 429) throw new Error("AI-tjänsten är överbelastad.");
+    if (res.status === 402) throw new Error("AI-krediter slut.");
+    if (!res.ok) throw new Error(`AI-fel (${res.status})`);
+    const json = await res.json();
+    const content = String(json?.choices?.[0]?.message?.content ?? "").trim()
+      .replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/i, "").trim();
+    const parsed = JSON.parse(content);
+    return {
+      omradet: String(parsed.omradet ?? "").trim(),
+      fragaTips: Array.isArray(parsed.fragaTips) ? parsed.fragaTips.map(String) : [],
+    };
+  });
+
 // ── Morning Brief ─────────────────────────────────────────────────────────────
 
 const MorningBriefInput = z.object({
