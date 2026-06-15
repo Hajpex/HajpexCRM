@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState, useEffect, type ReactNode } from "react";
+import { useState, useEffect, useCallback, type ReactNode } from "react";
 import { AppShell } from "../components/AppShell";
 import { OBJEKT } from "../data/objekt";
 import { listObjekt } from "../lib/objektStore";
@@ -10,6 +10,68 @@ import { listIntagsmoten, type Intagsmote } from "../lib/intagsmoteStore";
 import { listAllaVisningar, type Visning } from "../lib/visningarStore";
 import type { Kontakt, NastaSteg } from "../lib/kontaktTypes";
 import { generateMorningBrief } from "../lib/ai.functions";
+
+/* ═══════════════════════════════════════════════════════════
+   WIDGET STORE
+══════════════════════════════════════════════════════════════ */
+
+const WIDGET_KEY = "hajpex.widgets.v1";
+
+type WidgetId =
+  | "idag"
+  | "kommande"
+  | "aktiva-objekt"
+  | "budgivning"
+  | "nasta-steg"
+  | "att-gora"
+  | "vader"
+  | "snabblänkar";
+
+type QuickLink = { label: string; url: string };
+
+type WidgetSettings = {
+  idag: boolean;
+  kommande: boolean;
+  "aktiva-objekt": boolean;
+  budgivning: boolean;
+  "nasta-steg": boolean;
+  "att-gora": boolean;
+  vader: boolean;
+  vaderOrt: string;
+  "snabblänkar": boolean;
+  links: QuickLink[];
+};
+
+const DEFAULT_WIDGETS: WidgetSettings = {
+  idag: true,
+  kommande: true,
+  "aktiva-objekt": true,
+  budgivning: true,
+  "nasta-steg": true,
+  "att-gora": true,
+  vader: false,
+  vaderOrt: "Stockholm",
+  "snabblänkar": false,
+  links: [
+    { label: "Hemnet", url: "https://hemnet.se" },
+    { label: "Lantmäteriet", url: "https://lantmateriet.se" },
+    { label: "Vitec", url: "https://vitec.net" },
+  ],
+};
+
+function readWidgets(): WidgetSettings {
+  try {
+    const raw = localStorage.getItem(WIDGET_KEY);
+    if (!raw) return DEFAULT_WIDGETS;
+    return { ...DEFAULT_WIDGETS, ...JSON.parse(raw) };
+  } catch {
+    return DEFAULT_WIDGETS;
+  }
+}
+
+function writeWidgets(w: WidgetSettings) {
+  try { localStorage.setItem(WIDGET_KEY, JSON.stringify(w)); } catch { /* ignore */ }
+}
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -101,6 +163,17 @@ function DashboardPage() {
   const [now] = useState(() => new Date());
   const [briefText, setBriefText] = useState<string | null>(null);
   const [briefLoading, setBriefLoading] = useState(false);
+  const [widgets, setWidgets] = useState<WidgetSettings>(DEFAULT_WIDGETS);
+  const [editingLayout, setEditingLayout] = useState(false);
+
+  useEffect(() => {
+    setWidgets(readWidgets());
+  }, []);
+
+  const saveWidgets = useCallback((next: WidgetSettings) => {
+    setWidgets(next);
+    writeWidgets(next);
+  }, []);
 
   useEffect(() => {
     const ks = listKontakter();
@@ -224,6 +297,12 @@ function DashboardPage() {
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2 pt-1">
+              <button
+                onClick={() => setEditingLayout(true)}
+                className="rounded-lg border border-border bg-card px-3.5 py-2 text-xs font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary"
+              >
+                ⊞ Redigera layout
+              </button>
               <Link
                 to="/kunder"
                 search={{ q: undefined, roll: undefined }}
@@ -280,41 +359,42 @@ function DashboardPage() {
           <div className="md:col-span-2 space-y-6">
 
             {/* Idag */}
-            <DashCard
-              title="Idag"
-              eyebrow="Agenda"
-              action={
-                <Link
-                  to="/kunder"
-                  search={{ q: undefined, roll: undefined }}
-                  className="rounded-md bg-primary/10 px-3 py-1.5 text-[11px] font-medium text-primary transition-colors hover:bg-primary/20"
-                >
-                  + Nytt möte
-                </Link>
-              }
-            >
-              {pastPlannerMoten.length === 0 && todayMoten.length === 0 && todayVisningar.length === 0 ? (
-                <EmptySlot icon="📅" text="Inga möten eller visningar idag" hint="Skapa ett nytt möte från en kontakt" />
-              ) : (
-                <div className="divide-y divide-border">
-                  {pastPlannerMoten.slice(0, 2).map((m) => (
-                    <MoteRow key={m.id} mote={m} kontakter={kontakter} variant="overdue" now={now} />
-                  ))}
-                  {todayMoten.map((m) => (
-                    <MoteRow key={m.id} mote={m} kontakter={kontakter} variant="today" now={now} />
-                  ))}
-                  {todayVisningar.map((v) => (
-                    <VisningDashRow key={v.id} visning={v} />
-                  ))}
-                </div>
-              )}
-            </DashCard>
+            {widgets.idag && (
+              <DashCard
+                title="Idag"
+                eyebrow="Agenda"
+                action={
+                  <Link
+                    to="/kunder"
+                    search={{ q: undefined, roll: undefined }}
+                    className="rounded-md bg-primary/10 px-3 py-1.5 text-[11px] font-medium text-primary transition-colors hover:bg-primary/20"
+                  >
+                    + Nytt möte
+                  </Link>
+                }
+              >
+                {pastPlannerMoten.length === 0 && todayMoten.length === 0 && todayVisningar.length === 0 ? (
+                  <EmptySlot icon="📅" text="Inga möten eller visningar idag" hint="Skapa ett nytt möte från en kontakt" />
+                ) : (
+                  <div className="divide-y divide-border">
+                    {pastPlannerMoten.slice(0, 2).map((m) => (
+                      <MoteRow key={m.id} mote={m} kontakter={kontakter} variant="overdue" now={now} />
+                    ))}
+                    {todayMoten.map((m) => (
+                      <MoteRow key={m.id} mote={m} kontakter={kontakter} variant="today" now={now} />
+                    ))}
+                    {todayVisningar.map((v) => (
+                      <VisningDashRow key={v.id} visning={v} />
+                    ))}
+                  </div>
+                )}
+              </DashCard>
+            )}
 
             {/* Kommande */}
-            {(upcomingMoten.length > 0 || upcomingVisningar.length > 0) && (
+            {widgets.kommande && (upcomingMoten.length > 0 || upcomingVisningar.length > 0) && (
               <DashCard title="Kommande" eyebrow="Nästa 7 dagar">
                 <div className="divide-y divide-border">
-                  {/* Merge and sort all upcoming items by date */}
                   {[
                     ...upcomingMoten.map((m) => ({ type: "mote" as const, ts: m.tidpunkt, item: m })),
                     ...upcomingVisningar.map((v) => ({ type: "visning" as const, ts: v.datum, item: v })),
@@ -331,143 +411,155 @@ function DashboardPage() {
             )}
 
             {/* Aktiva objekt */}
-            <DashCard
-              title="Aktiva objekt"
-              eyebrow="Portfölj"
-              action={
-                <Link to="/objekt" className="text-[11px] text-primary hover:underline">
-                  Visa alla →
-                </Link>
-              }
-            >
-              {activeObjs.length === 0 ? (
-                <EmptySlot icon="🏠" text="Inga aktiva uppdrag" hint="Lägg till ditt första objekt" />
-              ) : (
-                <div className="overflow-x-auto -mx-1">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="text-left text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
-                        <th className="pb-3 pl-1 pr-4 font-normal">Adress</th>
-                        <th className="pb-3 pr-4 font-normal hidden sm:table-cell">Typ</th>
-                        <th className="pb-3 pr-4 font-normal">Utrop</th>
-                        <th className="pb-3 pr-3 font-normal">Status</th>
-                        <th className="pb-3 pr-3 text-right font-normal hidden md:table-cell">Spek</th>
-                        <th className="pb-3 text-right font-normal">Bud</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {activeObjs.map((o) => {
-                        const slug = slugifyAddr(o.adress);
-                        const spekCount = kontakter.filter((k) =>
-                          k.objektKopplingar.some((kp) => kp.slug === slug && kp.relation === "spekulant")
-                        ).length;
-                        const budCount = (budMap[slug] ?? []).length;
-                        return (
-                          <tr key={o.adress} className="group border-t border-border">
-                            <td className="py-2.5 pl-1 pr-4">
-                              <Link
-                                to="/objekt/$slug"
-                                params={{ slug }}
-                                search={{ tab: undefined, q: undefined }}
-                                className="font-medium text-foreground hover:text-primary"
-                              >
-                                {o.adress}
-                              </Link>
-                              <div className="text-[10px] text-muted-foreground">{o.stad}</div>
-                            </td>
-                            <td className="py-2.5 pr-4 text-xs text-muted-foreground hidden sm:table-cell">
-                              {o.typ}
-                            </td>
-                            <td className="py-2.5 pr-4 font-mono text-sm">{fmtKrShort(o.pris)}</td>
-                            <td className="py-2.5 pr-3">
-                              <StatusBadge status={o.status} />
-                            </td>
-                            <td className="py-2.5 pr-3 text-right font-mono text-sm hidden md:table-cell">
-                              {spekCount || <span className="text-muted-foreground">—</span>}
-                            </td>
-                            <td className="py-2.5 text-right">
-                              {budCount > 0 ? (
+            {widgets["aktiva-objekt"] && (
+              <DashCard
+                title="Aktiva objekt"
+                eyebrow="Portfölj"
+                action={
+                  <Link to="/objekt" className="text-[11px] text-primary hover:underline">
+                    Visa alla →
+                  </Link>
+                }
+              >
+                {activeObjs.length === 0 ? (
+                  <EmptySlot icon="🏠" text="Inga aktiva uppdrag" hint="Lägg till ditt första objekt" />
+                ) : (
+                  <div className="overflow-x-auto -mx-1">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="text-left text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
+                          <th className="pb-3 pl-1 pr-4 font-normal">Adress</th>
+                          <th className="pb-3 pr-4 font-normal hidden sm:table-cell">Typ</th>
+                          <th className="pb-3 pr-4 font-normal">Utrop</th>
+                          <th className="pb-3 pr-3 font-normal">Status</th>
+                          <th className="pb-3 pr-3 text-right font-normal hidden md:table-cell">Spek</th>
+                          <th className="pb-3 text-right font-normal">Bud</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {activeObjs.map((o) => {
+                          const slug = slugifyAddr(o.adress);
+                          const spekCount = kontakter.filter((k) =>
+                            k.objektKopplingar.some((kp) => kp.slug === slug && kp.relation === "spekulant")
+                          ).length;
+                          const budCount = (budMap[slug] ?? []).length;
+                          return (
+                            <tr key={o.adress} className="group border-t border-border">
+                              <td className="py-2.5 pl-1 pr-4">
                                 <Link
                                   to="/objekt/$slug"
                                   params={{ slug }}
-                                  search={{ tab: "Budgivning", q: undefined }}
-                                  className="inline-block rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary hover:bg-primary/20"
+                                  search={{ tab: undefined, q: undefined }}
+                                  className="font-medium text-foreground hover:text-primary"
                                 >
-                                  {budCount}
+                                  {o.adress}
                                 </Link>
-                              ) : (
-                                <span className="text-muted-foreground text-xs">—</span>
-                              )}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </DashCard>
+                                <div className="text-[10px] text-muted-foreground">{o.stad}</div>
+                              </td>
+                              <td className="py-2.5 pr-4 text-xs text-muted-foreground hidden sm:table-cell">
+                                {o.typ}
+                              </td>
+                              <td className="py-2.5 pr-4 font-mono text-sm">{fmtKrShort(o.pris)}</td>
+                              <td className="py-2.5 pr-3">
+                                <StatusBadge status={o.status} />
+                              </td>
+                              <td className="py-2.5 pr-3 text-right font-mono text-sm hidden md:table-cell">
+                                {spekCount || <span className="text-muted-foreground">—</span>}
+                              </td>
+                              <td className="py-2.5 text-right">
+                                {budCount > 0 ? (
+                                  <Link
+                                    to="/objekt/$slug"
+                                    params={{ slug }}
+                                    search={{ tab: "Budgivning", q: undefined }}
+                                    className="inline-block rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary hover:bg-primary/20"
+                                  >
+                                    {budCount}
+                                  </Link>
+                                ) : (
+                                  <span className="text-muted-foreground text-xs">—</span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </DashCard>
+            )}
+
+            {/* Väder widget */}
+            {widgets.vader && <VaderWidget ort={widgets.vaderOrt} />}
           </div>
 
           {/* ── RIGHT SIDEBAR (1/3) ── */}
           <div className="space-y-6">
 
+            {/* Snabblänkar widget */}
+            {widgets["snabblänkar"] && widgets.links.length > 0 && (
+              <SnabblänkarWidget links={widgets.links} />
+            )}
+
             {/* Aktiv budgivning */}
-            <DashCard
-              title="Aktiv budgivning"
-              eyebrow="Live"
-              action={
-                objsWithBids.length > 0 ? (
-                  <span className="flex items-center gap-1.5 text-[10px] font-medium text-emerald-500">
-                    <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
-                    {objsWithBids.length} aktiva
-                  </span>
-                ) : undefined
-              }
-            >
-              {objsWithBids.length === 0 ? (
-                <EmptySlot icon="🔨" text="Inga pågående bud" />
-              ) : (
-                <div className="divide-y divide-border">
-                  {objsWithBids.slice(0, 6).map(({ o, slug, bids }) => {
-                    const highest = bids[0];
-                    const hasWinner = bids.some((b) => b.vinnare);
-                    const latestBidAge = relTime(highest.tidpunkt ?? Date.now());
-                    return (
-                      <Link
-                        key={slug}
-                        to="/objekt/$slug"
-                        params={{ slug }}
-                        search={{ tab: "Budgivning", q: undefined }}
-                        className="group block py-3"
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="min-w-0">
-                            <p className="truncate text-sm font-medium text-foreground group-hover:text-primary">
-                              {o.adress}
-                            </p>
-                            <p className="text-[10px] text-muted-foreground">
-                              {bids.length} bud · {latestBidAge}
-                            </p>
+            {widgets.budgivning && (
+              <DashCard
+                title="Aktiv budgivning"
+                eyebrow="Live"
+                action={
+                  objsWithBids.length > 0 ? (
+                    <span className="flex items-center gap-1.5 text-[10px] font-medium text-emerald-500">
+                      <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
+                      {objsWithBids.length} aktiva
+                    </span>
+                  ) : undefined
+                }
+              >
+                {objsWithBids.length === 0 ? (
+                  <EmptySlot icon="🔨" text="Inga pågående bud" />
+                ) : (
+                  <div className="divide-y divide-border">
+                    {objsWithBids.slice(0, 6).map(({ o, slug, bids }) => {
+                      const highest = bids[0];
+                      const hasWinner = bids.some((b) => b.vinnare);
+                      const latestBidAge = relTime(highest.tidpunkt ?? Date.now());
+                      return (
+                        <Link
+                          key={slug}
+                          to="/objekt/$slug"
+                          params={{ slug }}
+                          search={{ tab: "Budgivning", q: undefined }}
+                          className="group block py-3"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-medium text-foreground group-hover:text-primary">
+                                {o.adress}
+                              </p>
+                              <p className="text-[10px] text-muted-foreground">
+                                {bids.length} bud · {latestBidAge}
+                              </p>
+                            </div>
+                            <div className="flex-shrink-0 text-right">
+                              <p className="font-mono text-sm font-semibold text-primary">
+                                {fmtBud(highest.belopp)}
+                              </p>
+                              {hasWinner && (
+                                <span className="text-[9px] font-medium text-emerald-500">✓ Klar</span>
+                              )}
+                            </div>
                           </div>
-                          <div className="flex-shrink-0 text-right">
-                            <p className="font-mono text-sm font-semibold text-primary">
-                              {fmtBud(highest.belopp)}
-                            </p>
-                            {hasWinner && (
-                              <span className="text-[9px] font-medium text-emerald-500">✓ Klar</span>
-                            )}
-                          </div>
-                        </div>
-                      </Link>
-                    );
-                  })}
-                </div>
-              )}
-            </DashCard>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
+              </DashCard>
+            )}
 
             {/* Nästa steg — förfallna */}
-            {(overdueTasks.length > 0 || upcomingTasks.length > 0) && (
+            {widgets["nasta-steg"] && (overdueTasks.length > 0 || upcomingTasks.length > 0) && (
               <DashCard
                 title="Att följa upp"
                 eyebrow="Nästa steg"
@@ -489,10 +581,19 @@ function DashboardPage() {
             )}
 
             {/* Smart att-göra */}
-            <SmartAttGora objs={objs} kontakter={kontakter} budMap={budMap} />
+            {widgets["att-gora"] && <SmartAttGora objs={objs} kontakter={kontakter} budMap={budMap} />}
           </div>
         </div>
       </div>
+
+      {/* ── Layout editor panel ── */}
+      {editingLayout && (
+        <LayoutEditor
+          widgets={widgets}
+          onChange={saveWidgets}
+          onClose={() => setEditingLayout(false)}
+        />
+      )}
     </AppShell>
   );
 }
@@ -678,6 +779,286 @@ function SmartAttGora({
         ))}
       </div>
     </DashCard>
+  );
+}
+
+/* ── Väder widget ── */
+
+type VaderData = { temp: number; feels: number; emoji: string; desc: string; ort: string };
+
+function wmoEmoji(code: number): { emoji: string; desc: string } {
+  if (code === 0)              return { emoji: "☀️",  desc: "Klar himmel" };
+  if (code <= 2)               return { emoji: "🌤",  desc: "Mestadels klar" };
+  if (code === 3)              return { emoji: "☁️",  desc: "Mulet" };
+  if (code <= 48)              return { emoji: "🌫",  desc: "Dimma" };
+  if (code <= 55)              return { emoji: "🌦",  desc: "Duggregn" };
+  if (code <= 65)              return { emoji: "🌧",  desc: "Regn" };
+  if (code <= 77)              return { emoji: "🌨",  desc: "Snö" };
+  if (code <= 82)              return { emoji: "🌦",  desc: "Regnskurar" };
+  if (code >= 95)              return { emoji: "⛈",  desc: "Åska" };
+  return { emoji: "🌡", desc: "Okänt" };
+}
+
+function VaderWidget({ ort }: { ort: string }) {
+  const [data, setData] = useState<VaderData | null>(null);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    const cacheKey = `hajpex.vader2.${ort}.${new Date().toISOString().slice(0, 13)}`;
+    try {
+      const cached = localStorage.getItem(cacheKey);
+      if (cached) { setData(JSON.parse(cached)); return; }
+    } catch { /* ignore */ }
+
+    // Step 1: geocode city name
+    fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(ort)}&count=1&language=sv&format=json`)
+      .then((r) => r.json())
+      .then((geo) => {
+        const res = geo.results?.[0];
+        if (!res) throw new Error("not found");
+        const { latitude, longitude, name } = res;
+        // Step 2: fetch weather
+        return fetch(
+          `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,apparent_temperature,weather_code`
+        ).then((r) => r.json()).then((w) => {
+          const cur = w.current;
+          const { emoji, desc } = wmoEmoji(cur.weather_code);
+          const d: VaderData = {
+            temp: Math.round(cur.temperature_2m),
+            feels: Math.round(cur.apparent_temperature),
+            emoji, desc, ort: name,
+          };
+          setData(d);
+          try { localStorage.setItem(cacheKey, JSON.stringify(d)); } catch { /* ignore */ }
+        });
+      })
+      .catch(() => setError(true));
+  }, [ort]);
+
+  return (
+    <section className="rounded-xl border border-border bg-card/70 p-5 shadow-[0_8px_30px_-12px_rgba(0,0,0,0.15)]">
+      <p className="text-[10px] uppercase tracking-[0.2em] text-primary/60">Mäklarsaker</p>
+      <h2 className="mt-0.5 mb-3 text-base font-medium text-foreground" style={serif}>Väder</h2>
+      {error ? (
+        <p className="text-xs text-muted-foreground">Kunde inte hämta väder för "{ort}"</p>
+      ) : !data ? (
+        <div className="space-y-2">
+          <div className="h-8 w-1/2 animate-pulse rounded bg-muted" />
+          <div className="h-3 w-1/3 animate-pulse rounded bg-muted" />
+        </div>
+      ) : (
+        <div>
+          <div className="flex items-end gap-3">
+            <span className="text-4xl leading-none">{data.emoji}</span>
+            <div>
+              <p className="text-2xl font-medium leading-none" style={serif}>{data.temp}°C</p>
+              <p className="mt-1 text-[11px] text-muted-foreground">{data.desc} · Känns {data.feels}°C</p>
+            </div>
+          </div>
+          <p className="mt-2 text-[11px] text-muted-foreground">{data.ort}</p>
+        </div>
+      )}
+    </section>
+  );
+}
+
+/* ── Snabblänkar widget ── */
+
+function SnabblänkarWidget({ links }: { links: QuickLink[] }) {
+  return (
+    <section className="rounded-xl border border-border bg-card/70 p-5 shadow-[0_8px_30px_-12px_rgba(0,0,0,0.15)]">
+      <p className="text-[10px] uppercase tracking-[0.2em] text-primary/60">Mäklarsaker</p>
+      <h2 className="mt-0.5 mb-3 text-base font-medium text-foreground" style={serif}>Snabblänkar</h2>
+      <div className="flex flex-wrap gap-2">
+        {links.map((l) => (
+          <a
+            key={l.url}
+            href={l.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="rounded-lg border border-border bg-background px-3 py-1.5 text-xs text-foreground transition-colors hover:border-primary/40 hover:text-primary"
+          >
+            {l.label} ↗
+          </a>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+/* ── Layout editor panel ── */
+
+const WIDGET_META: Array<{ id: WidgetId; label: string; desc: string; category: string }> = [
+  { id: "idag",          label: "Idag",            desc: "Dagens möten och visningar",         category: "Dashboard" },
+  { id: "kommande",      label: "Kommande",         desc: "Möten och visningar nästa 7 dagar",  category: "Dashboard" },
+  { id: "aktiva-objekt", label: "Aktiva objekt",    desc: "Portföljöversikt",                   category: "Dashboard" },
+  { id: "budgivning",    label: "Aktiv budgivning", desc: "Live budgivningsstatus",              category: "Dashboard" },
+  { id: "nasta-steg",    label: "Att följa upp",    desc: "Förfallna och kommande nästa steg",  category: "Dashboard" },
+  { id: "att-gora",      label: "Kräver åtgärd",   desc: "Automatiska påminnelser",            category: "Dashboard" },
+  { id: "vader",         label: "Väder",            desc: "Aktuellt väder för din ort",         category: "Widgets" },
+  { id: "snabblänkar",   label: "Snabblänkar",      desc: "Hemnet, Lantmäteriet m.fl.",         category: "Widgets" },
+];
+
+function LayoutEditor({
+  widgets, onChange, onClose,
+}: {
+  widgets: WidgetSettings;
+  onChange: (w: WidgetSettings) => void;
+  onClose: () => void;
+}) {
+  const [local, setLocal] = useState<WidgetSettings>({ ...widgets });
+  const [newLinkLabel, setNewLinkLabel] = useState("");
+  const [newLinkUrl, setNewLinkUrl] = useState("");
+
+  function toggle(id: WidgetId) {
+    setLocal((prev) => ({ ...prev, [id]: !prev[id] }));
+  }
+
+  function addLink() {
+    const label = newLinkLabel.trim();
+    let url = newLinkUrl.trim();
+    if (!label || !url) return;
+    if (!url.startsWith("http")) url = "https://" + url;
+    setLocal((prev) => ({ ...prev, links: [...prev.links, { label, url }] }));
+    setNewLinkLabel("");
+    setNewLinkUrl("");
+  }
+
+  function removeLink(i: number) {
+    setLocal((prev) => ({ ...prev, links: prev.links.filter((_, j) => j !== i) }));
+  }
+
+  function save() {
+    onChange(local);
+    onClose();
+  }
+
+  const categories = ["Dashboard", "Widgets"];
+
+  return (
+    <>
+      {/* Backdrop */}
+      <div
+        className="fixed inset-0 z-40 bg-background/60 backdrop-blur-sm"
+        onClick={onClose}
+      />
+      {/* Panel */}
+      <div className="fixed right-0 top-0 bottom-0 z-50 w-full max-w-sm overflow-y-auto border-l border-border bg-card shadow-2xl">
+        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-card px-5 py-4">
+          <div>
+            <p className="text-[10px] uppercase tracking-[0.2em] text-primary/60">Anpassa</p>
+            <h2 className="text-base font-medium text-foreground" style={serif}>Redigera layout</h2>
+          </div>
+          <button
+            onClick={onClose}
+            className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          >
+            ✕
+          </button>
+        </div>
+
+        <div className="p-5 space-y-6">
+          {categories.map((cat) => (
+            <div key={cat}>
+              <p className="mb-3 text-[10px] uppercase tracking-[0.2em] text-muted-foreground">{cat}</p>
+              <div className="space-y-2">
+                {WIDGET_META.filter((w) => w.category === cat).map((meta) => (
+                  <button
+                    key={meta.id}
+                    onClick={() => toggle(meta.id)}
+                    className="flex w-full items-center gap-3 rounded-lg border border-border bg-background/50 p-3 text-left transition-colors hover:border-primary/30"
+                  >
+                    <div className={[
+                      "flex h-5 w-5 flex-shrink-0 items-center justify-center rounded",
+                      local[meta.id] ? "bg-primary text-primary-foreground" : "border border-border bg-background",
+                    ].join(" ")}>
+                      {local[meta.id] && <span className="text-[10px] font-bold">✓</span>}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-foreground">{meta.label}</p>
+                      <p className="text-[11px] text-muted-foreground">{meta.desc}</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+
+          {/* Weather location setting */}
+          {local.vader && (
+            <div>
+              <p className="mb-2 text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Väderort</p>
+              <input
+                type="text"
+                value={local.vaderOrt}
+                onChange={(e) => setLocal((prev) => ({ ...prev, vaderOrt: e.target.value }))}
+                placeholder="t.ex. Stockholm"
+                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary/50 focus:outline-none"
+              />
+            </div>
+          )}
+
+          {/* Quick links manager */}
+          {local["snabblänkar"] && (
+            <div>
+              <p className="mb-2 text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Snabblänkar</p>
+              <div className="space-y-1.5 mb-3">
+                {local.links.map((l, i) => (
+                  <div key={i} className="flex items-center gap-2 rounded-lg border border-border bg-background/50 px-3 py-2">
+                    <span className="flex-1 truncate text-xs text-foreground">{l.label}</span>
+                    <span className="truncate text-[10px] text-muted-foreground">{l.url}</span>
+                    <button
+                      onClick={() => removeLink(i)}
+                      className="text-[11px] text-muted-foreground hover:text-red-400"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={newLinkLabel}
+                  onChange={(e) => setNewLinkLabel(e.target.value)}
+                  placeholder="Namn"
+                  className="w-24 rounded-lg border border-border bg-background px-2 py-1.5 text-xs focus:border-primary/50 focus:outline-none"
+                />
+                <input
+                  type="text"
+                  value={newLinkUrl}
+                  onChange={(e) => setNewLinkUrl(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && addLink()}
+                  placeholder="URL"
+                  className="flex-1 rounded-lg border border-border bg-background px-2 py-1.5 text-xs focus:border-primary/50 focus:outline-none"
+                />
+                <button
+                  onClick={addLink}
+                  className="rounded-lg bg-primary/10 px-2.5 py-1.5 text-xs font-medium text-primary hover:bg-primary/20"
+                >
+                  +
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div className="flex gap-2 pt-2">
+            <button
+              onClick={save}
+              className="flex-1 rounded-lg bg-primary py-2.5 text-sm font-medium text-primary-foreground hover:opacity-90"
+            >
+              Spara layout
+            </button>
+            <button
+              onClick={onClose}
+              className="rounded-lg border border-border px-4 py-2.5 text-sm text-muted-foreground hover:text-foreground"
+            >
+              Avbryt
+            </button>
+          </div>
+        </div>
+      </div>
+    </>
   );
 }
 
