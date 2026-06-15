@@ -3054,6 +3054,8 @@ type OiSection =
 
 function ObjektsinfoView({ adress, slug }: { adress: string; slug: string }) {
   const blank = isUserCreatedSlug(slug);
+  const objTyp = getObjektBySlug(slug)?.typ;
+  const isBrf = objTyp === "Bostadsrätt";
   const [open, setOpen] = useState<Record<OiSection, boolean>>({
     uppdrag: false, grunddata: true, boarea: false, byggnad: false,
     el: false, ovrigt: false, rum: false, bilder: false,
@@ -3088,7 +3090,7 @@ function ObjektsinfoView({ adress, slug }: { adress: string; slug: string }) {
         <BoareaBody slug={slug} />
       </OiSec>
       <OiSec id="byggnad" title="Byggnad" open={open.byggnad} onToggle={toggle} done={done.byggnad} onToggleDone={toggleDone}>
-        <ByggnadBody />
+        <ByggnadBody isBrf={isBrf} />
       </OiSec>
       <OiSec id="el" title="El, uppvärmning & ventilation" open={open.el} onToggle={toggle} done={done.el} onToggleDone={toggleDone}>
         <ElBody />
@@ -3191,15 +3193,19 @@ function GrunddataBody({ adress, slug }: { adress: string; slug: string }) {
         <Field label="Distrikt"><Input placeholder="—" /></Field>
         <Field label="Område"><Input value={blank ? "" : "Länna"} placeholder={blank ? "—" : undefined} /></Field>
       </div>
-      <div className="grid gap-4 md:grid-cols-2">
-        <Field label="Tomtareal/mark"><Input value={blank ? "" : "1 994,5"} suffix="m²" /></Field>
-        <Field label="Tomtarealuppgifter enligt"><Input value={blank ? "" : "Lantmäteriet"} placeholder={blank ? "—" : undefined} /></Field>
-        <Field label="Vattenareal"><Input placeholder="0" suffix="m²" /></Field>
-        <Field label="Totalareal"><Input value={blank ? "" : "1 994,5"} suffix="m²" /></Field>
-      </div>
-      <Field label="Tomtbeskrivning">
-        <textarea rows={3} defaultValue={blank ? "" : "Stor och uppvuxen trädgårdstomt med gott om plats för både lek, odling och avkoppling. Tomten präglas av generösa gräsytor, slingrande gångar och en rik variation av träd, buskar och planteringar som skapar en grönskande och privat miljö."} className="w-full rounded-md border border-border bg-background px-2.5 py-2 text-sm focus:border-primary/40 focus:outline-none" />
-      </Field>
+      {!isBrf && (
+        <>
+          <div className="grid gap-4 md:grid-cols-2">
+            <Field label="Tomtareal/mark"><Input value={blank ? "" : "1 994,5"} suffix="m²" /></Field>
+            <Field label="Tomtarealuppgifter enligt"><Input value={blank ? "" : "Lantmäteriet"} placeholder={blank ? "—" : undefined} /></Field>
+            <Field label="Vattenareal"><Input placeholder="0" suffix="m²" /></Field>
+            <Field label="Totalareal"><Input value={blank ? "" : "1 994,5"} suffix="m²" /></Field>
+          </div>
+          <Field label="Tomtbeskrivning">
+            <textarea rows={3} defaultValue={blank ? "" : "Stor och uppvuxen trädgårdstomt med gott om plats för både lek, odling och avkoppling. Tomten präglas av generösa gräsytor, slingrande gångar och en rik variation av träd, buskar och planteringar som skapar en grönskande och privat miljö."} className="w-full rounded-md border border-border bg-background px-2.5 py-2 text-sm focus:border-primary/40 focus:outline-none" />
+          </Field>
+        </>
+      )}
     </div>
   );
 }
@@ -3209,6 +3215,7 @@ function GrunddataBody({ adress, slug }: { adress: string; slug: string }) {
 function BoareaBody({ slug }: { slug?: string }) {
   const blank = useContext(BlankCtx);
   const o = slug ? getObjektBySlug(slug) : undefined;
+  const isBrf = o?.typ === "Bostadsrätt";
   const boarea = blank ? (o?.boarea ? String(o.boarea) : "") : "69";
   const rum = blank ? (o?.rum ? String(o.rum) : "") : "4";
   return (
@@ -3230,51 +3237,77 @@ function BoareaBody({ slug }: { slug?: string }) {
         <div></div>
         <Field label="Möjlighet till antal sovrum"><Input value={blank ? "" : "3"} /></Field>
       </div>
-      <div className="grid gap-4 md:grid-cols-2">
-        <Field label="Taxeringsår"><Input value={blank ? "" : "2024"} /></Field>
-        <Field label="Taxeringsvärde byggnad"><Input value={blank ? "" : "1 511 000"} suffix="SEK" /></Field>
-        <Field label="Taxeringsvärdet är"><Select value="Fastställt" options={["Fastställt", "Preliminärt"]} /></Field>
-        <Field label="Taxeringsvärde mark"><Input value={blank ? "" : "2 605 000"} suffix="SEK" /></Field>
-        <Field label="Värdeår"><Input value={blank ? "" : "1944"} /></Field>
-        <Field label="Summa taxeringsvärde"><Input value={blank ? "" : "4 116 000"} suffix="SEK" readOnly /></Field>
-      </div>
-      <Field label="Taxeringsvärdesbeskrivning">
-        <textarea rows={2} className="w-full rounded-md border border-border bg-background px-2.5 py-2 text-sm focus:border-primary/40 focus:outline-none" />
-      </Field>
+      {!isBrf && (
+        <>
+          <div className="grid gap-4 md:grid-cols-2">
+            <Field label="Taxeringsår"><Input value={blank ? "" : "2024"} /></Field>
+            <Field label="Taxeringsvärde byggnad"><Input value={blank ? "" : "1 511 000"} suffix="SEK" /></Field>
+            <Field label="Taxeringsvärdet är"><Select value="Fastställt" options={["Fastställt", "Preliminärt"]} /></Field>
+            <Field label="Taxeringsvärde mark"><Input value={blank ? "" : "2 605 000"} suffix="SEK" /></Field>
+            <Field label="Värdeår"><Input value={blank ? "" : "1944"} /></Field>
+            <Field label="Summa taxeringsvärde"><Input value={blank ? "" : "4 116 000"} suffix="SEK" readOnly /></Field>
+          </div>
+          <Field label="Taxeringsvärdesbeskrivning">
+            <textarea rows={2} className="w-full rounded-md border border-border bg-background px-2.5 py-2 text-sm focus:border-primary/40 focus:outline-none" />
+          </Field>
+        </>
+      )}
     </div>
   );
 }
 
 /* ---------- Byggnad ---------- */
 
-function ByggnadBody() {
+function ByggnadBody({ isBrf }: { isBrf?: boolean }) {
+  const blank = useContext(BlankCtx);
+  if (isBrf) {
+    return (
+      <div className="space-y-5">
+        <Field label="Allmän information om byggnaden">
+          <textarea rows={2} className="w-full rounded-md border border-border bg-background px-2.5 py-2 text-sm focus:border-primary/40 focus:outline-none" />
+        </Field>
+        <div className="grid gap-4 md:grid-cols-2">
+          <Field label="Byggnadstyp"><Select value={blank ? "" : "Flerfamiljshus"} options={["Flerfamiljshus", "Radhuslänga", "Kedjehus"]} /></Field>
+          <Field label="Byggår"><Input value={blank ? "" : ""} placeholder="—" /></Field>
+          <Field label="Antal våningar"><Input placeholder="—" /></Field>
+          <Field label="Hiss"><Select value="" options={["Ja", "Nej"]} /></Field>
+          <Field label="Fasadtyp"><Input placeholder="—" /></Field>
+          <Field label="Taktyp/takbeklädnad"><Input placeholder="—" /></Field>
+        </div>
+        <div className="grid gap-4 md:grid-cols-2">
+          <Field label="Vatten"><Input value={blank ? "" : "Kommunalt vatten"} placeholder="—" /></Field>
+          <Field label="Avlopp"><Input value={blank ? "" : "Kommunalt avlopp"} placeholder="—" /></Field>
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="space-y-5">
       <Field label="Allmän information">
         <textarea rows={2} className="w-full rounded-md border border-border bg-background px-2.5 py-2 text-sm focus:border-primary/40 focus:outline-none" />
       </Field>
       <div className="grid gap-4 md:grid-cols-2">
-        <Field label="Byggnadstyp"><Input value="1-planshus med källare" /></Field>
-        <Field label="Standardpoäng"><Input value="32" /></Field>
-        <Field label="Byggår"><Input value="1944" /></Field>
+        <Field label="Byggnadstyp"><Input value={blank ? "" : "1-planshus med källare"} placeholder="—" /></Field>
+        <Field label="Standardpoäng"><Input value={blank ? "" : "32"} placeholder="—" /></Field>
+        <Field label="Byggår"><Input value={blank ? "" : "1944"} placeholder="—" /></Field>
         <Field label="Om-/tillbyggnadsår"><Input placeholder="—" /></Field>
-        <Field label="Mark"><Input value="Sten" /></Field>
-        <Field label="Grundmur"><Input placeholder="Grundmur" /></Field>
-        <Field label="Taktyp/takbeklädnad"><Input value="Papp" /></Field>
-        <Field label="Grund"><Input value="Källare" /></Field>
-        <Field label="Utvändiga plåtarbeten"><Input placeholder="Utvändiga plåtarbeten" /></Field>
-        <Field label="Fasadtyp"><Input value="Träfasad" /></Field>
-        <Field label="Stomme"><Input value="Trä" /></Field>
-        <Field label="Fönster"><Input value="3-glasfönster isoler" /></Field>
+        <Field label="Mark"><Input value={blank ? "" : "Sten"} placeholder="—" /></Field>
+        <Field label="Grundmur"><Input placeholder="—" /></Field>
+        <Field label="Taktyp/takbeklädnad"><Input value={blank ? "" : "Papp"} placeholder="—" /></Field>
+        <Field label="Grund"><Input value={blank ? "" : "Källare"} placeholder="—" /></Field>
+        <Field label="Utvändiga plåtarbeten"><Input placeholder="—" /></Field>
+        <Field label="Fasadtyp"><Input value={blank ? "" : "Träfasad"} placeholder="—" /></Field>
+        <Field label="Stomme"><Input value={blank ? "" : "Trä"} placeholder="—" /></Field>
+        <Field label="Fönster"><Input value={blank ? "" : "3-glasfönster isoler"} placeholder="—" /></Field>
         <div></div>
-        <Field label="Bjälklag"><Input value="Trä" /></Field>
+        <Field label="Bjälklag"><Input value={blank ? "" : "Trä"} placeholder="—" /></Field>
       </div>
       <Field label="Byggnadskommentar">
         <textarea rows={3} className="w-full rounded-md border border-border bg-background px-2.5 py-2 text-sm focus:border-primary/40 focus:outline-none" />
       </Field>
       <div className="grid gap-4 md:grid-cols-2">
-        <Field label="Vatten"><Input value="Kommunalt vatten året om" /></Field>
-        <Field label="Avlopp"><Input value="Kommunalt avlopp" /></Field>
+        <Field label="Vatten"><Input value={blank ? "" : "Kommunalt vatten året om"} placeholder="—" /></Field>
+        <Field label="Avlopp"><Input value={blank ? "" : "Kommunalt avlopp"} placeholder="—" /></Field>
       </div>
     </div>
   );
