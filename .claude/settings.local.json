@@ -11,7 +11,11 @@
       "mcp__Claude_in_Chrome__*",
       "mcp__computer-use__*",
       "mcp__ccd_session__*",
-      "mcp__visualize__*"
+      "mcp__visualize__*",
+      "Skill(run)",
+      "Skill(run:*)",
+      "mcp__Claude_Preview__preview_start",
+      "WebFetch(domain:www.skandiamaklarna.se)"
     ]
   }
 }

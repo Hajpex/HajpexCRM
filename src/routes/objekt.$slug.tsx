@@ -1064,6 +1064,16 @@ function SpekulanterTopView({ slug }: { slug: string }) {
 
   function changeIntresse(kontaktId: string, intresse: SpekulantIntresse) {
     setObjektKopplingIntresse(kontaktId, slug, intresse);
+    if (intresse === "budgivare") {
+      const k = spekulanter.find((s) => s.id === kontaktId);
+      if (k) {
+        const namn = `${k.fornamn} ${k.efternamn}`;
+        const existing = listBud(slug);
+        if (!existing.some((b) => b.namn === namn)) {
+          addBud(slug, { belopp: 0, namn, telefon: k.telefon ?? "", villkor: "" });
+        }
+      }
+    }
     reload();
   }
 
@@ -3155,8 +3165,8 @@ function GrunddataBody({ adress, slug }: { adress: string; slug: string }) {
   const objektstyp = o?.typ ?? "Villa";
   const kategori = isBrf ? "Bostadsrätt" : "Småhus";
   const gatu = blank ? (o?.adress ?? adress) : adress;
-  const postnr = blank ? (o?.postnr ?? "") : "12345";
-  const ort = blank ? (o?.stad ?? "") : "Stockholm";
+  const postnr = o?.postnr ?? (blank ? "" : "12345");
+  const ort = o?.stad ?? (blank ? "" : "Stockholm");
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap justify-end gap-2">
@@ -3940,7 +3950,7 @@ function BuBudgivningBody({ slug }: { slug: string }) {
                   <td className="px-3 py-2.5 text-muted-foreground">{i + 1}</td>
                   <td className="px-3 py-2.5 font-medium text-foreground">{b.namn}</td>
                   <td className="px-3 py-2.5 text-muted-foreground">{b.telefon || "—"}</td>
-                  <td className="px-3 py-2.5 font-mono font-medium text-foreground">{fmtBud(b.belopp)}</td>
+                  <td className="px-3 py-2.5 font-mono font-medium text-foreground">{b.belopp > 0 ? fmtBud(b.belopp) : <span className="text-muted-foreground">Ej angivet</span>}</td>
                   <td className="px-3 py-2.5 text-muted-foreground">{b.villkor || "—"}</td>
                   <td className="px-3 py-2.5 text-muted-foreground text-[11px]">
                     {new Date(b.tidpunkt).toLocaleString("sv-SE", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}

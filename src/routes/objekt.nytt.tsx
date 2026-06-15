@@ -16,6 +16,9 @@ import { saveBrf, deleteBrf, searchBrfs, type SavedBrf } from "../lib/brfStore";
 import { useUserRole, isKontorschef } from "../lib/userRole";
 import { saveObjekt } from "../lib/objektStore";
 import { slugifyAddr, type Typ } from "../data/objekt";
+import { listKontakter, addObjektKoppling } from "../lib/kontaktStore";
+import { getAuth } from "../lib/authStore";
+import type { Kontakt } from "../lib/kontaktTypes";
 
 export const Route = createFileRoute("/objekt/nytt")({
   head: () => ({
@@ -151,6 +154,17 @@ function ObjektsformularPage() {
     setBrf(tomBrf);
     setLoadedBrfId(null);
   }
+  const [saljareKontakt, setSaljareKontakt] = useState<Kontakt | null>(null);
+  const [saljareQuery, setSaljareQuery] = useState("");
+  const [saljareOpen, setSaljareOpen] = useState(false);
+  const saljareMatches = useMemo(() => {
+    const q = saljareQuery.trim().toLowerCase();
+    if (q.length < 1) return [];
+    return listKontakter()
+      .filter((k) => `${k.fornamn} ${k.efternamn} ${k.telefon}`.toLowerCase().includes(q))
+      .slice(0, 6);
+  }, [saljareQuery]);
+
   const [rooms, setRooms] = useState<Room[]>([]);
   const [counter, setCounter] = useState(0);
   type CustomField = {
@@ -195,6 +209,10 @@ function ObjektsformularPage() {
     const pris = Number(grund.pris.replace(/\D/g, "")) || 0;
     const boarea = Number(String(grund.boarea).replace(",", ".")) || 0;
     const rum = Number(String(grund.rum).replace(",", ".")) || 0;
+    const authUser = getAuth();
+    const saljareNamn = saljareKontakt
+      ? `${saljareKontakt.fornamn} ${saljareKontakt.efternamn}`
+      : "";
     const entry = saveObjekt({
       adress: grund.adress.trim(),
       postnr,
@@ -203,11 +221,19 @@ function ObjektsformularPage() {
       rum,
       boarea,
       pris,
-      saljare: "",
-      ansvarig: "Erik Lindqvist",
+      saljare: saljareNamn,
+      ansvarig: authUser?.name ?? "Max Stendahl",
       status: "Under intag",
       kalla: "Eget upplägg",
     });
+    if (saljareKontakt) {
+      addObjektKoppling(saljareKontakt.id, {
+        slug: slugifyAddr(entry.adress),
+        relation: "säljare",
+        addedAt: Date.now(),
+        anteckning: "",
+      });
+    }
     setSavedObjMsg(`Sparat: ${entry.adress}`);
     setTimeout(() => {
       setSavedObjMsg(null);
@@ -399,6 +425,58 @@ function ObjektsformularPage() {
             <Field label="Övrigt att lyfta" value={grund.nyckelord}
               onChange={(v) => setGrund({ ...grund, nyckelord: v })} />
           </Grid>
+
+          {/* Säljare */}
+          <div className="mt-6 border-t border-border/50 pt-6">
+            <div className="mb-1.5 text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Säljare (valfritt)</div>
+            {saljareKontakt ? (
+              <div className="flex items-center gap-3 rounded-md border border-border bg-muted/30 px-3.5 py-2.5">
+                <div className="min-w-0 flex-1 text-sm text-foreground">
+                  {saljareKontakt.fornamn} {saljareKontakt.efternamn}
+                  {saljareKontakt.telefon && <span className="ml-2 text-muted-foreground">{saljareKontakt.telefon}</span>}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => { setSaljareKontakt(null); setSaljareQuery(""); }}
+                  className="shrink-0 text-xs text-muted-foreground hover:text-foreground"
+                >
+                  ✕ Ta bort
+                </button>
+              </div>
+            ) : (
+              <div className="relative">
+                <input
+                  type="text"
+                  value={saljareQuery}
+                  onChange={(e) => { setSaljareQuery(e.target.value); setSaljareOpen(true); }}
+                  onFocus={() => setSaljareOpen(true)}
+                  onBlur={() => setTimeout(() => setSaljareOpen(false), 150)}
+                  placeholder="Sök kontakt att koppla som säljare…"
+                  className="w-full rounded-md border border-input bg-background px-3.5 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/50 focus:border-primary focus:outline-none"
+                />
+                {saljareOpen && saljareMatches.length > 0 && (
+                  <div className="absolute z-20 mt-1 w-full rounded-lg border border-border bg-popover shadow-lg">
+                    {saljareMatches.map((k) => (
+                      <button
+                        key={k.id}
+                        type="button"
+                        onMouseDown={(e) => { e.preventDefault(); setSaljareKontakt(k); setSaljareQuery(""); setSaljareOpen(false); }}
+                        className="flex w-full items-center gap-2 px-3.5 py-2.5 text-left hover:bg-foreground/[0.04]"
+                      >
+                        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[11px] font-semibold text-primary">
+                          {k.fornamn[0]}{k.efternamn[0]}
+                        </div>
+                        <div>
+                          <div className="text-sm font-medium text-foreground">{k.fornamn} {k.efternamn}</div>
+                          {k.telefon && <div className="text-xs text-muted-foreground">{k.telefon}</div>}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </Card>
 
         {type === "brf" && (
