@@ -1138,8 +1138,7 @@ function NyttIntagsmoteModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70  p-4"
-      onClick={(e) => e.target === e.currentTarget && onClose()}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
       <div className="w-full max-w-lg rounded-2xl border border-white/[0.1] bg-card p-8 shadow-2xl">
         <div className="mb-6">
           <div className="text-[11px] uppercase tracking-[0.22em] text-primary/80">Nytt möte</div>
