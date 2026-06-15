@@ -5,7 +5,7 @@ import { OBJEKT, type Objekt } from "../data/objekt";
 import { listObjekt } from "../lib/objektStore";
 import { getObjektNotes, addObjektNote, setObjektBeskrivning, setObjektStatus, setObjektMarknadText } from "../lib/objektNotesStore";
 import { generateMarketingText } from "../lib/ai.functions";
-import { listBud, addBud, markeraVinnare, deleteBud, fmtBud, type Bud } from "../lib/budgivningStore";
+import { listBud, addBud, markeraVinnare, deleteBud, dragaTillbakaBud, getBudSettings, setBudSettings, fmtBud, type Bud } from "../lib/budgivningStore";
 import { getKontrakt, saveKontrakt, type KontraktData } from "../lib/kontraktStore";
 import { fmtSweNum, handleNumberInput } from "../lib/formatters";
 import { getBudget } from "../lib/budgetStore";
@@ -3917,6 +3917,8 @@ function BuBudgivningBody({ slug }: { slug: string }) {
   const [bids, setBids] = useState<Bud[]>(() => listBud(slug));
   const [addOpen, setAddOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [godkannAlla, setGodkannAlla] = useState(() => getBudSettings(slug).godkannAllaBud);
+  const [showWithdrawn, setShowWithdrawn] = useState(false);
 
   function refresh() { setBids(listBud(slug)); }
 
@@ -3926,36 +3928,73 @@ function BuBudgivningBody({ slug }: { slug: string }) {
   }
 
   function handleDelete(budId: string) {
-    if (!window.confirm("Ta bort budet?")) return;
+    if (!window.confirm("Ta bort budet permanent?")) return;
     deleteBud(slug, budId);
     refresh();
   }
 
-  const highestBid = bids[0]?.belopp ?? 0;
+  function handleDraTillbaka(budId: string) {
+    dragaTillbakaBud(slug, budId, true);
+    refresh();
+  }
+
+  function handleÅteraktivera(budId: string) {
+    dragaTillbakaBud(slug, budId, false);
+    refresh();
+  }
+
+  function toggleGodkannAlla() {
+    const next = !godkannAlla;
+    setGodkannAlla(next);
+    setBudSettings(slug, { godkannAllaBud: next });
+  }
+
+  const activeBids = bids.filter((b) => !b.tillbakadragen);
+  const withdrawnBids = bids.filter((b) => b.tillbakadragen);
+  const highestBid = activeBids[0]?.belopp ?? 0;
 
   return (
     <div className="space-y-6">
       {/* Top action bar */}
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+      <div className="flex flex-wrap gap-3">
         <button
           onClick={() => setSettingsOpen(true)}
           className="rounded-md border border-primary/50 bg-primary/5 px-4 py-2.5 text-center text-xs font-semibold uppercase tracking-[0.18em] text-primary hover:bg-primary/10"
         >
-          ⚙ Inställningar för budgivningen
+          ⚙ Inställningar
         </button>
         <button className="rounded-md border border-primary/50 bg-primary/5 px-4 py-2.5 text-center text-xs font-semibold uppercase tracking-[0.18em] text-primary hover:bg-primary/10">
           ✉ Kommunikation
         </button>
+        <button
+          onClick={toggleGodkannAlla}
+          className={[
+            "rounded-md border px-4 py-2.5 text-center text-xs font-semibold uppercase tracking-[0.18em] transition-colors",
+            godkannAlla
+              ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20"
+              : "border-border bg-background text-muted-foreground hover:border-primary/40 hover:text-primary",
+          ].join(" ")}
+        >
+          {godkannAlla ? "✓ Godkänn alla bud" : "Godkänn alla bud"}
+        </button>
       </div>
 
-      {/* Budlista */}
+      {/* Godkänn alla bud notice */}
+      {godkannAlla && (
+        <div className="flex items-center gap-2 rounded-lg border border-emerald-500/20 bg-emerald-500/5 px-4 py-2.5 text-[12px] text-emerald-600">
+          <span>✓</span>
+          <span>Alla inkomna bud godkänns automatiskt — säljaren har gett sitt medgivande.</span>
+        </div>
+      )}
+
+      {/* Aktiva bud */}
       <div>
         <div className="mb-3 flex items-center justify-between">
           <div>
             <h3 className="text-sm font-semibold text-foreground">Budlista</h3>
-            {bids.length > 0 && (
+            {activeBids.length > 0 && (
               <div className="text-[11px] text-muted-foreground">
-                Högsta bud: <span className="font-medium text-primary">{fmtBud(highestBid)}</span> · {bids.length} bud
+                Högsta bud: <span className="font-medium text-primary">{fmtBud(highestBid)}</span> · {activeBids.length} aktiva bud
               </div>
             )}
           </div>
@@ -3970,15 +4009,15 @@ function BuBudgivningBody({ slug }: { slug: string }) {
           <table className="w-full min-w-[700px] text-sm">
             <thead className="bg-foreground/[0.04] text-left text-xs uppercase tracking-wider text-muted-foreground">
               <tr>
-                {["#","Namn","Telefon","Bud","Villkor","Datum","Vinnare",""].map((h) => (
+                {["#","Namn","Telefon","Bud","Villkor","Datum","Status",""].map((h) => (
                   <th key={h} className="px-3 py-2 font-medium">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {bids.length === 0 ? (
-                <tr><td colSpan={8} className="px-3 py-8 text-center text-sm text-muted-foreground">Inga bud ännu — klicka "+ Lägg till bud" för att registrera det första</td></tr>
-              ) : bids.map((b, i) => (
+              {activeBids.length === 0 ? (
+                <tr><td colSpan={8} className="px-3 py-8 text-center text-sm text-muted-foreground">Inga aktiva bud — klicka "+ Lägg till bud" för att registrera det första</td></tr>
+              ) : activeBids.map((b, i) => (
                 <tr key={b.id} className={b.vinnare ? "bg-emerald-500/5" : ""}>
                   <td className="px-3 py-2.5 text-muted-foreground">{i + 1}</td>
                   <td className="px-3 py-2.5 font-medium text-foreground">{b.namn}</td>
@@ -3991,6 +4030,10 @@ function BuBudgivningBody({ slug }: { slug: string }) {
                   <td className="px-3 py-2.5">
                     {b.vinnare ? (
                       <span className="rounded bg-emerald-500/15 px-2 py-0.5 text-[11px] font-medium text-emerald-400">✓ Vinnare</span>
+                    ) : godkannAlla ? (
+                      <button onClick={() => handleMarkVinnare(b.id)} className="rounded bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-600 hover:bg-emerald-500/20">
+                        Markera vinnare
+                      </button>
                     ) : (
                       <button onClick={() => handleMarkVinnare(b.id)} className="text-[11px] text-muted-foreground hover:text-primary">
                         Markera vinnare
@@ -3998,7 +4041,16 @@ function BuBudgivningBody({ slug }: { slug: string }) {
                     )}
                   </td>
                   <td className="px-3 py-2.5">
-                    <button onClick={() => handleDelete(b.id)} className="text-[11px] text-muted-foreground hover:text-red-400">✕</button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => handleDraTillbaka(b.id)}
+                        className="text-[11px] text-muted-foreground hover:text-amber-500"
+                        title="Dra tillbaka budet"
+                      >
+                        ↩ Tillbaka
+                      </button>
+                      <button onClick={() => handleDelete(b.id)} className="text-[11px] text-muted-foreground hover:text-red-400" title="Ta bort permanent">✕</button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -4006,6 +4058,56 @@ function BuBudgivningBody({ slug }: { slug: string }) {
           </table>
         </div>
       </div>
+
+      {/* Tillbakadragna bud */}
+      {withdrawnBids.length > 0 && (
+        <div>
+          <button
+            onClick={() => setShowWithdrawn((v) => !v)}
+            className="text-[11px] text-muted-foreground hover:text-foreground"
+          >
+            {showWithdrawn ? "▲" : "▼"} {withdrawnBids.length} tillbakadragna bud
+          </button>
+          {showWithdrawn && (
+            <div className="mt-2 overflow-x-auto rounded-md border border-border">
+              <table className="w-full min-w-[600px] text-sm opacity-60">
+                <tbody className="divide-y divide-border">
+                  {withdrawnBids.map((b) => (
+                    <tr key={b.id} className="line-through">
+                      <td className="px-3 py-2 text-muted-foreground">{b.namn}</td>
+                      <td className="px-3 py-2 font-mono text-muted-foreground">{b.belopp > 0 ? fmtBud(b.belopp) : "Ej angivet"}</td>
+                      <td className="px-3 py-2 text-[11px] text-muted-foreground">
+                        {new Date(b.tidpunkt).toLocaleDateString("sv-SE")}
+                      </td>
+                      <td className="px-3 py-2">
+                        <span className="rounded bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-600">Återkallat</span>
+                      </td>
+                      <td className="px-3 py-2">
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => { handleÅteraktivera(b.id); setShowWithdrawn(false); }}
+                            className="text-[11px] text-muted-foreground no-underline hover:text-primary"
+                            style={{ textDecoration: "none" }}
+                          >
+                            Återaktivera
+                          </button>
+                          <button
+                            onClick={() => handleDelete(b.id)}
+                            className="text-[11px] text-muted-foreground hover:text-red-400"
+                            style={{ textDecoration: "none" }}
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Utskrift */}
       <div>
