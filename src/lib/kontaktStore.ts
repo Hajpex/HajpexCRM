@@ -85,6 +85,20 @@ export function addObjektKoppling(kontaktId: string, koppling: ObjektKoppling) {
   write(list);
 }
 
+export function setObjektKopplingIntresse(
+  kontaktId: string,
+  slug: string,
+  intresse: import("./kontaktTypes").SpekulantIntresse
+) {
+  const list = read();
+  const idx = list.findIndex((k) => k.id === kontaktId);
+  if (idx < 0) return;
+  list[idx].objektKopplingar = list[idx].objektKopplingar.map((kp) =>
+    kp.slug === slug && kp.relation === "spekulant" ? { ...kp, intresse } : kp
+  );
+  write(list);
+}
+
 export function removeObjektKoppling(
   kontaktId: string,
   slug: string,

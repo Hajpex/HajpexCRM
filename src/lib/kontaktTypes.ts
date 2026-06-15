@@ -8,11 +8,14 @@ export type NastaSteg = {
   typ: NastaStegTyp;
 };
 
+export type SpekulantIntresse = "aktiv" | "budgivare" | "ej_intresserad";
+
 export type ObjektKoppling = {
   slug: string;
   relation: KontaktRelation;
   addedAt: number;
   anteckning: string;
+  intresse?: SpekulantIntresse;
 };
 
 export type AktivitetTyp =

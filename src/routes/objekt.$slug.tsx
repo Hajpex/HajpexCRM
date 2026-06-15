@@ -10,7 +10,8 @@ import { getKontrakt, saveKontrakt, type KontraktData } from "../lib/kontraktSto
 import { fmtSweNum, handleNumberInput } from "../lib/formatters";
 import { getBudget } from "../lib/budgetStore";
 import { getDemoSaljare } from "../lib/demoKontakter";
-import { listKontakter, addObjektKoppling, saveKontakt, removeObjektKoppling } from "../lib/kontaktStore";
+import { listKontakter, addObjektKoppling, saveKontakt, removeObjektKoppling, setObjektKopplingIntresse } from "../lib/kontaktStore";
+import type { SpekulantIntresse } from "../lib/kontaktTypes";
 import type { KontaktRelation, Kontakt } from "../lib/kontaktTypes";
 import {
   listVisningar, saveVisning, deleteVisning, toggleDeltog, addDeltagare,
@@ -1012,18 +1013,72 @@ function StatusPicker({ value, onChange }: { value: string; onChange: (s: string
   );
 }
 
+const INTRESSE_CONFIG: Record<SpekulantIntresse, { label: string; color: string }> = {
+  aktiv:          { label: "Aktiv",           color: "bg-blue-500/12 text-blue-700 border-blue-500/25" },
+  budgivare:      { label: "Budgivare",        color: "bg-emerald-500/12 text-emerald-700 border-emerald-500/25" },
+  ej_intresserad: { label: "Ej intresserad",  color: "bg-muted/60 text-muted-foreground border-border" },
+};
+const INTRESSE_ORDER: SpekulantIntresse[] = ["budgivare", "aktiv", "ej_intresserad"];
+
+function spekulantAiInsikt(
+  spekulanter: ReturnType<typeof listKontakter>,
+  slug: string
+): string {
+  const kopplingMap = spekulanter.map((k) =>
+    k.objektKopplingar.find((kp) => kp.slug === slug && kp.relation === "spekulant")
+  );
+  const budgivare = kopplingMap.filter((kp) => kp?.intresse === "budgivare").length;
+  const aktiva    = kopplingMap.filter((kp) => !kp?.intresse || kp.intresse === "aktiv").length;
+  const avböjt    = kopplingMap.filter((kp) => kp?.intresse === "ej_intresserad").length;
+
+  const utan_nastaSteg = spekulanter.filter(
+    (k) => !k.nastaSteg || k.nastaSteg.datum < Date.now()
+  ).length;
+
+  if (budgivare >= 2) return `${budgivare} budgivare — hög budkonkurrens. Förbered budstrategin med säljaren.`;
+  if (budgivare === 1 && aktiva > 0) return `1 budgivare och ${aktiva} aktiv${aktiva > 1 ? "a" : ""} — uppmuntra de aktiva att lägga bud.`;
+  if (budgivare === 1) return "1 budgivare. Kontrollera om fler spekulanter kan aktiveras innan budgivning.";
+  if (aktiva === 0 && avböjt > 0) return "Alla spekulanter har avböjt. Kan vara läge att se över pris eller marknadsföring.";
+  if (utan_nastaSteg > 0) return `${utan_nastaSteg} spekulant${utan_nastaSteg > 1 ? "er saknar" : " saknar"} nästa steg — boka uppföljning.`;
+  if (aktiva > 3) return `${aktiva} aktiva spekulanter — bra intresse. Håll kontinuerlig kontakt.`;
+  return `${spekulanter.length} spekulant${spekulanter.length !== 1 ? "er" : ""} registrerad${spekulanter.length !== 1 ? "e" : ""}. Uppdatera status löpande.`;
+}
+
 function SpekulanterTopView({ slug }: { slug: string }) {
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [tick, setTick] = useState(0);
+  const [tick, setTick]             = useState(0);
+  const [spekulanter, setSpekulanter] = useState(() =>
+    listKontakter().filter((k) =>
+      k.objektKopplingar.some((kp) => kp.slug === slug && kp.relation === "spekulant")
+    )
+  );
   void tick;
 
-  const spekulanter = listKontakter().filter((k) =>
-    k.objektKopplingar.some((kp) => kp.slug === slug && kp.relation === "spekulant")
-  );
+  function reload() {
+    setSpekulanter(
+      listKontakter().filter((k) =>
+        k.objektKopplingar.some((kp) => kp.slug === slug && kp.relation === "spekulant")
+      )
+    );
+  }
+
+  function changeIntresse(kontaktId: string, intresse: SpekulantIntresse) {
+    setObjektKopplingIntresse(kontaktId, slug, intresse);
+    reload();
+  }
+
+  const sorted = [...spekulanter].sort((a, b) => {
+    const ia = a.objektKopplingar.find((kp) => kp.slug === slug && kp.relation === "spekulant")?.intresse ?? "aktiv";
+    const ib = b.objektKopplingar.find((kp) => kp.slug === slug && kp.relation === "spekulant")?.intresse ?? "aktiv";
+    return INTRESSE_ORDER.indexOf(ia) - INTRESSE_ORDER.indexOf(ib);
+  });
+
+  const aiInsikt = spekulantAiInsikt(spekulanter, slug);
 
   return (
-    <div className="rounded-xl border border-border bg-card/80 p-6 shadow-[0_20px_50px_-30px_rgba(0,0,0,0.25)] ">
-      <div className="mb-5 flex items-center justify-between">
+    <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
+      {/* Header */}
+      <div className="mb-4 flex items-center justify-between">
         <div>
           <div className="text-[10px] uppercase tracking-[0.22em] text-primary/70">Spekulanter</div>
           <div className="mt-0.5 text-sm text-muted-foreground">{spekulanter.length} registrerade</div>
@@ -1036,46 +1091,100 @@ function SpekulanterTopView({ slug }: { slug: string }) {
         </button>
       </div>
 
+      {/* AI-insikt */}
+      {spekulanter.length > 0 && (
+        <div className="mb-5 flex items-start gap-2.5 rounded-lg border border-border bg-muted/40 px-4 py-3">
+          <span className="mt-0.5 text-sm">✦</span>
+          <p className="text-sm text-foreground">{aiInsikt}</p>
+        </div>
+      )}
+
       {spekulanter.length === 0 ? (
         <div className="py-12 text-center text-sm text-muted-foreground">
           Inga spekulanter kopplade till detta objekt ännu
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-md border border-border">
-          <table className="w-full text-sm">
-            <thead className="bg-foreground/[0.04] text-left text-xs uppercase tracking-wider text-muted-foreground">
-              <tr>
-                {["Namn", "Telefon", "E-post", "Kopplad", ""].map((h) => (
-                  <th key={h} className="px-3 py-2 font-medium">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {spekulanter.map((k) => {
-                const koppling = k.objektKopplingar.find((kp) => kp.slug === slug && kp.relation === "spekulant");
-                return (
-                  <tr key={k.id}>
-                    <td className="px-3 py-2.5">
-                      <Link to="/kunder/$id" params={{ id: k.id }} className="font-medium text-foreground hover:text-primary">
-                        {k.fornamn} {k.efternamn}
-                      </Link>
-                    </td>
-                    <td className="px-3 py-2.5 text-muted-foreground">{k.telefon || "—"}</td>
-                    <td className="px-3 py-2.5 text-muted-foreground">{k.epost || "—"}</td>
-                    <td className="px-3 py-2.5 text-[11px] text-muted-foreground">
-                      {koppling ? new Date(koppling.addedAt).toLocaleDateString("sv-SE") : "—"}
-                    </td>
-                    <td className="px-3 py-2.5">
-                      <Link to="/kunder/$id" params={{ id: k.id }}
-                        className="text-[11px] text-primary hover:underline">
-                        Visa profil →
-                      </Link>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+        <div className="space-y-2">
+          {sorted.map((k) => {
+            const koppling  = k.objektKopplingar.find((kp) => kp.slug === slug && kp.relation === "spekulant");
+            const intresse: SpekulantIntresse = koppling?.intresse ?? "aktiv";
+            const cfg       = INTRESSE_CONFIG[intresse];
+            const dagSedan  = koppling ? Math.floor((Date.now() - koppling.addedAt) / 86_400_000) : 0;
+            const budMin    = Number(k.budgetMin) || 0;
+            const budMax    = Number(k.budgetMax) || 0;
+            const harBudget = budMin > 0 || budMax > 0;
+
+            return (
+              <div key={k.id} className="rounded-lg border border-border bg-background p-4">
+                <div className="flex items-start justify-between gap-3">
+                  {/* Namn + meta */}
+                  <div className="min-w-0">
+                    <Link
+                      to="/kunder/$id"
+                      params={{ id: k.id }}
+                      className="font-medium text-foreground hover:text-primary"
+                    >
+                      {k.fornamn} {k.efternamn}
+                    </Link>
+                    <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+                      {k.telefon && <span>{k.telefon}</span>}
+                      {k.epost   && <span>{k.epost}</span>}
+                      <span>Kopplad {dagSedan === 0 ? "idag" : `${dagSedan} dagar sedan`}</span>
+                      {harBudget && (
+                        <span className="font-medium text-foreground">
+                          Budget: {budMin > 0 ? `${(budMin / 1_000_000).toFixed(1)}M` : "—"}
+                          {budMax > 0 ? `–${(budMax / 1_000_000).toFixed(1)}M` : ""}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Status-pill */}
+                  <span className={`shrink-0 rounded-full border px-2.5 py-0.5 text-[11px] font-medium ${cfg.color}`}>
+                    {cfg.label}
+                  </span>
+                </div>
+
+                {/* Åtgärdsknappar */}
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {(["budgivare", "aktiv", "ej_intresserad"] as SpekulantIntresse[])
+                    .filter((s) => s !== intresse)
+                    .map((s) => (
+                      <button
+                        key={s}
+                        onClick={() => changeIntresse(k.id, s)}
+                        className="rounded-md border border-border px-2.5 py-1 text-[11px] text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
+                      >
+                        → {INTRESSE_CONFIG[s].label}
+                      </button>
+                    ))}
+                  {k.telefon && (
+                    <a
+                      href={`tel:${k.telefon}`}
+                      className="rounded-md border border-border px-2.5 py-1 text-[11px] text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
+                    >
+                      Ring
+                    </a>
+                  )}
+                  {k.epost && (
+                    <a
+                      href={`mailto:${k.epost}`}
+                      className="rounded-md border border-border px-2.5 py-1 text-[11px] text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
+                    >
+                      Mejla
+                    </a>
+                  )}
+                  <Link
+                    to="/kunder/$id"
+                    params={{ id: k.id }}
+                    className="rounded-md border border-border px-2.5 py-1 text-[11px] text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
+                  >
+                    Visa profil →
+                  </Link>
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
 
@@ -1084,7 +1193,7 @@ function SpekulanterTopView({ slug }: { slug: string }) {
           slug={slug}
           relation="spekulant"
           onClose={() => setDialogOpen(false)}
-          onLinked={() => { setTick((t) => t + 1); setDialogOpen(false); }}
+          onLinked={() => { reload(); setTick((t) => t + 1); setDialogOpen(false); }}
         />
       )}
     </div>

@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as VisningarRouteImport } from './routes/visningar'
 import { Route as StatistikRouteImport } from './routes/statistik'
+import { Route as LoginRouteImport } from './routes/login'
 import { Route as ListorRouteImport } from './routes/listor'
 import { Route as KunderRouteImport } from './routes/kunder'
 import { Route as IndexRouteImport } from './routes/index'
@@ -27,6 +28,11 @@ const VisningarRoute = VisningarRouteImport.update({
 const StatistikRoute = StatistikRouteImport.update({
   id: '/statistik',
   path: '/statistik',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ListorRoute = ListorRouteImport.update({
@@ -69,6 +75,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/kunder': typeof KunderRouteWithChildren
   '/listor': typeof ListorRoute
+  '/login': typeof LoginRoute
   '/statistik': typeof StatistikRoute
   '/visningar': typeof VisningarRoute
   '/kunder/$id': typeof KunderIdRoute
@@ -80,6 +87,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/kunder': typeof KunderRouteWithChildren
   '/listor': typeof ListorRoute
+  '/login': typeof LoginRoute
   '/statistik': typeof StatistikRoute
   '/visningar': typeof VisningarRoute
   '/kunder/$id': typeof KunderIdRoute
@@ -92,6 +100,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/kunder': typeof KunderRouteWithChildren
   '/listor': typeof ListorRoute
+  '/login': typeof LoginRoute
   '/statistik': typeof StatistikRoute
   '/visningar': typeof VisningarRoute
   '/kunder/$id': typeof KunderIdRoute
@@ -105,6 +114,7 @@ export interface FileRouteTypes {
     | '/'
     | '/kunder'
     | '/listor'
+    | '/login'
     | '/statistik'
     | '/visningar'
     | '/kunder/$id'
@@ -116,6 +126,7 @@ export interface FileRouteTypes {
     | '/'
     | '/kunder'
     | '/listor'
+    | '/login'
     | '/statistik'
     | '/visningar'
     | '/kunder/$id'
@@ -127,6 +138,7 @@ export interface FileRouteTypes {
     | '/'
     | '/kunder'
     | '/listor'
+    | '/login'
     | '/statistik'
     | '/visningar'
     | '/kunder/$id'
@@ -139,6 +151,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   KunderRoute: typeof KunderRouteWithChildren
   ListorRoute: typeof ListorRoute
+  LoginRoute: typeof LoginRoute
   StatistikRoute: typeof StatistikRoute
   VisningarRoute: typeof VisningarRoute
   ObjektSlugRoute: typeof ObjektSlugRoute
@@ -160,6 +173,13 @@ declare module '@tanstack/react-router' {
       path: '/statistik'
       fullPath: '/statistik'
       preLoaderRoute: typeof StatistikRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/listor': {
@@ -229,6 +249,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   KunderRoute: KunderRouteWithChildren,
   ListorRoute: ListorRoute,
+  LoginRoute: LoginRoute,
   StatistikRoute: StatistikRoute,
   VisningarRoute: VisningarRoute,
   ObjektSlugRoute: ObjektSlugRoute,
