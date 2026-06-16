@@ -13,7 +13,7 @@ import { getBudget, saveBudget, type BudgetGoals } from "../lib/budgetStore";
 export const Route = createFileRoute("/statistik")({
   head: () => ({
     meta: [
-      { title: "Statistik · Stendahl CRM" },
+      { title: "Statistik · Hajpex CRM" },
       { name: "description", content: "KPI:er, budget, leads, NPS och topplistor." },
     ],
   }),

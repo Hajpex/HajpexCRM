@@ -17,7 +17,7 @@ import { AddressInput } from "../components/AddressInput";
 const serif = { fontFamily: '"Instrument Serif", ui-serif, Georgia, serif', letterSpacing: "-0.01em" } as const;
 
 export const Route = createFileRoute("/kunder/$id")({
-  head: () => ({ meta: [{ title: "Kontakt · Stendahl CRM" }] }),
+  head: () => ({ meta: [{ title: "Kontakt · Hajpex CRM" }] }),
   component: KontaktDetailPage,
 });
 

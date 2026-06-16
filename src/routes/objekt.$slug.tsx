@@ -26,7 +26,7 @@ import {
 export const Route = createFileRoute("/objekt/$slug")({
   head: ({ params }) => ({
     meta: [
-      { title: `${prettyAddr(params.slug)} · Stendahl CRM` },
+      { title: `${prettyAddr(params.slug)} · Hajpex CRM` },
       { name: "description", content: "Objektsöversikt." },
     ],
   }),

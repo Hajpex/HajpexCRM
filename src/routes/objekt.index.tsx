@@ -19,7 +19,7 @@ function thumbFor(o: Objekt): string | null {
 export const Route = createFileRoute("/objekt/")({
   head: () => ({
     meta: [
-      { title: "Objekt · Stendahl CRM" },
+      { title: "Objekt · Hajpex CRM" },
       { name: "description", content: "Alla objekt i portföljen." },
     ],
   }),

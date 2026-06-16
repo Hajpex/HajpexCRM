@@ -6,7 +6,7 @@ import { slugifyAddr } from "./objekt.$slug";
 export const Route = createFileRoute("/listor")({
   head: () => ({
     meta: [
-      { title: "Listor · Stendahl CRM" },
+      { title: "Listor · Hajpex CRM" },
       { name: "description", content: "Intagsmöten, uppgifter, kontakter och leads." },
     ],
   }),

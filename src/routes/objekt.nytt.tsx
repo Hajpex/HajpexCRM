@@ -24,7 +24,7 @@ import { AddressInput } from "../components/AddressInput";
 export const Route = createFileRoute("/objekt/nytt")({
   head: () => ({
     meta: [
-      { title: "Nytt objekt · Stendahl CRM" },
+      { title: "Nytt objekt · Hajpex CRM" },
       { name: "description", content: "Mata in ett nytt objekt med AI-stöd för rumstexter." },
     ],
   }),
