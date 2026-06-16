@@ -10,8 +10,8 @@ import { getKontrakt, saveKontrakt, type KontraktData } from "../lib/kontraktSto
 import { fmtSweNum, handleNumberInput } from "../lib/formatters";
 import { getBudget } from "../lib/budgetStore";
 import { getDemoSaljare } from "../lib/demoKontakter";
-import { listKontakter, addObjektKoppling, saveKontakt, removeObjektKoppling, setObjektKopplingIntresse } from "../lib/kontaktStore";
-import type { SpekulantIntresse } from "../lib/kontaktTypes";
+import { listKontakter, addObjektKoppling, saveKontakt, removeObjektKoppling, setObjektKopplingIntresse, setMedspekulanter } from "../lib/kontaktStore";
+import type { SpekulantIntresse, Medspekulant } from "../lib/kontaktTypes";
 import type { KontaktRelation, Kontakt } from "../lib/kontaktTypes";
 import {
   listVisningar, saveVisning, deleteVisning, toggleDeltog, addDeltagare,
@@ -1023,11 +1023,13 @@ function StatusPicker({ value, onChange }: { value: string; onChange: (s: string
 }
 
 const INTRESSE_CONFIG: Record<SpekulantIntresse, { label: string; color: string }> = {
-  aktiv:          { label: "Aktiv",           color: "bg-blue-500/12 text-blue-700 border-blue-500/25" },
-  budgivare:      { label: "Budgivare",        color: "bg-emerald-500/12 text-emerald-700 border-emerald-500/25" },
-  ej_intresserad: { label: "Ej intresserad",  color: "bg-muted/60 text-muted-foreground border-border" },
+  budgivare:      { label: "Budgivare",         color: "bg-emerald-500/12 text-emerald-400 border-emerald-500/30" },
+  aktiv:          { label: "Intresserad",        color: "bg-blue-500/12 text-blue-400 border-blue-500/30" },
+  följer:         { label: "Följer budgivning",  color: "bg-amber-500/12 text-amber-400 border-amber-500/30" },
+  ej_intresserad: { label: "Ej intresserad",     color: "bg-muted/60 text-muted-foreground border-border" },
 };
-const INTRESSE_ORDER: SpekulantIntresse[] = ["budgivare", "aktiv", "ej_intresserad"];
+const INTRESSE_ORDER: SpekulantIntresse[] = ["budgivare", "aktiv", "följer", "ej_intresserad"];
+const ALL_INTRESSE = INTRESSE_ORDER;
 
 function spekulantAiInsikt(
   spekulanter: ReturnType<typeof listKontakter>,
@@ -1038,7 +1040,9 @@ function spekulantAiInsikt(
   );
   const budgivare = kopplingMap.filter((kp) => kp?.intresse === "budgivare").length;
   const aktiva    = kopplingMap.filter((kp) => !kp?.intresse || kp.intresse === "aktiv").length;
+  const följer    = kopplingMap.filter((kp) => kp?.intresse === "följer").length;
   const avböjt    = kopplingMap.filter((kp) => kp?.intresse === "ej_intresserad").length;
+  void följer;
 
   const utan_nastaSteg = spekulanter.filter(
     (k) => !k.nastaSteg || k.nastaSteg.datum < Date.now()
@@ -1056,11 +1060,14 @@ function spekulantAiInsikt(
 function SpekulanterTopView({ slug }: { slug: string }) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [tick, setTick]             = useState(0);
+  const [selected, setSelected]     = useState<Set<string>>(new Set());
+  const [bulkAction, setBulkAction] = useState<"ring" | "sms" | null>(null);
   const [spekulanter, setSpekulanter] = useState(() =>
     listKontakter().filter((k) =>
       k.objektKopplingar.some((kp) => kp.slug === slug && kp.relation === "spekulant")
     )
   );
+  const [kommande, setKommande] = useState<Visning[]>([]);
   void tick;
 
   function reload() {
@@ -1069,7 +1076,9 @@ function SpekulanterTopView({ slug }: { slug: string }) {
         k.objektKopplingar.some((kp) => kp.slug === slug && kp.relation === "spekulant")
       )
     );
+    setKommande(listVisningar(slug).filter((v) => v.sluttid >= Date.now()));
   }
+  useEffect(reload, [slug]);
 
   function changeIntresse(kontaktId: string, intresse: SpekulantIntresse) {
     setObjektKopplingIntresse(kontaktId, slug, intresse);
@@ -1086,12 +1095,21 @@ function SpekulanterTopView({ slug }: { slug: string }) {
     reload();
   }
 
+  function toggleSelect(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
   const sorted = [...spekulanter].sort((a, b) => {
     const ia = a.objektKopplingar.find((kp) => kp.slug === slug && kp.relation === "spekulant")?.intresse ?? "aktiv";
     const ib = b.objektKopplingar.find((kp) => kp.slug === slug && kp.relation === "spekulant")?.intresse ?? "aktiv";
     return INTRESSE_ORDER.indexOf(ia) - INTRESSE_ORDER.indexOf(ib);
   });
 
+  const selectedVals = spekulanter.filter((k) => selected.has(k.id));
   const aiInsikt = spekulantAiInsikt(spekulanter, slug);
 
   return (
@@ -1102,12 +1120,19 @@ function SpekulanterTopView({ slug }: { slug: string }) {
           <div className="text-[10px] uppercase tracking-[0.22em] text-primary/70">Spekulanter</div>
           <div className="mt-0.5 text-sm text-muted-foreground">{spekulanter.length} registrerade</div>
         </div>
-        <button
-          onClick={() => setDialogOpen(true)}
-          className="rounded-md bg-primary px-3 py-2 text-xs font-medium text-primary-foreground hover:opacity-90"
-        >
-          + Koppla spekulant
-        </button>
+        <div className="flex items-center gap-2">
+          {selected.size > 0 && (
+            <button onClick={() => setSelected(new Set())} className="text-[11px] text-muted-foreground hover:text-foreground">
+              Avmarkera alla
+            </button>
+          )}
+          <button
+            onClick={() => setDialogOpen(true)}
+            className="rounded-md bg-primary px-3 py-2 text-xs font-medium text-primary-foreground hover:opacity-90"
+          >
+            + Koppla spekulant
+          </button>
+        </div>
       </div>
 
       {/* AI-insikt */}
@@ -1124,87 +1149,30 @@ function SpekulanterTopView({ slug }: { slug: string }) {
         </div>
       ) : (
         <div className="space-y-2">
-          {sorted.map((k) => {
-            const koppling  = k.objektKopplingar.find((kp) => kp.slug === slug && kp.relation === "spekulant");
-            const intresse: SpekulantIntresse = koppling?.intresse ?? "aktiv";
-            const cfg       = INTRESSE_CONFIG[intresse];
-            const dagSedan  = koppling ? Math.floor((Date.now() - koppling.addedAt) / 86_400_000) : 0;
-            const budMin    = Number(k.budgetMin) || 0;
-            const budMax    = Number(k.budgetMax) || 0;
-            const harBudget = budMin > 0 || budMax > 0;
-
-            return (
-              <div key={k.id} className="rounded-lg border border-border bg-background p-4">
-                <div className="flex items-start justify-between gap-3">
-                  {/* Namn + meta */}
-                  <div className="min-w-0">
-                    <Link
-                      to="/kunder/$id"
-                      params={{ id: k.id }}
-                      className="font-medium text-foreground hover:text-primary"
-                    >
-                      {k.fornamn} {k.efternamn}
-                    </Link>
-                    <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
-                      {k.telefon && <span>{k.telefon}</span>}
-                      {k.epost   && <span>{k.epost}</span>}
-                      <span>Kopplad {dagSedan === 0 ? "idag" : `${dagSedan} dagar sedan`}</span>
-                      {harBudget && (
-                        <span className="font-medium text-foreground">
-                          Budget: {budMin > 0 ? `${(budMin / 1_000_000).toFixed(1)}M` : "—"}
-                          {budMax > 0 ? `–${(budMax / 1_000_000).toFixed(1)}M` : ""}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Status-pill */}
-                  <span className={`shrink-0 rounded-full border px-2.5 py-0.5 text-[11px] font-medium ${cfg.color}`}>
-                    {cfg.label}
-                  </span>
-                </div>
-
-                {/* Åtgärdsknappar */}
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {(["budgivare", "aktiv", "ej_intresserad"] as SpekulantIntresse[])
-                    .filter((s) => s !== intresse)
-                    .map((s) => (
-                      <button
-                        key={s}
-                        onClick={() => changeIntresse(k.id, s)}
-                        className="rounded-md border border-border px-2.5 py-1 text-[11px] text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
-                      >
-                        → {INTRESSE_CONFIG[s].label}
-                      </button>
-                    ))}
-                  {k.telefon && (
-                    <a
-                      href={`tel:${k.telefon}`}
-                      className="rounded-md border border-border px-2.5 py-1 text-[11px] text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
-                    >
-                      Ring
-                    </a>
-                  )}
-                  {k.epost && (
-                    <a
-                      href={`mailto:${k.epost}`}
-                      className="rounded-md border border-border px-2.5 py-1 text-[11px] text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
-                    >
-                      Mejla
-                    </a>
-                  )}
-                  <Link
-                    to="/kunder/$id"
-                    params={{ id: k.id }}
-                    className="rounded-md border border-border px-2.5 py-1 text-[11px] text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
-                  >
-                    Visa profil →
-                  </Link>
-                </div>
-              </div>
-            );
-          })}
+          {sorted.map((k) => (
+            <SpekulantKort
+              key={k.id}
+              kontakt={k}
+              slug={slug}
+              kommande={kommande}
+              selected={selected.has(k.id)}
+              onToggleSelect={() => toggleSelect(k.id)}
+              onChangeIntresse={(s) => changeIntresse(k.id, s)}
+              onReload={reload}
+            />
+          ))}
         </div>
+      )}
+
+      {/* Bulk-bar */}
+      {selected.size > 0 && (
+        <BulkBar
+          selected={selectedVals}
+          bulkAction={bulkAction}
+          onBulkAction={setBulkAction}
+          onChangeIntresse={(ids, s) => { ids.forEach((id) => changeIntresse(id, s)); setSelected(new Set()); }}
+          onClear={() => { setSelected(new Set()); setBulkAction(null); }}
+        />
       )}
 
       {dialogOpen && (
@@ -1215,6 +1183,319 @@ function SpekulanterTopView({ slug }: { slug: string }) {
           onLinked={() => { reload(); setTick((t) => t + 1); setDialogOpen(false); }}
         />
       )}
+    </div>
+  );
+}
+
+/* ── Spekulant-kort ── */
+function SpekulantKort({
+  kontakt: k, slug, kommande, selected, onToggleSelect, onChangeIntresse, onReload,
+}: {
+  kontakt: Kontakt;
+  slug: string;
+  kommande: Visning[];
+  selected: boolean;
+  onToggleSelect: () => void;
+  onChangeIntresse: (s: SpekulantIntresse) => void;
+  onReload: () => void;
+}) {
+  const koppling   = k.objektKopplingar.find((kp) => kp.slug === slug && kp.relation === "spekulant");
+  const intresse: SpekulantIntresse = koppling?.intresse ?? "aktiv";
+  const cfg        = INTRESSE_CONFIG[intresse];
+  const dagSedan   = koppling ? Math.floor((Date.now() - koppling.addedAt) / 86_400_000) : 0;
+  const budMin     = Number(k.budgetMin) || 0;
+  const budMax     = Number(k.budgetMax) || 0;
+  const harBudget  = budMin > 0 || budMax > 0;
+  const meds       = koppling?.medspekulanter ?? [];
+
+  const [showBokaMenu, setShowBokaMenu] = useState(false);
+  const bokaRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!showBokaMenu) return;
+    const h = (e: MouseEvent) => {
+      if (bokaRef.current && !bokaRef.current.contains(e.target as Node)) setShowBokaMenu(false);
+    };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, [showBokaMenu]);
+
+  function bokaVisning(v: Visning) {
+    addDeltagare(slug, v.id, {
+      namn: `${k.fornamn} ${k.efternamn}`,
+      telefon: k.telefon ?? "",
+      kontaktId: k.id,
+      anmald: true,
+      deltog: false,
+    });
+    setShowBokaMenu(false);
+  }
+
+  const actionBtn = "rounded-md border border-border px-2.5 py-1.5 text-[11px] text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground";
+
+  return (
+    <div className={`rounded-lg border bg-background transition-colors ${selected ? "border-primary/50 bg-primary/3" : "border-border"}`}>
+      {/* Top: checkbox + namn + pill */}
+      <div className="flex items-start gap-3 p-4 pb-3">
+        <input
+          type="checkbox"
+          checked={selected}
+          onChange={onToggleSelect}
+          className="mt-1 h-3.5 w-3.5 shrink-0 accent-primary"
+        />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center justify-between gap-2">
+            <Link to="/kunder/$id" params={{ id: k.id }} className="font-medium text-foreground hover:text-primary">
+              {k.fornamn} {k.efternamn}
+            </Link>
+            <span className={`shrink-0 rounded-full border px-2.5 py-0.5 text-[11px] font-medium ${cfg.color}`}>
+              {cfg.label}
+            </span>
+          </div>
+          <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">
+            {k.telefon && <span>{k.telefon}</span>}
+            {k.epost   && <span>{k.epost}</span>}
+            <span>Kopplad {dagSedan === 0 ? "idag" : `${dagSedan}d sedan`}</span>
+            {harBudget && (
+              <span className="font-medium text-foreground">
+                Budget {budMin > 0 ? `${(budMin / 1_000_000).toFixed(1)}M` : ""}
+                {budMax > 0 ? `–${(budMax / 1_000_000).toFixed(1)}M` : ""}
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Status-knappar */}
+      <div className="flex flex-wrap gap-1.5 border-t border-border/40 px-4 py-2.5">
+        {ALL_INTRESSE.map((s) => (
+          <button
+            key={s}
+            onClick={() => { if (s !== intresse) onChangeIntresse(s); }}
+            className={`rounded-md border px-2.5 py-1 text-[11px] font-medium transition-colors ${
+              s === intresse
+                ? cfg.color
+                : "border-border text-muted-foreground hover:border-primary/40 hover:text-foreground"
+            }`}
+          >
+            {INTRESSE_CONFIG[s].label}
+          </button>
+        ))}
+      </div>
+
+      {/* Åtgärdsknappar */}
+      <div className="flex flex-wrap items-center gap-1.5 border-t border-border/40 px-4 py-2.5">
+        {k.telefon && (
+          <a href={`tel:${k.telefon}`} className={actionBtn}>📞 Ring</a>
+        )}
+        {k.telefon && (
+          <a href={`sms:${k.telefon}`} className={actionBtn}>💬 SMS</a>
+        )}
+        {k.epost && (
+          <a href={`mailto:${k.epost}`} className={actionBtn}>✉ Mejla</a>
+        )}
+        <Link to="/kunder/$id" params={{ id: k.id }} className={actionBtn}>
+          Profil →
+        </Link>
+        {kommande.length > 0 && (
+          <div ref={bokaRef} className="relative">
+            <button onClick={() => setShowBokaMenu((v) => !v)} className={`${actionBtn} text-primary border-primary/30`}>
+              📅 Boka visning
+            </button>
+            {showBokaMenu && (
+              <div className="absolute bottom-full left-0 z-50 mb-1 min-w-[200px] overflow-hidden rounded-xl border border-border bg-card shadow-2xl">
+                {kommande.map((v) => {
+                  const d = new Date(v.datum);
+                  const already = v.deltagare.some((p) => p.kontaktId === k.id || p.telefon === k.telefon);
+                  return (
+                    <button
+                      key={v.id}
+                      onMouseDown={(e) => { e.preventDefault(); if (!already) bokaVisning(v); }}
+                      disabled={already}
+                      className={`flex w-full items-center justify-between gap-3 px-4 py-2.5 text-left text-sm transition-colors ${
+                        already ? "cursor-default text-muted-foreground/50" : "hover:bg-white/5"
+                      }`}
+                    >
+                      <span>{d.toLocaleDateString("sv", { weekday: "short", month: "short", day: "numeric" })} {d.toLocaleTimeString("sv", { hour: "2-digit", minute: "2-digit" })}</span>
+                      {already ? <span className="text-[10px] text-primary">Bokad</span> : null}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Medspekulanter */}
+      <MedspekulantSektion kontaktId={k.id} slug={slug} meds={meds} onUpdate={onReload} />
+    </div>
+  );
+}
+
+/* ── Medspekulant-sektion ── */
+function MedspekulantSektion({
+  kontaktId, slug, meds, onUpdate,
+}: {
+  kontaktId: string;
+  slug: string;
+  meds: Medspekulant[];
+  onUpdate: () => void;
+}) {
+  const [adding, setAdding] = useState(false);
+  const [namn, setNamn]     = useState("");
+  const [tel, setTel]       = useState("");
+
+  function handleAdd() {
+    if (!namn.trim()) return;
+    setMedspekulanter(kontaktId, slug, [...meds, { namn: namn.trim(), telefon: tel.trim() }]);
+    setNamn(""); setTel(""); setAdding(false); onUpdate();
+  }
+
+  function handleRemove(i: number) {
+    setMedspekulanter(kontaktId, slug, meds.filter((_, idx) => idx !== i));
+    onUpdate();
+  }
+
+  return (
+    <div className="border-t border-border/40 px-4 pb-3 pt-2.5">
+      <div className="mb-1.5 text-[10px] uppercase tracking-[0.16em] text-muted-foreground/60">Medspekulant</div>
+      <div className="flex flex-wrap gap-1.5">
+        {meds.map((m, i) => (
+          <div key={i} className="flex items-center gap-1.5 rounded-md border border-border bg-muted/30 px-2.5 py-1 text-[11px]">
+            <span className="font-medium text-foreground">{m.namn}</span>
+            {m.telefon && (
+              <>
+                <span className="text-muted-foreground/40">·</span>
+                <a href={`tel:${m.telefon}`} className="text-muted-foreground hover:text-foreground">{m.telefon}</a>
+                <a href={`sms:${m.telefon}`} className="text-primary/60 hover:text-primary">💬</a>
+              </>
+            )}
+            <button onClick={() => handleRemove(i)} className="ml-0.5 text-muted-foreground/50 hover:text-foreground">×</button>
+          </div>
+        ))}
+        {adding ? (
+          <div className="flex flex-wrap items-center gap-1.5">
+            <input
+              autoFocus
+              value={namn}
+              onChange={(e) => setNamn(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") handleAdd(); if (e.key === "Escape") { setAdding(false); setNamn(""); setTel(""); } }}
+              placeholder="Namn"
+              className="h-7 rounded-md border border-input bg-background px-2 text-[11px] focus:border-primary focus:outline-none w-28"
+            />
+            <input
+              value={tel}
+              onChange={(e) => setTel(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") handleAdd(); if (e.key === "Escape") { setAdding(false); setNamn(""); setTel(""); } }}
+              placeholder="Telefon"
+              className="h-7 rounded-md border border-input bg-background px-2 text-[11px] focus:border-primary focus:outline-none w-28"
+            />
+            <button onClick={handleAdd} className="rounded-md bg-primary px-2 py-1 text-[11px] font-medium text-primary-foreground hover:opacity-90">Lägg till</button>
+            <button onClick={() => { setAdding(false); setNamn(""); setTel(""); }} className="text-[11px] text-muted-foreground hover:text-foreground">Avbryt</button>
+          </div>
+        ) : (
+          <button onClick={() => setAdding(true)} className="rounded-md border border-dashed border-border px-2.5 py-1 text-[11px] text-muted-foreground/60 hover:border-primary/40 hover:text-muted-foreground">
+            + Lägg till
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ── Bulk-bar ── */
+function BulkBar({
+  selected, bulkAction, onBulkAction, onChangeIntresse, onClear,
+}: {
+  selected: Kontakt[];
+  bulkAction: "ring" | "sms" | null;
+  onBulkAction: (a: "ring" | "sms" | null) => void;
+  onChangeIntresse: (ids: string[], s: SpekulantIntresse) => void;
+  onClear: () => void;
+}) {
+  const [statusOpen, setStatusOpen] = useState(false);
+  const phones = selected.map((k) => k.telefon).filter(Boolean) as string[];
+  const emails = selected.map((k) => k.epost).filter(Boolean) as string[];
+  const ids    = selected.map((k) => k.id);
+
+  const barBtn = "rounded-md border border-border/60 px-3 py-1.5 text-xs text-foreground transition-colors hover:bg-white/5";
+
+  return (
+    <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2">
+      <div className="flex items-center gap-2 rounded-2xl border border-border bg-card px-5 py-3 shadow-2xl">
+        <span className="text-xs font-semibold text-primary">{selected.length} valda</span>
+        <div className="mx-1 h-4 w-px bg-border" />
+
+        {/* Ring */}
+        {phones.length > 0 && (
+          <div className="relative">
+            <button onClick={() => { onBulkAction(bulkAction === "ring" ? null : "ring"); setStatusOpen(false); }} className={barBtn}>
+              📞 Ring
+            </button>
+            {bulkAction === "ring" && (
+              <div className="absolute bottom-full left-0 mb-2 min-w-[180px] overflow-hidden rounded-xl border border-border bg-card shadow-2xl">
+                {selected.filter((k) => k.telefon).map((k) => (
+                  <a key={k.id} href={`tel:${k.telefon}`} className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm hover:bg-white/5">
+                    <span className="font-medium">{k.fornamn}</span>
+                    <span className="text-muted-foreground">{k.telefon}</span>
+                  </a>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* SMS */}
+        {phones.length > 0 && (
+          <div className="relative">
+            <button onClick={() => { onBulkAction(bulkAction === "sms" ? null : "sms"); setStatusOpen(false); }} className={barBtn}>
+              💬 SMS
+            </button>
+            {bulkAction === "sms" && (
+              <div className="absolute bottom-full left-0 mb-2 min-w-[180px] overflow-hidden rounded-xl border border-border bg-card shadow-2xl">
+                {selected.filter((k) => k.telefon).map((k) => (
+                  <a key={k.id} href={`sms:${k.telefon}`} className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm hover:bg-white/5">
+                    <span className="font-medium">{k.fornamn}</span>
+                    <span className="text-muted-foreground">{k.telefon}</span>
+                  </a>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Mejla alla */}
+        {emails.length > 0 && (
+          <a href={`mailto:${emails.join(",")}`} className={barBtn}>
+            ✉ Mejla alla
+          </a>
+        )}
+
+        {/* Byt status */}
+        <div className="relative">
+          <button onClick={() => { setStatusOpen((v) => !v); onBulkAction(null); }} className={barBtn}>
+            Byt status ▾
+          </button>
+          {statusOpen && (
+            <div className="absolute bottom-full left-0 mb-2 overflow-hidden rounded-xl border border-border bg-card shadow-2xl">
+              {ALL_INTRESSE.map((s) => (
+                <button
+                  key={s}
+                  onMouseDown={(e) => { e.preventDefault(); onChangeIntresse(ids, s); setStatusOpen(false); }}
+                  className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm hover:bg-white/5"
+                >
+                  <span className={`h-2 w-2 rounded-full border ${INTRESSE_CONFIG[s].color}`} />
+                  {INTRESSE_CONFIG[s].label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="mx-1 h-4 w-px bg-border" />
+        <button onClick={onClear} className="text-xs text-muted-foreground hover:text-foreground">✕</button>
+      </div>
     </div>
   );
 }

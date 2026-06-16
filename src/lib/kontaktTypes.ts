@@ -8,7 +8,9 @@ export type NastaSteg = {
   typ: NastaStegTyp;
 };
 
-export type SpekulantIntresse = "aktiv" | "budgivare" | "ej_intresserad";
+export type SpekulantIntresse = "aktiv" | "budgivare" | "följer" | "ej_intresserad";
+
+export type Medspekulant = { namn: string; telefon: string };
 
 export type ObjektKoppling = {
   slug: string;
@@ -16,6 +18,7 @@ export type ObjektKoppling = {
   addedAt: number;
   anteckning: string;
   intresse?: SpekulantIntresse;
+  medspekulanter?: Medspekulant[];
 };
 
 export type AktivitetTyp =

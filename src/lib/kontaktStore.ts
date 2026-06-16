@@ -99,6 +99,20 @@ export function setObjektKopplingIntresse(
   write(list);
 }
 
+export function setMedspekulanter(
+  kontaktId: string,
+  slug: string,
+  medspekulanter: import("./kontaktTypes").Medspekulant[]
+) {
+  const list = read();
+  const idx = list.findIndex((k) => k.id === kontaktId);
+  if (idx < 0) return;
+  list[idx].objektKopplingar = list[idx].objektKopplingar.map((kp) =>
+    kp.slug === slug && kp.relation === "spekulant" ? { ...kp, medspekulanter } : kp
+  );
+  write(list);
+}
+
 export function removeObjektKoppling(
   kontaktId: string,
   slug: string,
