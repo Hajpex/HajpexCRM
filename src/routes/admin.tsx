@@ -21,6 +21,7 @@ function AdminPage() {
   const [offices, setOffices] = useState<Office[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
+  const [createFor, setCreateFor] = useState<Office | null>(null);
 
   useEffect(() => {
     getSession().then((u) => {
@@ -121,17 +122,27 @@ function AdminPage() {
                       {o.org_nr ? ` · Org.nr ${o.org_nr}` : ""}
                     </p>
                   </div>
-                  <button
-                    onClick={() => toggleOffice(o)}
-                    disabled={busy === o.id}
-                    className={`shrink-0 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50 ${
-                      o.active
-                        ? "border-border text-muted-foreground hover:border-destructive/40 hover:text-destructive"
-                        : "border-emerald-500/30 bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20"
-                    }`}
-                  >
-                    {o.active ? "Stäng kontor" : "Öppna kontor"}
-                  </button>
+                  <div className="flex shrink-0 items-center gap-2">
+                    {o.active && (
+                      <button
+                        onClick={() => setCreateFor(o)}
+                        className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-opacity hover:opacity-90"
+                      >
+                        + Skapa mäklare
+                      </button>
+                    )}
+                    <button
+                      onClick={() => toggleOffice(o)}
+                      disabled={busy === o.id}
+                      className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50 ${
+                        o.active
+                          ? "border-border text-muted-foreground hover:border-destructive/40 hover:text-destructive"
+                          : "border-emerald-500/30 bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20"
+                      }`}
+                    >
+                      {o.active ? "Stäng kontor" : "Öppna kontor"}
+                    </button>
+                  </div>
                 </div>
 
                 {officeMembers.length === 0 ? (
@@ -180,10 +191,85 @@ function AdminPage() {
         </div>
 
         <p className="mt-6 text-[11px] text-muted-foreground/60">
-          Inaktivering är reversibel — data och historik bevaras. Att skapa nya inloggningar
-          för mäklare läggs till via en säker server-funktion.
+          Inaktivering är reversibel — data och historik bevaras.
         </p>
       </div>
+
+      {createFor && (
+        <CreateMaklareModal
+          office={createFor}
+          onClose={() => setCreateFor(null)}
+          onCreated={() => { setCreateFor(null); loadAll(); }}
+        />
+      )}
     </AppShell>
+  );
+}
+
+function CreateMaklareModal({ office, onClose, onCreated }: { office: Office; onClose: () => void; onCreated: () => void }) {
+  const [namn, setNamn] = useState("");
+  const [epost, setEpost] = useState("");
+  const [losen, setLosen] = useState("");
+  const [role, setRole] = useState<"maklare" | "admin">("maklare");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  async function handleCreate(e: React.FormEvent) {
+    e.preventDefault();
+    setError(""); setLoading(true);
+    const { data, error: err } = await supabase.functions.invoke("create-maklare", {
+      body: { name: namn.trim(), email: epost.trim().toLowerCase(), password: losen, office_id: office.id, role },
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const res = data as any;
+    if (err || res?.error) {
+      setError(res?.error ?? "Kunde inte skapa mäklaren. Är server-funktionen utrullad?");
+      setLoading(false);
+      return;
+    }
+    onCreated();
+  }
+
+  const inputCls = "w-full rounded-lg border border-border bg-background px-3.5 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/50 focus:border-primary/40 focus:outline-none";
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+      <div className="w-full max-w-md rounded-2xl border border-white/[0.1] bg-card p-8 shadow-2xl">
+        <div className="mb-1 flex items-center justify-between">
+          <h2 className="text-lg font-medium text-foreground" style={serif}>Skapa mäklare</h2>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground">✕</button>
+        </div>
+        <p className="mb-6 text-xs text-muted-foreground">Till {office.name}</p>
+        <form onSubmit={handleCreate} className="space-y-4">
+          <div>
+            <label className="mb-1.5 block text-xs font-medium text-foreground">Namn</label>
+            <input autoFocus value={namn} onChange={(e) => setNamn(e.target.value)} className={inputCls} placeholder="Anna Andersson" required />
+          </div>
+          <div>
+            <label className="mb-1.5 block text-xs font-medium text-foreground">E-post</label>
+            <input type="email" value={epost} onChange={(e) => setEpost(e.target.value)} className={inputCls} placeholder="anna@kontoret.se" required />
+          </div>
+          <div>
+            <label className="mb-1.5 block text-xs font-medium text-foreground">Tillfälligt lösenord</label>
+            <input type="text" value={losen} onChange={(e) => setLosen(e.target.value)} className={inputCls} placeholder="Minst 6 tecken" required />
+            <p className="mt-1 text-[10px] text-muted-foreground">Mäklaren loggar in med detta och kan byta sedan.</p>
+          </div>
+          <div>
+            <label className="mb-1.5 block text-xs font-medium text-foreground">Roll</label>
+            <select value={role} onChange={(e) => setRole(e.target.value as "maklare" | "admin")} className={inputCls}>
+              <option value="maklare">Mäklare</option>
+              <option value="admin">Kontorsadmin</option>
+            </select>
+          </div>
+          {error && <p className="rounded-lg bg-destructive/8 px-3 py-2 text-xs text-destructive">{error}</p>}
+          <div className="flex gap-2 pt-2">
+            <button type="button" onClick={onClose} className="flex-1 rounded-lg border border-border px-4 py-2.5 text-sm text-muted-foreground hover:bg-muted/50">Avbryt</button>
+            <button type="submit" disabled={loading} className="flex-1 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50">
+              {loading ? "Skapar…" : "Skapa mäklare"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   );
 }
