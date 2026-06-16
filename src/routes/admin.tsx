@@ -131,17 +131,20 @@ function AdminPage() {
                         + Skapa mäklare
                       </button>
                     )}
-                    <button
-                      onClick={() => toggleOffice(o)}
-                      disabled={busy === o.id}
-                      className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50 ${
-                        o.active
-                          ? "border-border text-muted-foreground hover:border-destructive/40 hover:text-destructive"
-                          : "border-emerald-500/30 bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20"
-                      }`}
-                    >
-                      {o.active ? "Stäng kontor" : "Öppna kontor"}
-                    </button>
+                    {/* Öppna/stänga kontor — enbart Hajpex super_admin */}
+                    {user.isSuperAdmin && (
+                      <button
+                        onClick={() => toggleOffice(o)}
+                        disabled={busy === o.id}
+                        className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50 ${
+                          o.active
+                            ? "border-border text-muted-foreground hover:border-destructive/40 hover:text-destructive"
+                            : "border-emerald-500/30 bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20"
+                        }`}
+                      >
+                        {o.active ? "Stäng kontor" : "Öppna kontor"}
+                      </button>
+                    )}
                   </div>
                 </div>
 
