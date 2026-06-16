@@ -8,6 +8,7 @@ export type AppUser = {
   role: "admin" | "maklare";
   officeId: string;
   officeName: string;
+  isSuperAdmin: boolean;
 };
 
 export async function signIn(email: string, password: string): Promise<AppUser | null> {
@@ -26,9 +27,9 @@ export async function fetchAppUser(userId: string): Promise<AppUser | null> {
 
   const { data: u } = await supabase
     .from("users")
-    .select("id, name, initials, role, office_id")
+    .select("id, name, initials, role, office_id, is_super_admin")
     .eq("id", userId)
-    .single() as { data: { id: string; name: string; initials: string | null; role: string; office_id: string } | null; error: unknown };
+    .single() as { data: { id: string; name: string; initials: string | null; role: string; office_id: string; is_super_admin: boolean } | null; error: unknown };
 
   if (!u) return null;
 
@@ -46,6 +47,7 @@ export async function fetchAppUser(userId: string): Promise<AppUser | null> {
     role: u.role as "admin" | "maklare",
     officeId: u.office_id,
     officeName: o?.name ?? "",
+    isSuperAdmin: u.is_super_admin ?? false,
   };
 }
 
