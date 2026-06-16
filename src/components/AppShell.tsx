@@ -1,7 +1,11 @@
 import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
 import { type ReactNode, useEffect, useState } from "react";
 import { GlobalSearchTrigger } from "./CommandPalette";
-import { getSession, signOut, type AppUser } from "../lib/supabaseAuth";
+import {
+  getSession, signOut, type AppUser,
+  hasMultiOfficeAccess, listAccessibleOffices, resolveActiveOfficeId,
+  setActiveOfficeId, getStoredActiveOfficeId, type OfficeRef,
+} from "../lib/supabaseAuth";
 import { hydrateFromCloud, resetCloudSync, isHydrated } from "../lib/cloudSync";
 
 type Item = { to: string; label: string; icon: ReactNode };
@@ -25,21 +29,37 @@ export function AppShell({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
   const [user, setUser] = useState<AppUser | null>(null);
   const [checking, setChecking] = useState(true);
+  const [offices, setOffices] = useState<OfficeRef[]>([]);
+  const [activeOfficeId, setActiveOffice] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
     getSession().then(async (u) => {
       if (!active) return;
       if (!u) { navigate({ to: "/login" }); return; }
-      // Hämta kontorets data från molnet till localStorage innan vi renderar.
-      // Bara en gång per session — inte vid varje sidnavigering.
-      if (!isHydrated()) await hydrateFromCloud(u.officeId);
+      // Hämta aktivt kontors data från molnet innan render (no-op om __root redan gjort det).
+      const officeId = await resolveActiveOfficeId(u);
+      if (officeId && !isHydrated()) await hydrateFromCloud(officeId);
       if (!active) return;
+      // Kontorsväljare för super/franchise-admin
+      if (hasMultiOfficeAccess(u)) {
+        const list = await listAccessibleOffices();
+        if (!active) return;
+        setOffices(list);
+        setActiveOffice(getStoredActiveOfficeId() ?? officeId);
+      }
       setUser(u);
       setChecking(false);
     });
     return () => { active = false; };
   }, [navigate]);
+
+  function switchOffice(id: string) {
+    if (id === activeOfficeId) return;
+    setActiveOfficeId(id);
+    resetCloudSync();      // tvinga ny hydrering för det nya kontoret
+    window.location.reload();
+  }
 
   async function handleLogout() {
     resetCloudSync();
@@ -68,6 +88,27 @@ export function AppShell({ children }: { children: ReactNode }) {
             </div>
             <div className="mt-0.5 text-[10px] uppercase tracking-[0.22em] text-muted-foreground/60">CRM</div>
           </div>
+
+          {/* Kontorsväljare — endast super/franchise-admin med flera kontor */}
+          {offices.length > 1 && (
+            <div className="px-3 pb-3">
+              <label className="mb-1 block px-1 text-[9px] font-medium uppercase tracking-[0.18em] text-muted-foreground/60">
+                Aktivt kontor
+              </label>
+              <div className="relative">
+                <select
+                  value={activeOfficeId ?? ""}
+                  onChange={(e) => switchOffice(e.target.value)}
+                  className="w-full appearance-none rounded-lg border border-border bg-background px-3 py-2 pr-8 text-xs font-medium text-foreground focus:border-primary/40 focus:outline-none"
+                >
+                  {offices.map((o) => (
+                    <option key={o.id} value={o.id}>{o.name}</option>
+                  ))}
+                </select>
+                <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground">▾</span>
+              </div>
+            </div>
+          )}
 
           {/* Nav */}
           <nav className="flex flex-col gap-0.5 px-3">

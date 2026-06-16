@@ -12,7 +12,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { seedDemoKontakter } from "../lib/demoKontakter";
-import { getSession } from "../lib/supabaseAuth";
+import { getSession, resolveActiveOfficeId } from "../lib/supabaseAuth";
 import { hydrateFromCloud, isHydrated } from "../lib/cloudSync";
 
 function NotFoundComponent() {
@@ -150,7 +150,10 @@ function RootComponent() {
       // 2. Om inloggad: hämta kontorets data från molnet till localStorage
       //    INNAN sidträdet renderas, så varje sida mountar med rätt data.
       const u = await getSession();
-      if (u && !isHydrated()) await hydrateFromCloud(u.officeId);
+      if (u && !isHydrated()) {
+        const officeId = await resolveActiveOfficeId(u);
+        if (officeId) await hydrateFromCloud(officeId);
+      }
       if (active) setReady(true);
     })();
     return () => { active = false; };
