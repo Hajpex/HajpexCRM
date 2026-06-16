@@ -11,28 +11,17 @@ export type AppUser = {
   isSuperAdmin: boolean;
 };
 
-export async function signIn(email: string, password: string): Promise<AppUser | null> {
-  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-  if (error || !data.user) return null;
-  return fetchAppUser(data.user.id);
-}
+type UserRow = {
+  id: string;
+  name: string;
+  initials: string | null;
+  role: string;
+  office_id: string;
+  is_super_admin: boolean;
+};
 
-export async function signOut(): Promise<void> {
-  await supabase.auth.signOut();
-}
-
-export async function fetchAppUser(userId: string): Promise<AppUser | null> {
-  const { data: authData } = await supabase.auth.getUser();
-  const email = authData?.user?.email ?? "";
-
-  const { data: u } = await supabase
-    .from("users")
-    .select("id, name, initials, role, office_id, is_super_admin")
-    .eq("id", userId)
-    .single() as { data: { id: string; name: string; initials: string | null; role: string; office_id: string; is_super_admin: boolean } | null; error: unknown };
-
-  if (!u) return null;
-
+/** Bygg AppUser från en users-rad + känd e-post. */
+async function buildAppUser(u: UserRow, email: string): Promise<AppUser> {
   const { data: o } = await supabase
     .from("offices")
     .select("name")
@@ -51,10 +40,59 @@ export async function fetchAppUser(userId: string): Promise<AppUser | null> {
   };
 }
 
+async function fetchUserRow(userId: string): Promise<UserRow | null> {
+  const { data } = await supabase
+    .from("users")
+    .select("id, name, initials, role, office_id, is_super_admin")
+    .eq("id", userId)
+    .single() as { data: UserRow | null; error: unknown };
+  return data;
+}
+
+export type SignInResult =
+  | { ok: true; user: AppUser }
+  | { ok: false; reason: "auth" | "profile"; message: string };
+
+export async function signInDetailed(email: string, password: string): Promise<SignInResult> {
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error || !data.user) {
+    return { ok: false, reason: "auth", message: error?.message ?? "Inloggning misslyckades" };
+  }
+
+  const u = await fetchUserRow(data.user.id);
+  if (!u) {
+    return { ok: false, reason: "profile", message: "Hittade ingen profil (users-raden saknas)" };
+  }
+
+  return { ok: true, user: await buildAppUser(u, data.user.email ?? email) };
+}
+
+export async function signIn(email: string, password: string): Promise<AppUser | null> {
+  const res = await signInDetailed(email, password);
+  return res.ok ? res.user : null;
+}
+
+export async function signOut(): Promise<void> {
+  await supabase.auth.signOut();
+}
+
+/** Hämtar inloggad användare utifrån befintlig session (ingen extra getUser()-rundtur). */
 export async function getSession(): Promise<AppUser | null> {
   const { data } = await supabase.auth.getSession();
-  if (!data.session?.user) return null;
-  return fetchAppUser(data.session.user.id);
+  const sessionUser = data.session?.user;
+  if (!sessionUser) return null;
+
+  const u = await fetchUserRow(sessionUser.id);
+  if (!u) return null;
+  return buildAppUser(u, sessionUser.email ?? "");
+}
+
+export async function fetchAppUser(userId: string): Promise<AppUser | null> {
+  const { data } = await supabase.auth.getSession();
+  const email = data.session?.user?.email ?? "";
+  const u = await fetchUserRow(userId);
+  if (!u) return null;
+  return buildAppUser(u, email);
 }
 
 export async function registerOffice(opts: {

@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
-import { signIn, getSession } from "../lib/supabaseAuth";
+import { signInDetailed, getSession } from "../lib/supabaseAuth";
 
 export const Route = createFileRoute("/login")({
   component: LoginPage,
@@ -28,11 +28,15 @@ function LoginPage() {
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
     setError(""); setLoading(true);
-    const user = await signIn(email.trim().toLowerCase(), password);
-    if (user) {
+    const res = await signInDetailed(email.trim().toLowerCase(), password);
+    if (res.ok) {
       navigate({ to: "/" });
     } else {
-      setError("Fel e-post eller lösenord.");
+      setError(
+        res.reason === "auth"
+          ? `Inloggning misslyckades: ${res.message}`
+          : `Inloggad, men profilen kunde inte hämtas (RLS): ${res.message}`
+      );
       setLoading(false);
     }
   }

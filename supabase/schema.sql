@@ -142,8 +142,10 @@ alter table public.intagsmoten      enable row level security;
 alter table public.kontrakt         enable row level security;
 
 -- Hjälpfunktion: hämta office_id för inloggad användare
+-- VIKTIGT: security definer + fast search_path så att den kringgår RLS
+-- och INTE används i policyn på users-tabellen (skulle ge oändlig rekursion)
 create or replace function public.my_office_id()
-returns uuid language sql stable security definer
+returns uuid language sql stable security definer set search_path = public
 as $$ select office_id from public.users where id = auth.uid() $$;
 
 -- POLICIES — kontor ser bara sin egen data
@@ -168,8 +170,11 @@ create policy "office_isolation" on public.intagsmoten
 create policy "office_isolation" on public.kontrakt
   using (office_id = public.my_office_id());
 
-create policy "users_own_office" on public.users
-  using (office_id = public.my_office_id());
+-- users: läs ENDAST din egen rad direkt mot auth.uid().
+-- Får INTE använda my_office_id() här — det skulle ge oändlig rekursion
+-- (policyn på users anropar en funktion som själv läser från users).
+create policy "users_select_self" on public.users
+  for select using (id = auth.uid());
 
 create policy "offices_own" on public.offices
   using (id = public.my_office_id());

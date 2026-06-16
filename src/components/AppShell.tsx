@@ -1,7 +1,7 @@
 import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
 import { type ReactNode, useEffect, useState } from "react";
 import { GlobalSearchTrigger } from "./CommandPalette";
-import { getAuth, logout, type User } from "../lib/authStore";
+import { getSession, signOut, type AppUser } from "../lib/supabaseAuth";
 
 type Item = { to: string; label: string; icon: ReactNode };
 
@@ -22,20 +22,26 @@ const serifLogo = { fontFamily: '"Instrument Serif", ui-serif, Georgia, serif' }
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const navigate = useNavigate();
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<AppUser | null>(null);
+  const [checking, setChecking] = useState(true);
 
   useEffect(() => {
-    const u = getAuth();
-    if (!u) { navigate({ to: "/login" }); return; }
-    setUser(u);
+    let active = true;
+    getSession().then((u) => {
+      if (!active) return;
+      if (!u) { navigate({ to: "/login" }); return; }
+      setUser(u);
+      setChecking(false);
+    });
+    return () => { active = false; };
   }, [navigate]);
 
-  function handleLogout() {
-    logout();
+  async function handleLogout() {
+    await signOut();
     navigate({ to: "/login" });
   }
 
-  if (!user) return null;
+  if (checking || !user) return null;
 
   return (
     <div className="min-h-screen w-full bg-background text-foreground" style={fontStyle}>

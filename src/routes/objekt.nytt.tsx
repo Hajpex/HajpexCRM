@@ -17,7 +17,7 @@ import { useUserRole, isKontorschef } from "../lib/userRole";
 import { saveObjekt } from "../lib/objektStore";
 import { slugifyAddr, type Typ } from "../data/objekt";
 import { listKontakter, addObjektKoppling } from "../lib/kontaktStore";
-import { getAuth } from "../lib/authStore";
+import { getSession } from "../lib/supabaseAuth";
 import type { Kontakt } from "../lib/kontaktTypes";
 import { AddressInput } from "../components/AddressInput";
 
@@ -191,7 +191,7 @@ function ObjektsformularPage() {
   const navigate = useNavigate();
   const [savedObjMsg, setSavedObjMsg] = useState<string | null>(null);
 
-  function handleSaveObjekt() {
+  async function handleSaveObjekt() {
     if (!grund.adress.trim()) {
       setSavedObjMsg("Ange minst adress för att spara objektet.");
       setTimeout(() => setSavedObjMsg(null), 3000);
@@ -210,7 +210,7 @@ function ObjektsformularPage() {
     const pris = Number(grund.pris.replace(/\D/g, "")) || 0;
     const boarea = Number(String(grund.boarea).replace(",", ".")) || 0;
     const rum = Number(String(grund.rum).replace(",", ".")) || 0;
-    const authUser = getAuth();
+    const authUser = await getSession();
     const saljareNamn = saljareKontakt
       ? `${saljareKontakt.fornamn} ${saljareKontakt.efternamn}`
       : "";

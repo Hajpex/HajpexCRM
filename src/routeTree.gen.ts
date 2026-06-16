@@ -10,10 +10,12 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as VisningarRouteImport } from './routes/visningar'
+import { Route as SuperadminRouteImport } from './routes/superadmin'
 import { Route as StatistikRouteImport } from './routes/statistik'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as ListorRouteImport } from './routes/listor'
 import { Route as KunderRouteImport } from './routes/kunder'
+import { Route as InfoRouteImport } from './routes/info'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ObjektIndexRouteImport } from './routes/objekt.index'
 import { Route as VisningIdRouteImport } from './routes/visning.$id'
@@ -24,6 +26,11 @@ import { Route as KunderIdRouteImport } from './routes/kunder.$id'
 const VisningarRoute = VisningarRouteImport.update({
   id: '/visningar',
   path: '/visningar',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SuperadminRoute = SuperadminRouteImport.update({
+  id: '/superadmin',
+  path: '/superadmin',
   getParentRoute: () => rootRouteImport,
 } as any)
 const StatistikRoute = StatistikRouteImport.update({
@@ -44,6 +51,11 @@ const ListorRoute = ListorRouteImport.update({
 const KunderRoute = KunderRouteImport.update({
   id: '/kunder',
   path: '/kunder',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const InfoRoute = InfoRouteImport.update({
+  id: '/info',
+  path: '/info',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -79,10 +91,12 @@ const KunderIdRoute = KunderIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/info': typeof InfoRoute
   '/kunder': typeof KunderRouteWithChildren
   '/listor': typeof ListorRoute
   '/login': typeof LoginRoute
   '/statistik': typeof StatistikRoute
+  '/superadmin': typeof SuperadminRoute
   '/visningar': typeof VisningarRoute
   '/kunder/$id': typeof KunderIdRoute
   '/objekt/$slug': typeof ObjektSlugRoute
@@ -92,10 +106,12 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/info': typeof InfoRoute
   '/kunder': typeof KunderRouteWithChildren
   '/listor': typeof ListorRoute
   '/login': typeof LoginRoute
   '/statistik': typeof StatistikRoute
+  '/superadmin': typeof SuperadminRoute
   '/visningar': typeof VisningarRoute
   '/kunder/$id': typeof KunderIdRoute
   '/objekt/$slug': typeof ObjektSlugRoute
@@ -106,10 +122,12 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/info': typeof InfoRoute
   '/kunder': typeof KunderRouteWithChildren
   '/listor': typeof ListorRoute
   '/login': typeof LoginRoute
   '/statistik': typeof StatistikRoute
+  '/superadmin': typeof SuperadminRoute
   '/visningar': typeof VisningarRoute
   '/kunder/$id': typeof KunderIdRoute
   '/objekt/$slug': typeof ObjektSlugRoute
@@ -121,10 +139,12 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/info'
     | '/kunder'
     | '/listor'
     | '/login'
     | '/statistik'
+    | '/superadmin'
     | '/visningar'
     | '/kunder/$id'
     | '/objekt/$slug'
@@ -134,10 +154,12 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/info'
     | '/kunder'
     | '/listor'
     | '/login'
     | '/statistik'
+    | '/superadmin'
     | '/visningar'
     | '/kunder/$id'
     | '/objekt/$slug'
@@ -147,10 +169,12 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/info'
     | '/kunder'
     | '/listor'
     | '/login'
     | '/statistik'
+    | '/superadmin'
     | '/visningar'
     | '/kunder/$id'
     | '/objekt/$slug'
@@ -161,10 +185,12 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  InfoRoute: typeof InfoRoute
   KunderRoute: typeof KunderRouteWithChildren
   ListorRoute: typeof ListorRoute
   LoginRoute: typeof LoginRoute
   StatistikRoute: typeof StatistikRoute
+  SuperadminRoute: typeof SuperadminRoute
   VisningarRoute: typeof VisningarRoute
   ObjektSlugRoute: typeof ObjektSlugRoute
   ObjektNyttRoute: typeof ObjektNyttRoute
@@ -179,6 +205,13 @@ declare module '@tanstack/react-router' {
       path: '/visningar'
       fullPath: '/visningar'
       preLoaderRoute: typeof VisningarRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/superadmin': {
+      id: '/superadmin'
+      path: '/superadmin'
+      fullPath: '/superadmin'
+      preLoaderRoute: typeof SuperadminRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/statistik': {
@@ -207,6 +240,13 @@ declare module '@tanstack/react-router' {
       path: '/kunder'
       fullPath: '/kunder'
       preLoaderRoute: typeof KunderRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/info': {
+      id: '/info'
+      path: '/info'
+      fullPath: '/info'
+      preLoaderRoute: typeof InfoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -267,10 +307,12 @@ const KunderRouteWithChildren =
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  InfoRoute: InfoRoute,
   KunderRoute: KunderRouteWithChildren,
   ListorRoute: ListorRoute,
   LoginRoute: LoginRoute,
   StatistikRoute: StatistikRoute,
+  SuperadminRoute: SuperadminRoute,
   VisningarRoute: VisningarRoute,
   ObjektSlugRoute: ObjektSlugRoute,
   ObjektNyttRoute: ObjektNyttRoute,
