@@ -208,3 +208,84 @@ create trigger trg_kontakter_updated
 create trigger trg_kontrakt_updated
   before update on public.kontrakt
   for each row execute function public.set_updated_at();
+
+-- ============================================================
+-- FRANCHISE-HIERARKI (franchise → kontor → mäklare)
+-- Tillägg ovanpå basschemat. Idempotent — ersätter office-policyerna ovan.
+-- Roller: super_admin (Hajpex) | franchise_admin (huvudkontor) | admin | maklare
+-- ============================================================
+
+create table if not exists public.franchises (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  created_at timestamptz default now()
+);
+alter table public.franchises enable row level security;
+
+alter table public.offices add column if not exists franchise_id uuid references public.franchises(id) on delete set null;
+alter table public.offices add column if not exists active boolean not null default true;
+alter table public.users   add column if not exists franchise_id uuid references public.franchises(id) on delete set null;
+alter table public.users   add column if not exists active boolean not null default true;
+
+alter table public.users drop constraint if exists users_role_check;
+alter table public.users add constraint users_role_check
+  check (role in ('admin','maklare','franchise_admin'));
+
+-- Hjälpfunktioner (security definer = kringgår RLS, undviker rekursion)
+create or replace function public.is_super_admin() returns boolean
+  language sql stable security definer set search_path=public
+  as $$ select coalesce((select is_super_admin from public.users where id = auth.uid()), false) $$;
+
+create or replace function public.my_franchise_id() returns uuid
+  language sql stable security definer set search_path=public
+  as $$ select franchise_id from public.users where id = auth.uid() $$;
+
+-- Alla kontors-id inloggad får se: eget kontor + hela sin franchise
+create or replace function public.my_office_ids() returns setof uuid
+  language sql stable security definer set search_path=public
+  as $$
+    select o.id from public.offices o
+    where o.id = public.my_office_id()
+       or (o.franchise_id is not null and o.franchise_id = public.my_franchise_id())
+  $$;
+
+create policy "franchise_visible" on public.franchises
+  using (public.is_super_admin() or id = public.my_franchise_id());
+
+-- Datatabeller: se/redigera för super admin | eget kontor | hela franchisen
+do $$
+declare t text;
+begin
+  foreach t in array array['kontakter','objekt_kopplingar','visningar','bud','aktiviteter','intagsmoten','kontrakt','app_state']
+  loop
+    execute format('drop policy if exists "office_isolation" on public.%I', t);
+    execute format($f$
+      create policy "office_isolation" on public.%I
+        using (public.is_super_admin() or office_id in (select public.my_office_ids()))
+        with check (public.is_super_admin() or office_id in (select public.my_office_ids()))
+    $f$, t);
+  end loop;
+end $$;
+
+-- Kontor: synligt + hanterbart (uppdatera/stänga) inom scope
+drop policy if exists "offices_own" on public.offices;
+drop policy if exists "offices_visible" on public.offices;
+drop policy if exists "offices_manage" on public.offices;
+create policy "offices_visible" on public.offices
+  for select using (public.is_super_admin() or id in (select public.my_office_ids()));
+create policy "offices_manage" on public.offices
+  for update using (public.is_super_admin() or id in (select public.my_office_ids()))
+  with check (public.is_super_admin() or id in (select public.my_office_ids()));
+
+-- Användare: läs + hantera (uppdatera/ta bort) inom scope
+drop policy if exists "users_select_self" on public.users;
+drop policy if exists "users_visible" on public.users;
+drop policy if exists "users_manage" on public.users;
+drop policy if exists "users_delete" on public.users;
+create policy "users_visible" on public.users
+  for select using (id = auth.uid() or public.is_super_admin() or office_id in (select public.my_office_ids()));
+create policy "users_manage" on public.users
+  for update using (public.is_super_admin() or office_id in (select public.my_office_ids()))
+  with check (public.is_super_admin() or office_id in (select public.my_office_ids()));
+create policy "users_delete" on public.users
+  for delete using (public.is_super_admin() or office_id in (select public.my_office_ids()));

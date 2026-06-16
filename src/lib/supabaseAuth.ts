@@ -12,6 +12,7 @@ export type AppUser = {
   officeName: string;
   franchiseId: string | null;
   isSuperAdmin: boolean;
+  active: boolean;
 };
 
 type UserRow = {
@@ -22,6 +23,7 @@ type UserRow = {
   office_id: string | null;
   franchise_id: string | null;
   is_super_admin: boolean;
+  active: boolean | null;
 };
 
 /** Bygg AppUser från en users-rad + känd e-post. */
@@ -46,13 +48,14 @@ async function buildAppUser(u: UserRow, email: string): Promise<AppUser> {
     officeName,
     franchiseId: u.franchise_id,
     isSuperAdmin: u.is_super_admin ?? false,
+    active: u.active ?? true,
   };
 }
 
 async function fetchUserRow(userId: string): Promise<UserRow | null> {
   const { data } = await supabase
     .from("users")
-    .select("id, name, initials, role, office_id, franchise_id, is_super_admin")
+    .select("id, name, initials, role, office_id, franchise_id, is_super_admin, active")
     .eq("id", userId)
     .single() as { data: UserRow | null; error: unknown };
   return data;
@@ -60,7 +63,7 @@ async function fetchUserRow(userId: string): Promise<UserRow | null> {
 
 export type SignInResult =
   | { ok: true; user: AppUser }
-  | { ok: false; reason: "auth" | "profile"; message: string };
+  | { ok: false; reason: "auth" | "profile" | "inactive"; message: string };
 
 export async function signInDetailed(email: string, password: string): Promise<SignInResult> {
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
@@ -71,6 +74,10 @@ export async function signInDetailed(email: string, password: string): Promise<S
   const u = await fetchUserRow(data.user.id);
   if (!u) {
     return { ok: false, reason: "profile", message: "Hittade ingen profil (users-raden saknas)" };
+  }
+  if (u.active === false) {
+    await supabase.auth.signOut();
+    return { ok: false, reason: "inactive", message: "Kontot är inaktiverat. Kontakta din administratör." };
   }
 
   return { ok: true, user: await buildAppUser(u, data.user.email ?? email) };
@@ -93,6 +100,7 @@ export async function getSession(): Promise<AppUser | null> {
 
   const u = await fetchUserRow(sessionUser.id);
   if (!u) return null;
+  if (u.active === false) { await supabase.auth.signOut(); return null; }
   return buildAppUser(u, sessionUser.email ?? "");
 }
 

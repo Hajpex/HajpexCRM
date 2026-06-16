@@ -34,8 +34,8 @@ function LoginPage() {
     } else {
       setError(
         res.reason === "auth"
-          ? `Inloggning misslyckades: ${res.message}`
-          : `Inloggad, men profilen kunde inte hämtas (RLS): ${res.message}`
+          ? "Fel e-post eller lösenord."
+          : res.message
       );
       setLoading(false);
     }

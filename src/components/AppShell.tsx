@@ -135,6 +135,24 @@ export function AppShell({ children }: { children: ReactNode }) {
                 </Link>
               );
             })}
+
+            {/* Admin — endast super/franchise/kontorsadmin */}
+            {(user.isSuperAdmin || user.role === "franchise_admin" || user.role === "admin") && (() => {
+              const active = pathname.startsWith("/admin");
+              return (
+                <Link
+                  to="/admin"
+                  className={[
+                    "group relative mt-0.5 flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
+                    active ? "text-primary" : "text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground",
+                  ].join(" ")}
+                >
+                  {active && <span className="absolute left-0 top-1/2 h-4 w-0.5 -translate-y-1/2 rounded-r-full bg-primary" />}
+                  <span className={active ? "text-primary" : "text-muted-foreground group-hover:text-foreground"}><ShieldIcon /></span>
+                  <span className={active ? "font-medium" : ""}>Kontor &amp; personal</span>
+                </Link>
+              );
+            })()}
           </nav>
 
           {/* Footer */}
@@ -200,6 +218,7 @@ function ListIcon() { return <Svg><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h
 function UsersIcon() { return <Svg><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></Svg>; }
 function CalendarIcon() { return <Svg><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></Svg>; }
 function ChartIcon() { return <Svg><path d="M3 3v18h18"/><path d="M7 14l4-4 4 4 5-6"/></Svg>; }
+function ShieldIcon() { return <Svg><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></Svg>; }
 function LayersIcon() { return <Svg><path d="M12 2 2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></Svg>; }
 
 function Svg({ children }: { children: ReactNode }) {
