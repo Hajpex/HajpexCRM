@@ -126,6 +126,16 @@ create table if not exists public.kontrakt (
   unique(office_id, objekt_slug)
 );
 
+-- APP_STATE — generisk nyckel/värde-lagring per kontor (molnsynk av lokala stores)
+-- En rad per datalager (store_key) per kontor. data = hela listan som JSONB.
+create table if not exists public.app_state (
+  office_id   uuid not null references public.offices(id) on delete cascade,
+  store_key   text not null,
+  data        jsonb not null default '[]',
+  updated_at  timestamptz default now(),
+  primary key (office_id, store_key)
+);
+
 -- ============================================================
 -- ROW LEVEL SECURITY (RLS)
 -- Varje rad är bara synlig för rätt kontor
@@ -140,6 +150,7 @@ alter table public.bud              enable row level security;
 alter table public.aktiviteter      enable row level security;
 alter table public.intagsmoten      enable row level security;
 alter table public.kontrakt         enable row level security;
+alter table public.app_state        enable row level security;
 
 -- Hjälpfunktion: hämta office_id för inloggad användare
 -- VIKTIGT: security definer + fast search_path så att den kringgår RLS
@@ -169,6 +180,10 @@ create policy "office_isolation" on public.intagsmoten
 
 create policy "office_isolation" on public.kontrakt
   using (office_id = public.my_office_id());
+
+create policy "office_isolation" on public.app_state
+  using (office_id = public.my_office_id())
+  with check (office_id = public.my_office_id());
 
 -- users: läs ENDAST din egen rad direkt mot auth.uid().
 -- Får INTE använda my_office_id() här — det skulle ge oändlig rekursion

@@ -1,3 +1,5 @@
+import { schedulePush } from "./cloudSync";
+
 const KEY = "hajpex.visningar.v1";
 
 export type VisningTyp = "Öppen" | "Privat" | "Budvisning";
@@ -37,6 +39,7 @@ function read(): Record<string, Visning[]> {
 function write(data: Record<string, Visning[]>) {
   if (typeof window === "undefined") return;
   window.localStorage.setItem(KEY, JSON.stringify(data));
+  schedulePush(KEY);
 }
 
 export function listVisningar(slug: string): Visning[] {

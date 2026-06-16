@@ -1,4 +1,5 @@
 import { fmtSweNum } from "./formatters";
+import { schedulePush } from "./cloudSync";
 
 const KEY = "hajpex.budgivning.v1";
 
@@ -33,6 +34,7 @@ function read(): Record<string, Bud[]> {
 function write(data: Record<string, Bud[]>) {
   if (typeof window === "undefined") return;
   window.localStorage.setItem(KEY, JSON.stringify(data));
+  schedulePush(KEY);
 }
 
 export function listBud(slug: string): Bud[] {
@@ -79,6 +81,7 @@ function readSettings(): Record<string, BudSettings> {
 function writeSettings(s: Record<string, BudSettings>) {
   if (typeof window === "undefined") return;
   window.localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
+  schedulePush(SETTINGS_KEY);
 }
 
 export function getBudSettings(slug: string): BudSettings {

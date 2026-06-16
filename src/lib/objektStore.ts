@@ -1,4 +1,5 @@
 import { OBJEKT, type Objekt, type Status, type Typ } from "../data/objekt";
+import { schedulePush } from "./cloudSync";
 
 const KEY = "stendahl.objektLibrary.v1";
 
@@ -19,6 +20,7 @@ function read(): SavedObjekt[] {
 function write(list: SavedObjekt[]) {
   if (typeof window === "undefined") return;
   window.localStorage.setItem(KEY, JSON.stringify(list));
+  schedulePush(KEY);
 }
 
 export function listObjekt(): SavedObjekt[] {

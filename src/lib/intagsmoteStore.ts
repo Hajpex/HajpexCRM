@@ -1,4 +1,5 @@
 import type { Kontakt } from "./kontaktTypes";
+import { schedulePush } from "./cloudSync";
 
 export type IntagsmoteStatus = "Planerat" | "Genomfört" | "Vunnen" | "Förlorad";
 
@@ -33,6 +34,7 @@ function load(): Intagsmote[] {
 
 function save(items: Intagsmote[]) {
   localStorage.setItem(KEY, JSON.stringify(items));
+  schedulePush(KEY);
 }
 
 export function listIntagsmoten(): Intagsmote[] {

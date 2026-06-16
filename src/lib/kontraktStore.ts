@@ -1,3 +1,5 @@
+import { schedulePush } from "./cloudSync";
+
 const KEY = "hajpex.kontrakt.v1";
 
 export type KontraktData = {
@@ -55,6 +57,7 @@ function read(): Record<string, KontraktData> {
 function write(data: Record<string, KontraktData>) {
   if (typeof window === "undefined") return;
   window.localStorage.setItem(KEY, JSON.stringify(data));
+  schedulePush(KEY);
 }
 
 export function getKontrakt(slug: string): KontraktData {

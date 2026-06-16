@@ -1,3 +1,5 @@
+import { schedulePush } from "./cloudSync";
+
 const KEY = "hajpex.budget.v1";
 
 export type BudgetGoals = {
@@ -29,6 +31,7 @@ function read(): BudgetGoals {
 function write(data: BudgetGoals) {
   if (typeof window === "undefined") return;
   window.localStorage.setItem(KEY, JSON.stringify(data));
+  schedulePush(KEY);
 }
 
 export function getBudget(): BudgetGoals {

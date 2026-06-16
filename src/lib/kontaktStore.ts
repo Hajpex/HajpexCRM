@@ -1,4 +1,5 @@
 import type { Kontakt, ObjektKoppling, Aktivitet } from "./kontaktTypes";
+import { schedulePush } from "./cloudSync";
 
 const KEY = "hajpex.kontakter.v1";
 
@@ -17,6 +18,7 @@ function read(): Kontakt[] {
 function write(list: Kontakt[]) {
   if (typeof window === "undefined") return;
   window.localStorage.setItem(KEY, JSON.stringify(list));
+  schedulePush(KEY);
 }
 
 export function listKontakter(): Kontakt[] {

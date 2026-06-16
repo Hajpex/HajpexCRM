@@ -1,3 +1,5 @@
+import { schedulePush } from "./cloudSync";
+
 const KEY = "hajpex.objektNotes.v1";
 
 export type ObjektNote = { id: string; text: string; ts: number; av: string };
@@ -25,6 +27,7 @@ function read(): Record<string, ObjektNoteData> {
 function write(data: Record<string, ObjektNoteData>) {
   if (typeof window === "undefined") return;
   window.localStorage.setItem(KEY, JSON.stringify(data));
+  schedulePush(KEY);
 }
 
 export function getObjektNotes(slug: string): ObjektNoteData {

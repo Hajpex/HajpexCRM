@@ -1,4 +1,5 @@
 import type { Brf } from "./brfTypes";
+import { schedulePush } from "./cloudSync";
 
 const KEY = "stendahl.brfLibrary.v1";
 
@@ -19,6 +20,7 @@ function read(): SavedBrf[] {
 function write(list: SavedBrf[]) {
   if (typeof window === "undefined") return;
   window.localStorage.setItem(KEY, JSON.stringify(list));
+  schedulePush(KEY);
 }
 
 export function listBrfs(): SavedBrf[] {

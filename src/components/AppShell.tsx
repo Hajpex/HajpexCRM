@@ -2,6 +2,7 @@ import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
 import { type ReactNode, useEffect, useState } from "react";
 import { GlobalSearchTrigger } from "./CommandPalette";
 import { getSession, signOut, type AppUser } from "../lib/supabaseAuth";
+import { hydrateFromCloud, resetCloudSync, isHydrated } from "../lib/cloudSync";
 
 type Item = { to: string; label: string; icon: ReactNode };
 
@@ -27,9 +28,13 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let active = true;
-    getSession().then((u) => {
+    getSession().then(async (u) => {
       if (!active) return;
       if (!u) { navigate({ to: "/login" }); return; }
+      // Hämta kontorets data från molnet till localStorage innan vi renderar.
+      // Bara en gång per session — inte vid varje sidnavigering.
+      if (!isHydrated()) await hydrateFromCloud(u.officeId);
+      if (!active) return;
       setUser(u);
       setChecking(false);
     });
@@ -37,6 +42,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   }, [navigate]);
 
   async function handleLogout() {
+    resetCloudSync();
     await signOut();
     navigate({ to: "/login" });
   }
