@@ -65,9 +65,13 @@ async function upsert(officeId: string, key: string, value: unknown): Promise<vo
 
 /**
  * Hämtar kontorets data till localStorage. Körs efter inloggning, före render.
- * Om molnet saknar en nyckel men localStorage har data → pusha upp (första
- * gången migreras befintlig lokal data till molnet).
+ * Molnet är auktoritativt. Markören DATA_OFFICE_KEY visar vilket kontor den
+ * lokala datan tillhör, så att ett kontorsbyte rensar gammal data istället för
+ * att felaktigt pusha upp den till det nya kontoret. Saknad markör tolkas som
+ * äldre lokal data (före molnsynk) som får migreras upp en gång.
  */
+const DATA_OFFICE_KEY = "hajpex.dataOffice.v1";
+
 export async function hydrateFromCloud(officeId: string): Promise<void> {
   if (typeof window === "undefined") return;
   currentOfficeId = officeId;
@@ -87,23 +91,30 @@ export async function hydrateFromCloud(officeId: string): Promise<void> {
     ((data ?? []) as { store_key: string; data: unknown }[]).map((r) => [r.store_key, r.data])
   );
 
+  const localOwner = window.localStorage.getItem(DATA_OFFICE_KEY);
+  // Får lokal data migreras upp? Endast om den faktiskt tillhör detta kontor
+  // (samma ägare) eller om ingen markör finns ännu (äldre data före molnsynk).
+  const mayMigrateUp = !localOwner || localOwner === officeId;
+
   for (const key of SYNCED_KEYS) {
     if (cloud.has(key)) {
       // Molnet är auktoritativt
       try {
         window.localStorage.setItem(key, JSON.stringify(cloud.get(key)));
       } catch { /* ignore */ }
-    } else {
-      // Molnet saknar nyckeln → migrera upp befintlig lokal data (om någon)
+    } else if (mayMigrateUp) {
+      // Molnet saknar nyckeln men datan tillhör detta kontor → migrera upp
       const local = window.localStorage.getItem(key);
       if (local) {
-        try {
-          await upsert(officeId, key, JSON.parse(local));
-        } catch { /* ignore */ }
+        try { await upsert(officeId, key, JSON.parse(local)); } catch { /* ignore */ }
       }
+    } else {
+      // Bytte till ett annat kontor som saknar denna data → rensa gammal lokal data
+      window.localStorage.removeItem(key);
     }
   }
 
+  try { window.localStorage.setItem(DATA_OFFICE_KEY, officeId); } catch { /* ignore */ }
   hydrated = true;
 }
 
