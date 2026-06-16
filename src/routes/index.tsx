@@ -428,10 +428,16 @@ function DashboardPage() {
             </div>
           )}
 
-          {/* Onboarding — only when no real data yet */}
-          {savedObjCount === 0 && kontakter.length === 0 && (
-            <OnboardingBanner />
-          )}
+          {/* Onboarding — interaktiv checklista, döljer sig själv när klar/bortvald */}
+          <OnboardingBanner
+            progress={{
+              hasObjekt: savedObjCount > 0,
+              hasKontakt: kontakter.length > 0,
+              hasVisning: visningar.length > 0,
+              hasBud: objsWithBids.length > 0,
+              hasKontrakt: listKontrakt().some((k) => k.data?.signerat),
+            }}
+          />
 
           {/* KPI strip */}
           <div className="mt-7 grid grid-cols-2 gap-3 md:grid-cols-4">
@@ -1420,32 +1426,94 @@ function EmptySlot({ icon, text, hint }: { icon?: string; text: string; hint?: s
   );
 }
 
-function OnboardingBanner() {
+const ONBOARDING_DISMISS_KEY = "hajpex.onboarding.dismissed.v1";
+
+type OnboardingProgress = {
+  hasObjekt: boolean;
+  hasKontakt: boolean;
+  hasVisning: boolean;
+  hasBud: boolean;
+  hasKontrakt: boolean;
+};
+
+function OnboardingBanner({ progress }: { progress: OnboardingProgress }) {
+  const [dismissed, setDismissed] = useState(true); // dölj tills vi läst localStorage (undvik flimmer)
+
+  useEffect(() => {
+    try { setDismissed(localStorage.getItem(ONBOARDING_DISMISS_KEY) === "1"); }
+    catch { setDismissed(false); }
+  }, []);
+
+  function dismiss() {
+    try { localStorage.setItem(ONBOARDING_DISMISS_KEY, "1"); } catch { /* ignore */ }
+    setDismissed(true);
+  }
+
   const steps = [
-    { icon: "🏠", label: "Lägg till ditt första objekt", to: "/objekt/nytt", cta: "Nytt objekt →" },
-    { icon: "👤", label: "Lägg till din första kontakt", to: "/kunder", cta: "Ny kontakt →" },
-    { icon: "📅", label: "Boka ett intagningsmöte", to: "/kunder", cta: "Gå till kontakter →" },
-  ] as const;
+    { icon: "🏠", label: "Lägg till ditt första objekt", hint: "Starta ett nytt uppdrag", to: "/objekt/nytt" as const, search: undefined, done: progress.hasObjekt },
+    { icon: "👤", label: "Lägg till din första kontakt", hint: "Säljare eller spekulant", to: "/kunder" as const, search: { q: undefined, roll: undefined }, done: progress.hasKontakt },
+    { icon: "📅", label: "Boka en visning", hint: "Bjud in spekulanter", to: "/visningar" as const, search: undefined, done: progress.hasVisning },
+    { icon: "🔨", label: "Registrera ett bud", hint: "Följ budgivningen live", to: "/objekt" as const, search: undefined, done: progress.hasBud },
+    { icon: "📄", label: "Signera ett kontrakt", hint: "Slutför affären", to: "/objekt" as const, search: undefined, done: progress.hasKontrakt },
+  ];
+
+  const doneCount = steps.filter((s) => s.done).length;
+  const total = steps.length;
+
+  // Dölj om bortvald eller om allt är klart
+  if (dismissed || doneCount === total) return null;
 
   return (
     <div className="mt-6 rounded-2xl border border-primary/20 bg-primary/5 p-6">
-      <p className="mb-1 text-[11px] uppercase tracking-[0.22em] text-primary/70">Kom igång</p>
-      <h2 className="mb-4 text-lg font-medium text-foreground" style={{ fontFamily: '"Instrument Serif", ui-serif, Georgia, serif' }}>
-        Välkommen till HajpexCRM<span className="text-primary">.</span>
-      </h2>
-      <div className="grid gap-3 sm:grid-cols-3">
-        {steps.map((s, i) => (
+      <div className="mb-4 flex items-start justify-between gap-4">
+        <div>
+          <p className="mb-1 text-[11px] uppercase tracking-[0.22em] text-primary/70">Kom igång på 5 minuter</p>
+          <h2 className="text-lg font-medium text-foreground" style={{ fontFamily: '"Instrument Serif", ui-serif, Georgia, serif' }}>
+            Välkommen till Hajpex<span className="text-primary">.</span>
+          </h2>
+        </div>
+        <button
+          onClick={dismiss}
+          className="-mr-1 -mt-1 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full text-muted-foreground/50 transition-colors hover:bg-foreground/[0.06] hover:text-foreground"
+          title="Dölj guiden"
+        >
+          ✕
+        </button>
+      </div>
+
+      {/* Progress */}
+      <div className="mb-4 flex items-center gap-3">
+        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-foreground/[0.08]">
+          <div className="h-full rounded-full bg-primary transition-all duration-500" style={{ width: `${(doneCount / total) * 100}%` }} />
+        </div>
+        <span className="text-[11px] font-medium text-muted-foreground">{doneCount} av {total} klart</span>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {steps.map((s, i) => s.done ? (
+          <div
+            key={s.label + i}
+            className="flex items-start gap-3 rounded-xl border border-emerald-500/20 bg-emerald-500/[0.06] p-4"
+          >
+            <span className="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-emerald-500/15 text-sm text-emerald-500">✓</span>
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-muted-foreground line-through decoration-muted-foreground/40">{s.label}</p>
+              <p className="mt-1 text-[11px] text-emerald-600/80">Klart</p>
+            </div>
+          </div>
+        ) : (
           <Link
-            key={s.to + i}
+            key={s.label + i}
             to={s.to}
+            search={s.search as never}
             className="group flex items-start gap-3 rounded-xl border border-border bg-card/60 p-4 transition-colors hover:border-primary/40 hover:bg-card/80"
           >
             <span className="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-primary/10 text-base">
               {s.icon}
             </span>
-            <div>
+            <div className="min-w-0">
               <p className="text-sm font-medium text-foreground">{s.label}</p>
-              <p className="mt-1 text-[11px] text-primary group-hover:underline">{s.cta}</p>
+              <p className="mt-1 text-[11px] text-primary group-hover:underline">{s.hint} →</p>
             </div>
           </Link>
         ))}
