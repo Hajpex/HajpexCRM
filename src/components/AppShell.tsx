@@ -74,7 +74,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <BackgroundGlow />
       {/* Top search bar */}
       <div className="sticky top-0 z-50 w-full border-b border-border bg-card/90 backdrop-blur-md">
-        <div className="mx-auto flex max-w-xl items-center px-4 py-2.5 md:max-w-2xl">
+        <div className="mx-auto flex max-w-2xl items-center px-4 py-4 md:max-w-3xl">
           <GlobalSearchTrigger />
         </div>
       </div>

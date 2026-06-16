@@ -258,7 +258,7 @@ export function GlobalSearchTrigger() {
     <>
       <button
         onClick={() => { setSeed(""); setOpen(true); }}
-        className="group flex w-full items-center gap-2 rounded-lg border border-border bg-card/60 px-3 py-2 text-sm text-muted-foreground transition-colors hover:border-foreground/20 hover:bg-card"
+        className="group flex w-full items-center gap-2.5 rounded-xl border-2 border-foreground/25 bg-card px-4 py-2.5 text-sm text-muted-foreground shadow-sm transition-colors hover:border-foreground/50 hover:text-foreground"
       >
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
           <circle cx="11" cy="11" r="7" /><path d="m21 21-4.3-4.3" />

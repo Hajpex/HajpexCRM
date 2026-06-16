@@ -457,7 +457,7 @@ type FormState = {
   gdpr: boolean;
 };
 
-function NyKontaktDialog({
+export function NyKontaktDialog({
   onClose,
   onSaved,
 }: {
