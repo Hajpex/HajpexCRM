@@ -1,0 +1,26 @@
+{
+  "name": "Hajpex CRM",
+  "short_name": "Hajpex",
+  "description": "CRM för mäklare — kontakter, visningar, budgivning och kontrakt på ett ställe.",
+  "lang": "sv-SE",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#161615",
+  "theme_color": "#161615",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}
