@@ -1,9 +1,10 @@
-// Supabase Edge Function: create-maklare
+// Supabase Edge Function: quick-handler (skapar mäklare)
 // Skapar en ny mäklare (auth-konto + profilrad) på ett kontor.
 // Endast super_admin, franchise_admin eller kontorsadmin får anropa, och bara
 // för kontor i sin egen behörighet. Använder service_role (server-side hemlighet).
 //
-// Deploy:  supabase functions deploy create-maklare
+// Deployad via Dashboard → Edge Functions med namnet "quick-handler".
+// Appen anropar den via supabase.functions.invoke("quick-handler", ...).
 // (service_role-nyckeln finns automatiskt som env i Edge Functions.)
 
 import { createClient } from "jsr:@supabase/supabase-js@2";

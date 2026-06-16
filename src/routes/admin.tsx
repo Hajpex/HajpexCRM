@@ -220,13 +220,21 @@ function CreateMaklareModal({ office, onClose, onCreated }: { office: Office; on
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     setError(""); setLoading(true);
-    const { data, error: err } = await supabase.functions.invoke("create-maklare", {
+    const { data, error: err } = await supabase.functions.invoke("quick-handler", {
       body: { name: namn.trim(), email: epost.trim().toLowerCase(), password: losen, office_id: office.id, role },
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const res = data as any;
     if (err || res?.error) {
-      setError(res?.error ?? "Kunde inte skapa mäklaren. Är server-funktionen utrullad?");
+      // Supabase lägger felsvarets body i ett FunctionsHttpError (err.context = Response).
+      // Plocka ut funktionens riktiga felmeddelande därifrån.
+      let msg = res?.error ?? "";
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const ctx = (err as any)?.context;
+      if (!msg && ctx && typeof ctx.json === "function") {
+        try { const body = await ctx.json(); msg = body?.error; } catch { /* ignore */ }
+      }
+      setError(msg || "Kunde inte skapa mäklaren. Försök igen.");
       setLoading(false);
       return;
     }

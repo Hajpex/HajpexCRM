@@ -15,7 +15,9 @@
       "Skill(run)",
       "Skill(run:*)",
       "mcp__Claude_Preview__preview_start",
-      "WebFetch(domain:www.skandiamaklarna.se)"
+      "WebFetch(domain:www.skandiamaklarna.se)",
+      "Skill(claude-api)",
+      "Skill(claude-api:*)"
     ]
   }
 }
