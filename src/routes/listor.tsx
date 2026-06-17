@@ -1,6 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState, type ReactNode } from "react";
 import { AppShell } from "../components/AppShell";
+import { RingLage } from "../components/RingLage";
+import { listKontakter } from "../lib/kontaktStore";
 import { slugifyAddr } from "./objekt.$slug";
 
 export const Route = createFileRoute("/listor")({
@@ -17,12 +19,6 @@ const serif = { fontFamily: '"Instrument Serif", ui-serif, Georgia, serif', lett
 
 type TabId = "intag" | "uppgifter" | "kontakter" | "leads";
 
-const TABS: { id: TabId; label: string; count: number }[] = [
-  { id: "intag", label: "Intagsmöten", count: 18 },
-  { id: "uppgifter", label: "Uppgifter", count: 86 },
-  { id: "kontakter", label: "Kontakter", count: 7387 },
-  { id: "leads", label: "Leads", count: 36 },
-];
 
 // --- Mock data ---
 const intagsmoten = [
@@ -102,6 +98,16 @@ function ListorPage() {
   const [tab, setTab] = useState<TabId>("intag");
   const [query, setQuery] = useState("");
   const [view, setView] = useState("all");
+  const [ringLageOpen, setRingLageOpen] = useState(false);
+
+  const realKontakter = useMemo(() => listKontakter(), []);
+
+  const tabs = useMemo<{ id: TabId; label: string; count: number }[]>(() => [
+    { id: "intag", label: "Intagsmöten", count: intagsmoten.length },
+    { id: "uppgifter", label: "Uppgifter", count: uppgifter.length },
+    { id: "kontakter", label: "Kontakter", count: realKontakter.length },
+    { id: "leads", label: "Leads", count: leads.length },
+  ], [realKontakter]);
 
   const placeholder = useMemo(() => {
     switch (tab) {
@@ -132,7 +138,7 @@ function ListorPage() {
 
         {/* Tabs */}
         <div className="mb-6 flex flex-wrap gap-1 border-b border-border">
-          {TABS.map((t) => {
+          {tabs.map((t) => {
             const active = tab === t.id;
             return (
               <button
@@ -189,11 +195,30 @@ function ListorPage() {
           })}
         </div>
 
+        {/* Ring-läge för kontakter */}
+        {tab === "kontakter" && (
+          <div className="mb-4 flex justify-end">
+            <button
+              onClick={() => setRingLageOpen(true)}
+              className="flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-2 text-sm font-medium text-foreground hover:border-primary/40 hover:bg-primary/5 transition-colors"
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 13a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.6 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+              </svg>
+              Starta ring-läge
+            </button>
+          </div>
+        )}
+
+        {ringLageOpen && (
+          <RingLage kontakter={realKontakter} onClose={() => setRingLageOpen(false)} />
+        )}
+
         {/* Table */}
         <Card>
           {tab === "intag" && <IntagTable rows={intagsmoten} q={query} />}
           {tab === "uppgifter" && <UppgifterTable rows={uppgifter} q={query} />}
-          {tab === "kontakter" && <KontakterTable rows={kontakter} q={query} />}
+          {tab === "kontakter" && <KontakterTable rows={realKontakter} q={query} />}
           {tab === "leads" && <LeadsTable rows={leads} q={query} />}
         </Card>
       </div>
@@ -256,17 +281,27 @@ function UppgifterTable({ rows, q }: { rows: typeof uppgifter; q: string }) {
   );
 }
 
-function KontakterTable({ rows, q }: { rows: typeof kontakter; q: string }) {
-  const data = filterRows(rows, q);
+function KontakterTable({ rows, q }: { rows: ReturnType<typeof listKontakter>; q: string }) {
+  const data = useMemo(() => {
+    if (!q.trim()) return rows;
+    const needle = q.toLowerCase();
+    return rows.filter((k) =>
+      [k.fornamn, k.efternamn, k.telefon, k.epost, k.adress, k.ort]
+        .some((v) => v.toLowerCase().includes(needle))
+    );
+  }, [rows, q]);
+
   return (
-    <TableShell head={["Förnamn", "Efternamn", "Gata", "Skapad", "Källa"]} count={data.length}>
-      {data.map((r, i) => (
-        <tr key={i} className="border-t border-border/50 hover:bg-muted/20">
-          <td className="py-3 pr-4 font-medium text-foreground">{r.fornamn}</td>
-          <td className="py-3 pr-4 text-foreground">{r.efternamn}</td>
-          <td className="py-3 pr-4 text-xs text-muted-foreground">{r.gata}</td>
-          <td className="py-3 pr-4 font-mono text-xs text-muted-foreground">{r.skapad}</td>
-          <td className="py-3 text-xs text-muted-foreground">{r.kalla}</td>
+    <TableShell head={["Förnamn", "Efternamn", "Telefon", "Adress", "Kopplingar"]} count={data.length}>
+      {data.map((k) => (
+        <tr key={k.id} className="border-t border-border/50 hover:bg-muted/20">
+          <td className="py-3 pr-4 font-medium text-foreground">{k.fornamn}</td>
+          <td className="py-3 pr-4 text-foreground">{k.efternamn}</td>
+          <td className="py-3 pr-4 text-xs text-muted-foreground">
+            {k.telefon ? <a href={`tel:${k.telefon}`} className="hover:text-primary">{k.telefon}</a> : "—"}
+          </td>
+          <td className="py-3 pr-4 text-xs text-muted-foreground">{[k.adress, k.ort].filter(Boolean).join(", ") || "—"}</td>
+          <td className="py-3 text-xs text-muted-foreground">{k.objektKopplingar.length || "—"}</td>
         </tr>
       ))}
     </TableShell>
