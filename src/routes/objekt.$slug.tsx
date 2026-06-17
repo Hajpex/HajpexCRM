@@ -5642,19 +5642,6 @@ function MaBoendeBody() {
 
 /* ---------- Säljare (top-level tab) ---------- */
 
-type SaljarePerson = {
-  n: string; a: string; pnr: string; db: string;
-  tel: string; mail: string; adr: string; ks: string;
-};
-
-function getSaljarePersons(slug: string): SaljarePerson[] {
-  const demo = getDemoSaljare(slug);
-  const andel = demo.length === 1 ? "1/1" : "1/2";
-  return demo.map((s, i) => ({
-    n: s.namn, a: andel, pnr: s.pnr, db: "Nej",
-    tel: s.telefon, mail: s.email, adr: sellerAddress(slug, i), ks: "Ja",
-  }));
-}
 
 const SALJARE_CUSTOMER = [
   { k: "Underlag kapitalvinst", s: "Ändrad av kund", sCls: "bg-amber-500/20 text-amber-200", u: "2026-06-09 00:24" },
@@ -5677,9 +5664,6 @@ function SaljareView({ onTabChange }: { onTabChange: (tab: SideTab) => void }) {
   const [realSaljare, setRealSaljare] = useState(() => loadSaljare(slug));
 
   function refreshSaljare() { setRealSaljare(loadSaljare(slug)); }
-
-  const demoPersons = realSaljare.length === 0 ? getSaljarePersons(slug) : [];
-  const totalPersons = realSaljare.length + demoPersons.length;
 
   return (
     <div className="space-y-6">
@@ -5733,7 +5717,7 @@ function SaljareView({ onTabChange }: { onTabChange: (tab: SideTab) => void }) {
                       <tr>
                         <td className="px-3 py-2">
                           <select defaultValue={String(i + 1)} className="w-16 rounded-md border border-border bg-background/40 px-2 py-1 text-xs">
-                            {Array.from({ length: totalPersons }, (_, j) => <option key={j}>{j + 1}</option>)}
+                            {Array.from({ length: realSaljare.length }, (_, j) => <option key={j}>{j + 1}</option>)}
                           </select>
                         </td>
                         <td className="px-3 py-2 font-medium">{p.fornamn} {p.efternamn}</td>
@@ -5769,37 +5753,13 @@ function SaljareView({ onTabChange }: { onTabChange: (tab: SideTab) => void }) {
                       </tr>
                     </Fragment>
                   ))}
-                  {demoPersons.map((s, i) => (
-                    <Fragment key={s.n}>
-                      <tr>
-                        <td className="px-3 py-2">
-                          <select defaultValue={String(i + 1)} className="w-16 rounded-md border border-border bg-background/40 px-2 py-1 text-xs">
-                            {demoPersons.map((_, j) => <option key={j}>{j + 1}</option>)}
-                          </select>
-                        </td>
-                        <td className="px-3 py-2">{s.n}</td>
-                        <td className="px-3 py-2">{s.a}</td>
-                        <td className="px-3 py-2 text-muted-foreground">{s.pnr}</td>
-                        <td className="px-3 py-2">{s.db}</td>
-                        <td className="px-3 py-2 text-muted-foreground">📞 {s.tel}</td>
-                        <td className="px-3 py-2 text-muted-foreground">
-                          {s.mail ? <a href={`mailto:${s.mail}`} className="hover:text-primary">{s.mail} ✉</a> : "—"}
-                        </td>
-                        <td className="px-3 py-2 text-muted-foreground">{s.adr}</td>
-                        <td className="px-3 py-2"><span className="rounded bg-emerald-500/15 px-2 py-0.5 text-[10px] text-emerald-700">BankID ✓</span></td>
-                        <td className="px-3 py-2">{s.ks}</td>
-                        <td className="px-3 py-2 text-muted-foreground">⚙</td>
-                      </tr>
-                      <tr>
-                        <td colSpan={11} className="px-3 py-2">
-                          <textarea
-                            placeholder="Kommentar"
-                            className="min-h-[64px] w-full rounded-md border border-border bg-background/40 px-3 py-2 text-sm placeholder:text-muted-foreground/50 focus:border-primary/40 focus:outline-none"
-                          />
-                        </td>
-                      </tr>
-                    </Fragment>
-                  ))}
+                  {realSaljare.length === 0 && (
+                    <tr>
+                      <td colSpan={11} className="px-3 py-6 text-center text-sm text-muted-foreground">
+                        Ingen säljare kopplad ännu — klicka på "+ Lägg till säljare".
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
