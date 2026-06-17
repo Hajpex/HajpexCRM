@@ -22,6 +22,7 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from "../components/ui/resizable";
+import { RumSektion } from "../components/RumSektion";
 
 export const Route = createFileRoute("/objekt/$slug")({
   head: ({ params }) => ({
@@ -3592,7 +3593,7 @@ function ObjektsinfoView({ adress, slug }: { adress: string; slug: string }) {
         <OvrigtBody />
       </OiSec>
       <OiSec id="rum" title="Rum" open={open.rum} onToggle={toggle} done={done.rum} onToggleDone={toggleDone}>
-        <RumBody />
+        <RumBody slug={slug} />
       </OiSec>
       <OiSec id="bilder" title="Bilder" open={open.bilder} onToggle={toggle} done={done.bilder} onToggleDone={toggleDone}>
         <BilderSectionBody slug={slug} />
@@ -3887,47 +3888,43 @@ const ROOMS = [
   { n: "BADRUM & TVÄTT", v: "Källare", b: "Rymligt badrum på källarplanet, renoverat 2017, med klinkergolv och helkaklade väggar." },
 ];
 
-function RumBody() {
+function RumBody({ slug }: { slug: string }) {
   const blank = useContext(BlankCtx);
   const rows = blank ? [] : ROOMS;
+  const propertyType = getObjektBySlug(slug)?.typ;
   return (
-    <div className="space-y-4">
-      <Field label="Rumsbeskrivning">
-        <textarea rows={2} className="w-full rounded-md border border-border bg-background px-2.5 py-2 text-sm focus:border-primary/40 focus:outline-none" />
-      </Field>
-      <div className="flex items-center justify-between">
-        <div className="text-sm font-medium">Övriga beskrivningar samtliga rum</div>
-        <BtnPrimary>+ Lägg till</BtnPrimary>
-      </div>
-      <div className="rounded-md border border-border px-3 py-4 text-sm text-muted-foreground">Inga poster</div>
-      <div className="flex items-center justify-between">
-        <div className="text-sm font-medium">Tillagda rum</div>
-        <BtnPrimary>+ Lägg till rum</BtnPrimary>
-      </div>
-      <div className="overflow-x-auto rounded-md border border-border">
-        <table className="w-full text-sm">
-          <thead className="bg-foreground/[0.03] text-xs uppercase tracking-wider text-muted-foreground">
-            <tr>
-              <th className="px-3 py-2 text-left w-16">#</th>
-              <th className="px-3 py-2 text-left">Namn på rum</th>
-              <th className="px-3 py-2 text-left">Våningsplan</th>
-              <th className="px-3 py-2 text-left">Beskrivning</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border">
-            {rows.length === 0 ? (
-              <tr><td colSpan={4} className="px-3 py-6 text-center text-muted-foreground">Inga rum tillagda</td></tr>
-            ) : rows.map((r, i) => (
-              <tr key={r.n}>
-                <td className="px-3 py-2 text-muted-foreground">{i + 1}</td>
-                <td className="px-3 py-2 font-medium">{r.n}</td>
-                <td className="px-3 py-2 text-muted-foreground">{r.v}</td>
-                <td className="px-3 py-2 text-muted-foreground">{r.b}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+    <div className="space-y-6">
+      {/* Exempelrum för demo-objekt (read-only) */}
+      {rows.length > 0 && (
+        <div>
+          <div className="mb-2 text-sm font-medium">Exempelrum</div>
+          <div className="overflow-x-auto rounded-md border border-border">
+            <table className="w-full text-sm">
+              <thead className="bg-foreground/[0.03] text-xs uppercase tracking-wider text-muted-foreground">
+                <tr>
+                  <th className="px-3 py-2 text-left w-16">#</th>
+                  <th className="px-3 py-2 text-left">Namn på rum</th>
+                  <th className="px-3 py-2 text-left">Våningsplan</th>
+                  <th className="px-3 py-2 text-left">Beskrivning</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {rows.map((r, i) => (
+                  <tr key={r.n}>
+                    <td className="px-3 py-2 text-muted-foreground">{i + 1}</td>
+                    <td className="px-3 py-2 font-medium">{r.n}</td>
+                    <td className="px-3 py-2 text-muted-foreground">{r.v}</td>
+                    <td className="px-3 py-2 text-muted-foreground">{r.b}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Interaktiv rumshantering med AI-bildanalys */}
+      <RumSektion slug={slug} propertyType={propertyType} />
     </div>
   );
 }
