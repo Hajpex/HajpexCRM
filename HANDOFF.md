@@ -71,6 +71,13 @@ Testinloggning: `max@test.se` (super_admin / Hajpex).
   filtrerad lista.
 - Nästlade-knappen-buggen i VisningRow fixad (hydrering).
 - "Ring-läge" (ringlista) finns på Kontakter-sidan OCH via Listor-fliken.
+- **AI migrerad till Claude:** alla AI-funktioner (`src/lib/ai.functions.ts`)
+  låg på Lovable-gatewayen med en nyckel som SAKNADES i miljön → allt var
+  trasigt (rumsbeskrivning/bildläsning, annonstext, områdestext, morning brief).
+  Omskrivet till Anthropic Claude via `@anthropic-ai/sdk` med vision, modell
+  `claude-haiku-4-5`. **KRÄVER `ANTHROPIC_API_KEY` i .env** (Max skapar nyckeln
+  på console.anthropic.com och lägger in den; committas aldrig). Tills nyckeln
+  finns kastar funktionerna "ANTHROPIC_API_KEY saknas på servern."
 
 ## ÅTERSTÅR (prioriterat — detta är nästa jobb)
 1. **Roller: kontorschef vs mäklare.** Designförslag klart i **`KONTORSCHEF.md`**
@@ -81,6 +88,17 @@ Testinloggning: `max@test.se` (super_admin / Hajpex).
    riktiga KPI:er (och utfall mot budget när rollen byggts).
 3. **Deploy** för publik/iPad-demo: kräver Max-klick (koppla GitHub + 2 env-vars
    i Vercel). Appen är TanStack Start + Nitro; Supabase-backend funkar direkt.
+
+4. **Flytta rum-skaparen till objektet + ta bort ur förening-flödet.** Den
+   AI-drivna rum-skaparen (foto-uppladdning → Claude beskriver → följdfrågor)
+   ligger idag i SKAPA-objekt/förening-flödet (`objekt.nytt.tsx`, "Rum"-Card +
+   `RoomCard`-komponent, ~rad 245/694). Max vill ha den på SJÄLVA objektet
+   (`objekt.$slug.tsx`, rumsbeskrivnings-platshållaren ~rad 3900 "+ Lägg till
+   rum") och bort ur förening-flödet (rum-sektionen "03"). ORDNING: bygg
+   objekt-detalj-versionen FÖRST (extrahera RoomCard + state till delad
+   komponent, spara per objekt), verifiera visuellt, ta SEN bort ur skapa-
+   flödet — annars tappar man funktionen temporärt. Stor UI-refaktor; bör göras
+   när Max kan klicka-verifiera (assistenten kan inte logga in).
 
 Lägre prio: kontraktflödet (`KontraktView`) är delvis platshållare.
 
