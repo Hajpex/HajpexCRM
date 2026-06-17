@@ -5005,9 +5005,12 @@ function VisningRow({ v, slug, adress, now, expandedId, onToggleExpand, newDelta
 
   return (
     <div className={`rounded-xl border transition-colors ${isPast ? "border-border/50 bg-card/40" : "border-border bg-card/80"}`}>
-      <button
-        className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
+      <div
+        role="button"
+        tabIndex={0}
+        className="flex w-full cursor-pointer items-center justify-between gap-3 px-4 py-3 text-left"
         onClick={() => onToggleExpand(isExpanded ? null : v.id)}
+        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onToggleExpand(isExpanded ? null : v.id); } }}
       >
         <div className="flex items-center gap-3">
           <span className={`flex h-8 w-8 items-center justify-center rounded-full text-sm ${
@@ -5045,7 +5048,7 @@ function VisningRow({ v, slug, adress, now, expandedId, onToggleExpand, newDelta
           )}
           <span className={`text-xs text-muted-foreground transition-transform ${isExpanded ? "rotate-90" : ""}`}>›</span>
         </div>
-      </button>
+      </div>
 
       {isExpanded && (
         <div className="border-t border-border px-4 py-4">
