@@ -24,9 +24,20 @@ franchisekontoren. Åtkomst styrs av roller (se nedan).
 npm install
 npm run dev        # startar på http://localhost:8080
 ```
-Kräver `.env` med `VITE_SUPABASE_URL` och `VITE_SUPABASE_ANON_KEY`.
-**`.env` får ALDRIG committas** (innehåller riktiga nycklar). Anon-nyckeln är
-en frontend-nyckel skyddad av RLS — den får ligga i hostens env vid deploy.
+Kräver `.env` med `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` och
+`ANTHROPIC_API_KEY` (för AI). **`.env` får ALDRIG committas.** Supabase
+anon-nyckeln är en publik frontend-nyckel (RLS-skyddad); ANTHROPIC_API_KEY är
+hemlig.
+
+## Deploy (LIVE)
+- **Produktion: https://hajpex-crm.vercel.app** (Vercel, projekt `hajpex-crm`,
+  scope `Hajpex1`). Auto-deployar vid varje push till `main`.
+- **VIKTIGT bygg-fix:** Lovable-configen defaultar nitro-target till Cloudflare
+  → gav 404 på Vercel. Löst i `vite.config.ts` med `nitro: { preset: "vercel" }`
+  (bygger till `.vercel/output`). Rör inte den raden om du vill behålla Vercel.
+- De tre miljövariablerna måste finnas i Vercel → Settings → Environment
+  Variables (samma som .env). VITE_*-vars bakas in vid bygget.
+- iPad: öppna URL:en i Safari, kan läggas till på hemskärmen (PWA fungerar).
 
 Testinloggning: `max@test.se` (super_admin / Hajpex).
 
@@ -86,8 +97,8 @@ Testinloggning: `max@test.se` (super_admin / Hajpex).
    leads; vanlig mäklare ser bara sitt eget.
 2. **Statistik-fliken** (`statistik.tsx`) visar fortfarande demodata — byt mot
    riktiga KPI:er (och utfall mot budget när rollen byggts).
-3. **Deploy** för publik/iPad-demo: kräver Max-klick (koppla GitHub + 2 env-vars
-   i Vercel). Appen är TanStack Start + Nitro; Supabase-backend funkar direkt.
+3. **AI-krediter:** rumsbeskrivaren/AI funkar tekniskt (verifierat mot Claude),
+   men Anthropic-kontot behöver krediter (Plans & Billing) innan svar kommer.
 
 4. **Flytta rum-skaparen till objektet + ta bort ur förening-flödet.** Den
    AI-drivna rum-skaparen (foto-uppladdning → Claude beskriver → följdfrågor)
