@@ -1,5 +1,62 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import Anthropic from "@anthropic-ai/sdk";
+
+// ── AI-leverantör: Anthropic Claude (vision) ───────────────────────────────────
+// Servernyckel ANTHROPIC_API_KEY krävs (ligger i .env, committas ALDRIG).
+// Modell: Haiku 4.5 — billig, snabb, kan läsa bilder. Byt MODEL för mer kraft.
+const MODEL = "claude-haiku-4-5";
+
+function getClient(): Anthropic {
+  const key = process.env.ANTHROPIC_API_KEY;
+  if (!key) throw new Error("ANTHROPIC_API_KEY saknas på servern. Lägg till den i .env.");
+  return new Anthropic({ apiKey: key });
+}
+
+type ContentBlock =
+  | { type: "text"; text: string }
+  | { type: "image"; source: { type: "base64"; media_type: "image/jpeg" | "image/png" | "image/gif" | "image/webp"; data: string } };
+
+// Anropa Claude och returnera ren text. Översätter fel till svenska.
+async function callClaude(opts: {
+  system?: string;
+  content: string | ContentBlock[];
+  maxTokens: number;
+}): Promise<string> {
+  const client = getClient();
+  try {
+    const msg = await client.messages.create({
+      model: MODEL,
+      max_tokens: opts.maxTokens,
+      ...(opts.system ? { system: opts.system } : {}),
+      messages: [{ role: "user", content: opts.content as never }],
+    });
+    return msg.content
+      .filter((b): b is Anthropic.TextBlock => b.type === "text")
+      .map((b) => b.text)
+      .join("")
+      .trim();
+  } catch (e) {
+    if (e instanceof Anthropic.AuthenticationError) throw new Error("AI-nyckeln (ANTHROPIC_API_KEY) är ogiltig.");
+    if (e instanceof Anthropic.RateLimitError) throw new Error("AI-tjänsten är överbelastad just nu. Försök igen om en stund.");
+    if (e instanceof Anthropic.APIError) throw new Error(`AI-fel (${e.status ?? "?"}): ${String(e.message).slice(0, 200)}`);
+    throw e;
+  }
+}
+
+// dataUrl ("data:image/png;base64,AAAA") → Anthropic image source
+function imageBlockFromDataUrl(dataUrl: string): ContentBlock {
+  const m = /^data:(image\/(?:jpeg|png|gif|webp));base64,(.+)$/s.exec(dataUrl);
+  if (!m) throw new Error("Ogiltigt bildformat (måste vara JPEG, PNG, GIF eller WebP).");
+  const media_type = m[1] as "image/jpeg" | "image/png" | "image/gif" | "image/webp";
+  return { type: "image", source: { type: "base64", media_type, data: m[2] } };
+}
+
+function stripFences(s: string): string {
+  return s.trim().replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/i, "").trim();
+}
+
+// ── Rumsbeskrivning från bilder (vision) ───────────────────────────────────────
 
 const ImageInput = z.object({
   name: z.string(),
@@ -43,39 +100,13 @@ const SCHEMA_HINT = `Returnera JSON med exakt denna form:
 - options ska vara konkreta materialalternativ, alltid med "Vet ej" som sista alternativ.
 - max 4 clarifications.`;
 
-async function callGateway(body: unknown): Promise<string> {
-  const key = process.env.LOVABLE_API_KEY;
-  if (!key) throw new Error("LOVABLE_API_KEY saknas på servern.");
-  const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Lovable-API-Key": key,
-    },
-    body: JSON.stringify(body),
-  });
-  if (res.status === 429) throw new Error("AI-tjänsten är överbelastad just nu. Försök igen om en stund.");
-  if (res.status === 402) throw new Error("AI-krediter slut. Lägg till krediter i Lovable-arbetsytan.");
-  if (!res.ok) {
-    const t = await res.text();
-    throw new Error(`AI-fel (${res.status}): ${t.slice(0, 200)}`);
-  }
-  const json = await res.json();
-  const content = json?.choices?.[0]?.message?.content;
-  if (typeof content !== "string") throw new Error("Oväntat AI-svar.");
-  return content;
-}
-
-function parseJson(content: string): RoomAnalysis {
-  let txt = content.trim();
-  // Strip ```json fences if model adds them anyway
-  txt = txt.replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/i, "").trim();
-  const obj = JSON.parse(txt);
+function parseRoomJson(content: string): RoomAnalysis {
+  const obj = JSON.parse(stripFences(content));
   return {
     description: String(obj.description ?? "").trim(),
     observed: Array.isArray(obj.observed) ? obj.observed.map(String) : [],
     clarifications: Array.isArray(obj.clarifications)
-      ? obj.clarifications.slice(0, 4).map((c: any, i: number) => ({
+      ? obj.clarifications.slice(0, 4).map((c: { id?: unknown; question?: unknown; options?: unknown }, i: number) => ({
           id: String(c.id ?? `q${i}`),
           question: String(c.question ?? ""),
           options: Array.isArray(c.options) ? c.options.map(String).slice(0, 5) : [],
@@ -95,28 +126,16 @@ export const analyzeRoomImages = createServerFn({ method: "POST" })
       SCHEMA_HINT,
     ].filter(Boolean).join("\n");
 
-    const content = await callGateway({
-      model: "google/gemini-3-flash-preview",
-      messages: [
-        { role: "system", content: SYSTEM },
-        {
-          role: "user",
-          content: [
-            { type: "text", text: userText },
-            ...data.images.map((img) => ({
-              type: "image_url" as const,
-              image_url: { url: img.dataUrl },
-            })),
-          ],
-        },
-      ],
-      response_format: { type: "json_object" },
-    });
+    const content: ContentBlock[] = [
+      { type: "text", text: userText },
+      ...data.images.map((img) => imageBlockFromDataUrl(img.dataUrl)),
+    ];
 
-    return parseJson(content);
+    const text = await callClaude({ system: SYSTEM, content, maxTokens: 1500 });
+    return parseRoomJson(text);
   });
 
-// ── Marketing text generation ─────────────────────────────────────────────────
+// ── Annonstext ─────────────────────────────────────────────────────────────────
 
 const MarketingInput = z.object({
   adress: z.string(),
@@ -145,9 +164,6 @@ Svara ENDAST med giltig JSON. Inga kodblock, ingen text utanför JSON.`;
 export const generateMarketingText = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => MarketingInput.parse(input))
   .handler(async ({ data }): Promise<MarketingTextResult> => {
-    const key = process.env.LOVABLE_API_KEY;
-    if (!key) throw new Error("LOVABLE_API_KEY saknas på servern.");
-
     const facts = [
       `Adress: ${data.adress}`,
       data.stad ? `Ort: ${data.stad}` : "",
@@ -167,40 +183,16 @@ export const generateMarketingText = createServerFn({ method: "POST" })
   "lang": "Lång säljande beskrivning (400-800 ord, 4-6 stycken, flytande text)"
 }`;
 
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Lovable-API-Key": key,
-      },
-      body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
-        messages: [
-          { role: "system", content: MARKETING_SYSTEM },
-          { role: "user", content: userText },
-        ],
-        response_format: { type: "json_object" },
-      }),
-    });
-
-    if (res.status === 429) throw new Error("AI-tjänsten är överbelastad just nu. Försök igen om en stund.");
-    if (res.status === 402) throw new Error("AI-krediter slut. Lägg till krediter i Lovable-arbetsytan.");
-    if (!res.ok) {
-      const t = await res.text();
-      throw new Error(`AI-fel (${res.status}): ${t.slice(0, 200)}`);
-    }
-
-    const json = await res.json();
-    const content = String(json?.choices?.[0]?.message?.content ?? "").trim()
-      .replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/i, "").trim();
-
-    const parsed = JSON.parse(content);
+    const text = await callClaude({ system: MARKETING_SYSTEM, content: userText, maxTokens: 2000 });
+    const parsed = JSON.parse(stripFences(text));
     return {
       rubrik: String(parsed.rubrik ?? "").trim(),
       kort: String(parsed.kort ?? "").trim(),
       lang: String(parsed.lang ?? "").trim(),
     };
   });
+
+// ── Slutgiltig rumstext (efter följdfrågor) ─────────────────────────────────────
 
 const FinalizeInput = z.object({
   roomName: z.string(),
@@ -214,9 +206,6 @@ const FinalizeInput = z.object({
 export const finalizeRoomText = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => FinalizeInput.parse(input))
   .handler(async ({ data }): Promise<{ text: string }> => {
-    const key = process.env.LOVABLE_API_KEY;
-    if (!key) throw new Error("LOVABLE_API_KEY saknas.");
-
     const userText = [
       `Skriv den slutgiltiga rumsbeskrivningen för ${data.roomName}${data.floor ? ` (${data.floor})` : ""}.`,
       "",
@@ -233,22 +222,11 @@ export const finalizeRoomText = createServerFn({ method: "POST" })
       "Regler: Naturlig svenska, 3–5 meningar, löptext, inga floskler, inga påhittade detaljer. Returnera ENDAST själva texten.",
     ].filter(Boolean).join("\n");
 
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "Lovable-API-Key": key },
-      body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
-        messages: [
-          { role: "system", content: "Du skriver svenska mäklartexter — naturligt, korrekt, inga floskler." },
-          { role: "user", content: userText },
-        ],
-      }),
+    const text = await callClaude({
+      system: "Du skriver svenska mäklartexter — naturligt, korrekt, inga floskler.",
+      content: userText,
+      maxTokens: 800,
     });
-    if (res.status === 429) throw new Error("AI överbelastad. Försök igen strax.");
-    if (res.status === 402) throw new Error("AI-krediter slut.");
-    if (!res.ok) throw new Error(`AI-fel (${res.status}).`);
-    const json = await res.json();
-    const text = String(json?.choices?.[0]?.message?.content ?? "").trim();
     return { text };
   });
 
@@ -273,9 +251,6 @@ export type VisningsFusklappResult = {
 export const generateVisningsFusklapp = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => VisningsFusklappInput.parse(input))
   .handler(async ({ data }): Promise<VisningsFusklappResult> => {
-    const key = process.env.LOVABLE_API_KEY;
-    if (!key) throw new Error("LOVABLE_API_KEY saknas.");
-
     const facts = [
       `Adress: ${data.adress}, ${data.postnr} ${data.stad}`,
       `Typ: ${data.typ}`,
@@ -294,28 +269,14 @@ Ge en kort beskrivning av OMRÅDET (2-3 meningar om kommunikationer, karaktär o
 
 Ge också 5 vanliga frågor som spekulanter brukar ställa på visningar av denna bostadstyp (kortfattade, som en checklista).
 
-Returnera JSON:
+Returnera ENDAST giltig JSON:
 {
   "omradet": "...",
   "fragaTips": ["...", "...", "...", "...", "..."]
 }`;
 
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "Lovable-API-Key": key },
-      body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
-        messages: [{ role: "user", content: userText }],
-        response_format: { type: "json_object" },
-      }),
-    });
-    if (res.status === 429) throw new Error("AI-tjänsten är överbelastad.");
-    if (res.status === 402) throw new Error("AI-krediter slut.");
-    if (!res.ok) throw new Error(`AI-fel (${res.status})`);
-    const json = await res.json();
-    const content = String(json?.choices?.[0]?.message?.content ?? "").trim()
-      .replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/i, "").trim();
-    const parsed = JSON.parse(content);
+    const text = await callClaude({ content: userText, maxTokens: 1000 });
+    const parsed = JSON.parse(stripFences(text));
     return {
       omradet: String(parsed.omradet ?? "").trim(),
       fragaTips: Array.isArray(parsed.fragaTips) ? parsed.fragaTips.map(String) : [],
@@ -336,9 +297,6 @@ export type MorningBriefResult = { text: string };
 export const generateMorningBrief = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => MorningBriefInput.parse(input))
   .handler(async ({ data }): Promise<MorningBriefResult> => {
-    const key = process.env.LOVABLE_API_KEY;
-    if (!key) throw new Error("LOVABLE_API_KEY saknas.");
-
     const parts: string[] = [];
     if (data.overdueCount > 0)
       parts.push(`${data.overdueCount} förfalln${data.overdueCount === 1 ? "et" : "a"} nästa steg`);
@@ -358,18 +316,6 @@ Fakta idag: ${data.activeObjCount} aktiva uppdrag, ${facts}.
 
 Regler: Exakt 1-2 meningar. Naturlig svenska. Lyft fram siffror och tider om de finns. Börja INTE med "Hej" eller hälsningsfras — börja direkt med innehållet. Ingen formatering. Returnera ENBART texten.`;
 
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "Lovable-API-Key": key },
-      body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
-        messages: [{ role: "user", content: userText }],
-      }),
-    });
-    if (res.status === 429) throw new Error("AI-tjänsten är överbelastad.");
-    if (res.status === 402) throw new Error("AI-krediter slut.");
-    if (!res.ok) throw new Error(`AI-fel (${res.status})`);
-    const json = await res.json();
-    const text = String(json?.choices?.[0]?.message?.content ?? "").trim();
+    const text = await callClaude({ content: userText, maxTokens: 300 });
     return { text };
   });
