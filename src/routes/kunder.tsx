@@ -655,16 +655,16 @@ function relDaysSince(ts: number) {
   return `${Math.floor(d / 30)} månader sedan`;
 }
 
-function RingLage({ onClose }: { onClose: () => void }) {
+export function RingLage({ onClose, kontakter: source }: { onClose: () => void; kontakter?: Kontakt[] }) {
   const allKontakter = useMemo(() => {
-    return listKontakter()
+    return (source ?? listKontakter())
       .filter((k) => k.telefon.trim())
       .sort((a, b) => {
         const la = a.aktiviteter.length > 0 ? Math.max(...a.aktiviteter.map((x) => x.tidpunkt)) : a.skapadAt;
         const lb = b.aktiviteter.length > 0 ? Math.max(...b.aktiviteter.map((x) => x.tidpunkt)) : b.skapadAt;
         return la - lb;
       });
-  }, []);
+  }, [source]);
 
   const [index, setIndex] = useState(0);
   const [phase, setPhase] = useState<"ring" | "outcome">("ring");
