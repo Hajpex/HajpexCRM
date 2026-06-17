@@ -223,7 +223,7 @@ function ObjektsformularPage() {
       boarea,
       pris,
       saljare: saljareNamn,
-      ansvarig: authUser?.name ?? "Max Stendahl",
+      ansvarig: authUser?.name ?? "",
       status: "Under intag",
       kalla: "Eget upplägg",
     });

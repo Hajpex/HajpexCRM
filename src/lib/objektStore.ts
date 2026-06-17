@@ -58,7 +58,7 @@ export function saveObjekt(input: NewObjektInput): SavedObjekt {
     boarea: input.boarea ?? 0,
     pris: input.pris ?? 0,
     saljare: input.saljare ?? "",
-    ansvarig: input.ansvarig ?? "Max Stendahl",
+    ansvarig: input.ansvarig ?? "",
     status: input.status ?? "Under intag",
     spek: [0, 0, 0, 0],
     kalla: input.kalla ?? "Eget upplägg",

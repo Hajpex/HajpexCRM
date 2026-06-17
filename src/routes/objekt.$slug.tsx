@@ -568,13 +568,10 @@ function AnteckningarCard() {
 function TrafikCard() {
   return (
     <Card title="Trafik bostadssida" icon="📊">
-        <div className="text-xs text-muted-foreground">Bostadssida trafik: 25</div>
-        <div className="mt-2 flex items-center justify-center">
-          <Donut />
-        </div>
-        <div className="mt-3 flex justify-center gap-4 text-[11px] text-muted-foreground">
-          <Legend color="bg-sky-400" label="hemsida" />
-          <Legend color="bg-emerald-400" label="övrigt" />
+        <div className="text-xs text-muted-foreground">Bostadssida trafik: 0</div>
+        <div className="mt-3 flex flex-col items-center justify-center gap-1 py-4 text-center">
+          <span className="text-2xl font-medium text-foreground">0</span>
+          <span className="text-[11px] text-muted-foreground">sidvisningar totalt</span>
         </div>
     </Card>
   );
@@ -773,9 +770,9 @@ function DetaljerCard({ slug }: { slug: string }) {
   const storlek = o?.boarea ? `${o.boarea} m²` : "—";
   const rum = o?.rum ? String(o.rum) : "—";
   const pris = o?.pris ? fmtKrShort(o.pris) : "—";
-  const manadsavgift =
-    o?.typ === "Bostadsrätt" ? `${(2500 + ((o.boarea | 0) * 35)).toLocaleString("sv-SE")} kr / mån` : "0 kr / mån";
-  const ansvarig = o?.ansvarig ?? "—";
+  const manadsavgift = "—";
+  const ansvarig = o?.ansvarig || "—";
+  const skapadDatum = o && "savedAt" in o ? new Date((o as { savedAt: number }).savedAt).toLocaleDateString("sv-SE") : "—";
   return (
     <Card title="Detaljer" icon="ℹ️">
         <dl className="grid grid-cols-2 gap-y-2 text-sm">
@@ -786,9 +783,7 @@ function DetaljerCard({ slug }: { slug: string }) {
           <Row k="Utgångspris" v={pris} />
           <Row k="Månadsavgift" v={manadsavgift} />
           <Row k="Ansvarig mäklare" v={ansvarig} />
-          <Row k="Uppdragsdatum" v="2026-05-27" />
-          <Row k="Senast uppdaterad" v="2026-06-12 13:40" />
-          <Row k="Skapat" v="2026-05-27 09:31" />
+          <Row k="Skapat" v={skapadDatum} />
         </dl>
     </Card>
   );
