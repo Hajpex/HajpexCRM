@@ -62,37 +62,41 @@ Testinloggning: `max@test.se` (super_admin / Hajpex).
   skapa/inaktivera mäklare).
 - Dashboard: onboarding-bannern borttagen; "+ Ny kontakt" öppnar modal kvar på
   startsidan och går till personen efter sparande; tydligare sökfält.
-- "Ring-läge" (ringlista) finns redan på Kontakter-sidan (`kunder.tsx`).
+- **Säljare-bugg fixad:** Säljare-fliken (`SaljareView`) visar nu BARA riktiga
+  kopplade kontakter + tom-state, ingen genererad demo-fallback. Översikt och
+  flik är konsekventa.
+- **Listor ombyggd på riktig data:** flikar Kontakter/Intagsmöten/Uppgifter
+  drivs av riktiga stores. Ny flik **Ringlistor** med kurerade listor som
+  startar ring-läget. `RingLage` exporteras nu från `kunder.tsx` och tar en
+  filtrerad lista.
+- Nästlade-knappen-buggen i VisningRow fixad (hydrering).
+- "Ring-läge" (ringlista) finns på Kontakter-sidan OCH via Listor-fliken.
 
 ## ÅTERSTÅR (prioriterat — detta är nästa jobb)
-1. **Säljare-inkonsekvens (bugg).** Det finns TRE källor för säljare som
-   används om vartannat: (a) riktiga kopplade kontakter i `kontaktStore`,
-   (b) seed-strängen `o.saljare` i `src/data/objekt.ts`, (c) genererad demodata
-   `getDemoSaljare()` i `src/lib/demoKontakter.ts`. Säljare-fliken
-   (`SaljareView` i `objekt.$slug.tsx`) faller tillbaka på (c) när ingen riktig
-   kontakt finns, medan översikten/Parter använder (a). Därför kan ett objekt
-   visa en säljare på ett ställe men inte i fliken. **Fix:** gör säljare till
-   EN källa (riktiga kontakter) och ta bort demo-fallbacken. Hänger ihop med
-   beslutet om demodata nedan.
-2. **Roller: kontorschef vs mäklare.** Kontorschef ska kunna sätta mäklares
-   budget, dela ut leads och styra. Vanlig mäklare har standardfunktioner.
-   Behöver designas (mappa mot befintlig `admin`-roll eller ny `kontorschef`).
-   Ej påbörjad.
-3. **Ringlistor på Listor-fliken + ersätt mockdata.** Hela `src/routes/listor.tsx`
-   är hårdkodad mockdata (t.ex. "7387 kontakter", påhittade namn). Ska kopplas
-   mot riktig data och få ringlist-funktion (återanvänd `RingLage` från
-   `kunder.tsx`).
+1. **Roller: kontorschef vs mäklare.** Designförslag klart i **`KONTORSCHEF.md`**
+   — läs det och ställ frågorna där till Max innan bygge (rör datamodell + RLS).
+   Kort: kontorschef = `admin`, får sätta mäklares budget (säljmål) + dela ut
+   leads; vanlig mäklare ser bara sitt eget.
+2. **Statistik-fliken** (`statistik.tsx`) visar fortfarande demodata — byt mot
+   riktiga KPI:er (och utfall mot budget när rollen byggts).
+3. **Deploy** för publik/iPad-demo: kräver Max-klick (koppla GitHub + 2 env-vars
+   i Vercel). Appen är TanStack Start + Nitro; Supabase-backend funkar direkt.
 
-Lägre prio: statistik-fliken (`statistik.tsx`) visar fortfarande demodata;
-kontraktflödet (`KontraktView`) är delvis platshållare.
+Lägre prio: kontraktflödet (`KontraktView`) är delvis platshållare.
+
+## OBS — verifieringsgräns
+Assistenten får INTE mata in lösenord för att logga in (säkerhetsregel), och hela
+appen ligger bakom login. Autonoma ändringar verifieras därför med
+`npx tsc --noEmit` (typkoll) + kodgranskning, inte klick i webbläsaren. Be Max
+verifiera visuellt, eller gör det när Max redan är inloggad.
 
 ## Öppet PRODUKTBESLUT (fråga Max)
-Mycket av appen fylls av **demodata**: `seedDemoKontakter()` skapar fejk-kontakter
-för 30+ demo-objekt i `src/data/objekt.ts`, och `listor.tsx` är helt mockad.
-Max vill bort från det hårdkodade. Innan punkt 1 och 3 ovan görs ordentligt:
-ska demodatan **behållas som tydligt demo-läge** (för säljdemos) eller **tas
-bort** så appen bara visar riktig data? Detta styr fixen för både säljare och
-Listor.
+Appen fylls fortfarande av **demodata**: `seedDemoKontakter()` skapar
+fejk-kontakter för 30+ demo-objekt i `src/data/objekt.ts`. (Listor-fliken är
+INTE längre mockad — den drivs nu av riktig data.) Max vill bort från det
+hårdkodade. Beslut som behövs: ska demodatan **behållas som tydligt demo-läge**
+(för säljdemos) eller **tas bort** så appen bara visar riktig data? Styr
+statistik-fliken och hur tomma vyer ser ut.
 
 ## Kända småsaker
 - Nästlade `<button>` i VisningRow (`objekt.$slug.tsx`) ger hydreringsvarning.
