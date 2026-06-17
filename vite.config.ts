@@ -12,4 +12,6 @@ export default defineConfig({
     // nitro/vite builds from this
     server: { entry: "server" },
   },
+  // Bygg för Vercel (annars defaultar configen till Cloudflare → 404 på Vercel).
+  nitro: { preset: "vercel" },
 });
