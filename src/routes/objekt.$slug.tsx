@@ -209,7 +209,7 @@ function ObjektDetailPage() {
               ) : tab === "Objektsinfo" ? (
                 <ObjektsinfoView adress={adress} slug={slug} />
               ) : tab === "Marknad" ? (
-                <MarknadView />
+                <MarknadView slug={slug} />
               ) : tab === "Visningar" ? (
                 <VisningarView />
               ) : tab === "Budgivning" ? (
@@ -244,7 +244,7 @@ function ObjektDetailPage() {
               ) : tab === "Objektsinfo" ? (
                 <ObjektsinfoView adress={adress} slug={slug} />
               ) : tab === "Marknad" ? (
-                <MarknadView />
+                <MarknadView slug={slug} />
               ) : tab === "Visningar" ? (
                 <VisningarView />
               ) : tab === "Budgivning" ? (
@@ -4018,7 +4018,7 @@ function KontraktView({ slug, onTabChange }: { slug: string; onTabChange: (tab: 
         <MaMjBody />
       </KoSec>
       <KoSec id="publicera" title="Publicera" open={open.publicera} onToggle={toggle} done={done.publicera} onToggleDone={toggleDone}>
-        <MaPubliceraBody />
+        <MaPubliceraBody slug={slug} />
       </KoSec>
       <KoSec id="saljare" title="Säljare" open={open.saljare} onToggle={toggle} done={done.saljare} onToggleDone={toggleDone}>
         <KoPartyBody role="Säljare" slug={slug} onTabChange={onTabChange} />
@@ -4927,7 +4927,7 @@ type MaSection =
   | "mj" | "marknad" | "visningar" | "publicera"
   | "boende" | "dokument" | "filer" | "tjanster";
 
-function MarknadView() {
+function MarknadView({ slug }: { slug: string }) {
   const [open, setOpen] = useState<Record<MaSection, boolean>>({
     mj: true, marknad: false, visningar: false, publicera: false,
     boende: false, dokument: false, filer: false, tjanster: false,
@@ -4951,7 +4951,7 @@ function MarknadView() {
         <MaVisningarBody />
       </MaSec>
       <MaSec id="publicera" title="Publicera" open={open.publicera} onToggle={toggle} done={done.publicera} onToggleDone={toggleDone}>
-        <MaPubliceraBody />
+        <MaPubliceraBody slug={slug} />
       </MaSec>
       <MaSec id="boende" title="Boendekostnadskalkyl" open={open.boende} onToggle={toggle} done={done.boende} onToggleDone={toggleDone}>
         <MaBoendeBody />
@@ -5545,9 +5545,12 @@ function MaVisningarBody() {
 
 /* ---------- Publicera ---------- */
 
-function MaPubliceraBody() {
+function MaPubliceraBody({ slug }: { slug: string }) {
+  const blank = isUserCreatedSlug(slug);
   const platforms = [
-    { name: "SkandiaMäklarna", status: "Förhandsgranskning", color: "emerald", published: "2026-06-12 10:09", updated: "2026-06-12 13:40" },
+    blank
+      ? { name: "SkandiaMäklarna", status: "Ej publicerad", color: "muted" }
+      : { name: "SkandiaMäklarna", status: "Förhandsgranskning", color: "emerald", published: "2026-06-12 10:09", updated: "2026-06-12 13:40" },
     { name: "Hemnet", status: "Ej publicerad", color: "muted", link: "Priskalkyl" },
     { name: "Boneo", desc: "Bonnier annonsering" },
     { name: "Bonnier Bostadsboxen", desc: "Digital annonsering på DN, Di och Expressen + ett hundratal lokaltidningar. Kontakta bostad@bonniernews.se för mer information och demo." },
@@ -5571,9 +5574,15 @@ function MaPubliceraBody() {
               <div className="font-medium">SkandiaMäklarna</div>
               <div className="mt-2 grid grid-cols-[160px_1fr] gap-y-1 text-sm">
                 <span className="text-muted-foreground">Nuvarande status:</span>
-                <span><span className="rounded bg-emerald-500/15 px-2 py-0.5 text-[10px] uppercase text-emerald-700">Förhandsgranskning</span></span>
-                <span className="text-muted-foreground">Publicerad:</span><span>2026-06-12 10:09</span>
-                <span className="text-muted-foreground">Senast uppdaterad:</span><span>2026-06-12 13:40</span>
+                {blank ? (
+                  <span><span className="rounded bg-muted px-2 py-0.5 text-[10px] uppercase text-muted-foreground">Ej publicerad</span></span>
+                ) : (
+                  <>
+                    <span><span className="rounded bg-emerald-500/15 px-2 py-0.5 text-[10px] uppercase text-emerald-700">Förhandsgranskning</span></span>
+                    <span className="text-muted-foreground">Publicerad:</span><span>2026-06-12 10:09</span>
+                    <span className="text-muted-foreground">Senast uppdaterad:</span><span>2026-06-12 13:40</span>
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -5939,6 +5948,26 @@ function ObjektsbeskrivningView({ adress, slug }: { adress: string; slug: string
     sidnr: false, doljMaklare: false, qrPdf: true,
   });
   const set = (k: keyof typeof opts) => setOpts((o) => ({ ...o, [k]: !o[k] }));
+
+  // Nyskapat objekt utan sparad annonstext → visa tomt läge i stället för
+  // den genererade demo-förhandsvisningen (som annars hittar på text/mäklare).
+  const blank = isUserCreatedSlug(slug);
+  const hasText = Boolean(aiRubrik || aiKort || aiLang);
+  if (blank && !hasText) {
+    return (
+      <div className="pl-2">
+        <div className="flex flex-col items-center justify-center rounded-md border border-dashed border-border bg-card px-6 py-20 text-center">
+          <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full border border-primary/30 bg-primary/10 text-2xl text-primary">📄</div>
+          <div className="text-lg text-foreground" style={serif}>Ingen objektsbeskrivning ännu</div>
+          <p className="mt-2 max-w-md text-sm text-muted-foreground">
+            Generera säljande annonstext via <span className="text-primary">Marknad</span>-fliken,
+            eller bygg rumsbeskrivningar med AI under <span className="text-primary">Objektsinfo → Rum</span>.
+            När det finns text visas förhandsvisningen här.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-4 pl-2 lg:flex-row">
