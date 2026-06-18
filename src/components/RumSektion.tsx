@@ -22,6 +22,7 @@ type EditorRoom = {
   floor: string;
   description: string;
   images: RoomImage[];
+  collapsed: boolean;
   aiStatus: "idle" | "analyzing" | "needs-input" | "finalizing" | "done" | "error";
   aiError?: string;
   aiDraft?: string;
@@ -33,7 +34,7 @@ type EditorRoom = {
 
 export function RumSektion({ slug, propertyType }: { slug: string; propertyType?: string }) {
   const [rooms, setRooms] = useState<EditorRoom[]>(() =>
-    listRum(slug).map((r) => ({ ...r, images: [], aiStatus: "idle" as const }))
+    listRum(slug).map((r) => ({ ...r, images: [], collapsed: !!r.description, aiStatus: "idle" as const }))
   );
 
   const analyzeFn = useServerFn(analyzeRoomImages);
@@ -45,7 +46,7 @@ export function RumSektion({ slug, propertyType }: { slug: string; propertyType?
 
   function handleAddRoom(name: string, floor = "Entréplan") {
     const saved = addRum(slug, name, floor);
-    setRooms((rs) => [...rs, { ...saved, images: [], aiStatus: "idle" }]);
+    setRooms((rs) => [...rs, { ...saved, images: [], collapsed: false, aiStatus: "idle" }]);
   }
 
   function handleDeleteRoom(id: string) {
@@ -140,65 +141,77 @@ export function RumSektion({ slug, propertyType }: { slug: string; propertyType?
   function pickVariant(room: EditorRoom, text: string) {
     const desc = room.description ? room.description + "\n\n" + text : text;
     updateRum(slug, room.id, { description: desc });
-    patch(room.id, { description: desc, aiStatus: "idle", aiVariants: undefined });
+    patch(room.id, { description: desc, aiStatus: "idle", aiVariants: undefined, collapsed: true });
   }
+
+  function toggleCollapse(id: string) {
+    setRooms((rs) => rs.map((r) => r.id === id ? { ...r, collapsed: !r.collapsed } : r));
+  }
+
+  const AddRoomPanel = () => (
+    <div className="rounded-xl border border-border/50 bg-muted/30 p-4">
+      <MiniLabel className="mb-3">Lägg till rum</MiniLabel>
+      <div className="flex flex-wrap gap-2">
+        {QUICK_ROOMS.map((name) => (
+          <button key={name} onClick={() => handleAddRoom(name)}
+            className="rounded-full border border-border bg-muted/40 px-3.5 py-1.5 text-xs font-medium text-foreground transition-all hover:border-primary/50 hover:bg-primary/10 hover:text-primary">
+            + {name}
+          </button>
+        ))}
+        <button onClick={() => handleAddRoom("Nytt rum")}
+          className="rounded-full border border-primary/40 bg-primary/10 px-3.5 py-1.5 text-xs font-medium uppercase tracking-[0.12em] text-primary transition-colors hover:bg-primary/20">
+          + Annat rum
+        </button>
+      </div>
+    </div>
+  );
 
   return (
     <div className="space-y-5">
-      {/* Snabblägg till */}
-      <div className="rounded-xl border border-border/50 bg-muted/30 p-4">
-        <MiniLabel className="mb-3">Lägg till rum</MiniLabel>
-        <div className="flex flex-wrap gap-2">
-          {QUICK_ROOMS.map((name) => (
-            <button key={name} onClick={() => handleAddRoom(name)}
-              className="rounded-full border border-border bg-muted/40 px-3.5 py-1.5 text-xs font-medium text-foreground transition-all hover:border-primary/50 hover:bg-primary/10 hover:text-primary">
-              + {name}
-            </button>
-          ))}
-          <button onClick={() => handleAddRoom("Nytt rum")}
-            className="rounded-full border border-primary/40 bg-primary/10 px-3.5 py-1.5 text-xs font-medium uppercase tracking-[0.12em] text-primary transition-colors hover:bg-primary/20">
-            + Annat rum
-          </button>
-        </div>
-      </div>
-
       {rooms.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border bg-black/20 px-6 py-12 text-center">
-          <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full border border-primary/30 bg-primary/10 text-primary">
-            <UploadIcon />
+        <>
+          <AddRoomPanel />
+          <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border bg-black/20 px-6 py-12 text-center">
+            <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full border border-primary/30 bg-primary/10 text-primary">
+              <UploadIcon />
+            </div>
+            <div className="text-base text-foreground" style={serifStyle}>Inga rum tillagda än.</div>
+            <div className="mt-1 max-w-sm text-xs text-muted-foreground">
+              Lägg till t.ex. Hall, Kök eller Sovrum — ladda sedan upp foton så beskriver AI:n rummet åt dig.
+            </div>
           </div>
-          <div className="text-base text-foreground" style={serifStyle}>Inga rum tillagda än.</div>
-          <div className="mt-1 max-w-sm text-xs text-muted-foreground">
-            Lägg till t.ex. Hall, Kök eller Sovrum — ladda sedan upp foton så beskriver AI:n rummet åt dig.
-          </div>
-        </div>
+        </>
       ) : (
-        <div className="flex flex-col gap-5">
-          {rooms.map((room, idx) => (
-            <RoomCard
-              key={room.id}
-              room={room}
-              index={idx + 1}
-              onName={(v) => persist(room.id, { name: v })}
-              onFloor={(v) => persist(room.id, { floor: v })}
-              onDescription={(v) => persist(room.id, { description: v })}
-              onDelete={() => handleDeleteRoom(room.id)}
-              onUpload={(files) => handleFiles(room.id, files)}
-              onRemoveImage={(imgId) => removeImage(room.id, imgId)}
-              onAnalyze={() => analyzeRoom(room)}
-              onAnswer={(qid, val) => setAnswer(room.id, qid, val)}
-              onFinalize={() => finalizeRoom(room)}
-              onPickVariant={(text) => pickVariant(room, text)}
-            />
-          ))}
-        </div>
+        <>
+          <div className="flex flex-col gap-3">
+            {rooms.map((room, idx) => (
+              <RoomCard
+                key={room.id}
+                room={room}
+                index={idx + 1}
+                onName={(v) => persist(room.id, { name: v })}
+                onFloor={(v) => persist(room.id, { floor: v })}
+                onDescription={(v) => persist(room.id, { description: v })}
+                onDelete={() => handleDeleteRoom(room.id)}
+                onUpload={(files) => handleFiles(room.id, files)}
+                onRemoveImage={(imgId) => removeImage(room.id, imgId)}
+                onAnalyze={() => analyzeRoom(room)}
+                onAnswer={(qid, val) => setAnswer(room.id, qid, val)}
+                onFinalize={() => finalizeRoom(room)}
+                onPickVariant={(text) => pickVariant(room, text)}
+                onToggleCollapse={() => toggleCollapse(room.id)}
+              />
+            ))}
+          </div>
+          <AddRoomPanel />
+        </>
       )}
     </div>
   );
 }
 
 function RoomCard({
-  room, index, onName, onFloor, onDescription, onDelete, onUpload, onRemoveImage, onAnalyze, onAnswer, onFinalize, onPickVariant,
+  room, index, onName, onFloor, onDescription, onDelete, onUpload, onRemoveImage, onAnalyze, onAnswer, onFinalize, onPickVariant, onToggleCollapse,
 }: {
   room: EditorRoom;
   index: number;
@@ -212,9 +225,33 @@ function RoomCard({
   onAnswer: (qid: string, value: string) => void;
   onFinalize: () => void;
   onPickVariant: (text: string) => void;
+  onToggleCollapse: () => void;
 }) {
   const canAnalyze = room.images.length > 0 && room.aiStatus !== "analyzing" && room.aiStatus !== "finalizing";
   const unanswered = useMemo(() => (room.aiAnswers ?? []).some((a) => !a.answer), [room.aiAnswers]);
+
+  if (room.collapsed) {
+    return (
+      <div className="flex items-center gap-3 rounded-xl border border-border bg-muted/20 px-5 py-3.5">
+        <span className="font-mono text-xs text-primary/50 shrink-0">{String(index).padStart(2, "0")}</span>
+        <div className="flex-1 min-w-0">
+          <span className="text-sm font-medium" style={serifStyle}>{room.name || "Rum"}</span>
+          {room.floor && <span className="ml-2 text-[11px] text-muted-foreground">{room.floor}</span>}
+          {room.description && (
+            <p className="mt-0.5 truncate text-xs text-muted-foreground">{room.description.split("\n")[0]}</p>
+          )}
+        </div>
+        <button onClick={onToggleCollapse}
+          className="shrink-0 rounded-md border border-border bg-muted/40 px-2.5 py-1 text-[11px] text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary">
+          Redigera
+        </button>
+        <button onClick={onDelete}
+          className="shrink-0 rounded-md border border-white/5 px-2 py-1 text-[11px] text-muted-foreground/50 transition-colors hover:border-destructive/40 hover:text-destructive">
+          ×
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="overflow-hidden rounded-xl border border-border bg-muted/20">
@@ -228,6 +265,12 @@ function RoomCard({
           onChange={(e) => onName(e.target.value)}
           placeholder="Rummets namn"
         />
+        {room.description && (
+          <button onClick={onToggleCollapse}
+            className="rounded-md border border-border bg-muted/30 px-2.5 py-1.5 text-[11px] uppercase tracking-[0.12em] text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary">
+            Minimera
+          </button>
+        )}
         <button onClick={onDelete}
           className="rounded-md border border-white/5 px-2.5 py-1.5 text-[11px] uppercase tracking-[0.14em] text-muted-foreground transition-colors hover:border-destructive/40 hover:text-destructive">
           Ta bort
