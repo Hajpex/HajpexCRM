@@ -2661,8 +2661,10 @@ function DokumentView({ slug, onTabChange }: { slug: string; onTabChange: (tab: 
     else setUploadedFil((prev) => [...prev, ...mapped]);
   }
 
-  const allFiles = [...DOK_FILES.map((f, i) => ({ ...f, ord: i + 1 })), ...uploadedFil.map((f, i) => ({
-    ord: DOK_FILES.length + i + 1,
+  const blank = isUserCreatedSlug(slug);
+  const baseDokFiles = blank ? [] : DOK_FILES;
+  const allFiles = [...baseDokFiles.map((f, i) => ({ ...f, ord: i + 1 })), ...uploadedFil.map((f, i) => ({
+    ord: baseDokFiles.length + i + 1,
     ext: (f.ext === "pdf" ? "pdf" : "png") as "pdf" | "png",
     typ: "Övrigt",
     titel: f.name,
@@ -2719,7 +2721,7 @@ function DokumentView({ slug, onTabChange }: { slug: string; onTabChange: (tab: 
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {getDokDocuments(isBrf).map((d) => (
+              {(blank ? [] : getDokDocuments(isBrf)).map((d) => (
                 <tr key={d.n}>
                   <td className="px-3 py-2">
                     <div className="font-medium">{d.n}</div>
@@ -5013,8 +5015,8 @@ function MarknadView() {
     boende: false, dokument: false, filer: false, tjanster: false,
   });
   const [done, setDone] = useState<Record<MaSection, boolean>>({
-    mj: false, marknad: true, visningar: false, publicera: true,
-    boende: false, dokument: true, filer: true, tjanster: false,
+    mj: false, marknad: false, visningar: false, publicera: false,
+    boende: false, dokument: false, filer: false, tjanster: false,
   });
   const toggle = (id: MaSection) => setOpen((o) => ({ ...o, [id]: !o[id] }));
   const toggleDone = (id: MaSection) => setDone((d) => ({ ...d, [id]: !d[id] }));
