@@ -213,25 +213,19 @@ const FinalizeInput = z.object({
 
 export const finalizeRoomText = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => FinalizeInput.parse(input))
-  .handler(async ({ data }): Promise<{ text: string }> => {
+  .handler(async ({ data }): Promise<{ variants: [string, string, string] }> => {
     const key = process.env.LOVABLE_API_KEY;
     if (!key) throw new Error("LOVABLE_API_KEY saknas.");
 
-    const userText = [
-      `Skriv den slutgiltiga rumsbeskrivningen för ${data.roomName}${data.floor ? ` (${data.floor})` : ""}.`,
-      "",
-      "Ursprunglig beskrivning från bildanalysen:",
-      data.baseDescription,
-      "",
+    const facts = [
+      `Rum: ${data.roomName}${data.floor ? ` (${data.floor})` : ""}`,
+      data.baseDescription ? `Bildanalys: ${data.baseDescription}` : "",
       data.observed.length ? `Observerat: ${data.observed.join(", ")}` : "",
-      "",
-      "Mäklarens svar på följdfrågor (använd dessa som fakta):",
       ...data.answers.map((a) => `- ${a.question} → ${a.answer}`),
-      "",
-      data.existingNotes ? `Mäklarens egna anteckningar: ${data.existingNotes}` : "",
-      "",
-      "Regler: Naturlig svenska, 3–5 meningar, löptext, inga floskler, inga påhittade detaljer. Returnera ENDAST själva texten.",
+      data.existingNotes ? `Mäklarens anteckningar: ${data.existingNotes}` : "",
     ].filter(Boolean).join("\n");
+
+    const userText = `Skriv 3 olika rumsbeskrivningar för ${data.roomName} baserat på dessa fakta:\n\n${facts}\n\nReturnera JSON med exakt dessa fält:\n{\n  "kort": "2–3 meningar, rak och faktabaserad",\n  "standard": "3–5 meningar, lätt säljande ton",\n  "utforlig": "5–7 meningar, detaljrik och inbjudande"\n}\nIngen annan text. Inga kodblock. Inga påhittade detaljer.`;
 
     const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -242,14 +236,23 @@ export const finalizeRoomText = createServerFn({ method: "POST" })
           { role: "system", content: "Du skriver svenska mäklartexter — naturligt, korrekt, inga floskler." },
           { role: "user", content: userText },
         ],
+        response_format: { type: "json_object" },
       }),
     });
     if (res.status === 429) throw new Error("AI överbelastad. Försök igen strax.");
     if (res.status === 402) throw new Error("AI-krediter slut.");
     if (!res.ok) throw new Error(`AI-fel (${res.status}).`);
     const json = await res.json();
-    const text = String(json?.choices?.[0]?.message?.content ?? "").trim();
-    return { text };
+    const raw = String(json?.choices?.[0]?.message?.content ?? "").trim()
+      .replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/i, "").trim();
+    const parsed = JSON.parse(raw);
+    return {
+      variants: [
+        String(parsed.kort ?? "").trim(),
+        String(parsed.standard ?? "").trim(),
+        String(parsed.utforlig ?? "").trim(),
+      ],
+    };
   });
 
 // ── Visnings-fusklapp ────────────────────────────────────────────────────────

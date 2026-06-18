@@ -10,6 +10,7 @@ export type ObjektNoteData = {
   rubrik?: string;
   kortBeskrivning?: string;
   langBeskrivning?: string;
+  manadsavgift?: string;
 };
 
 function read(): Record<string, ObjektNoteData> {
@@ -54,6 +55,13 @@ export function setObjektStatus(slug: string, status: string) {
   const data = read();
   const existing = data[slug] ?? { anteckningar: [], beskrivning: "" };
   data[slug] = { ...existing, statusOverride: status };
+  write(data);
+}
+
+export function setManadsavgift(slug: string, manadsavgift: string) {
+  const data = read();
+  const existing = data[slug] ?? { anteckningar: [], beskrivning: "" };
+  data[slug] = { ...existing, manadsavgift };
   write(data);
 }
 

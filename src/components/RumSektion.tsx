@@ -28,6 +28,7 @@ type EditorRoom = {
   aiObserved?: string[];
   aiQuestions?: RoomClarification[];
   aiAnswers?: Answer[];
+  aiVariants?: [string, string, string];
 };
 
 export function RumSektion({ slug, propertyType }: { slug: string; propertyType?: string }) {
@@ -133,12 +134,16 @@ export function RumSektion({ slug, propertyType }: { slug: string; propertyType?
           existingNotes: room.description,
         },
       });
-      const desc = room.description ? room.description + "\n\n" + res.text : res.text;
-      updateRum(slug, room.id, { description: desc });
-      patch(room.id, { aiStatus: "done", description: desc });
+      patch(room.id, { aiStatus: "done", aiVariants: res.variants });
     } catch (e: any) {
       patch(room.id, { aiStatus: "error", aiError: e?.message ?? "Något gick fel." });
     }
+  }
+
+  function pickVariant(room: EditorRoom, text: string) {
+    const desc = room.description ? room.description + "\n\n" + text : text;
+    updateRum(slug, room.id, { description: desc });
+    patch(room.id, { description: desc, aiStatus: "idle", aiVariants: undefined });
   }
 
   return (
@@ -186,6 +191,7 @@ export function RumSektion({ slug, propertyType }: { slug: string; propertyType?
               onAnalyze={() => analyzeRoom(room)}
               onAnswer={(qid, val) => setAnswer(room.id, qid, val)}
               onFinalize={() => finalizeRoom(room)}
+              onPickVariant={(text) => pickVariant(room, text)}
             />
           ))}
         </div>
@@ -195,7 +201,7 @@ export function RumSektion({ slug, propertyType }: { slug: string; propertyType?
 }
 
 function RoomCard({
-  room, index, onName, onFloor, onDescription, onDelete, onUpload, onRemoveImage, onAnalyze, onAnswer, onFinalize,
+  room, index, onName, onFloor, onDescription, onDelete, onUpload, onRemoveImage, onAnalyze, onAnswer, onFinalize, onPickVariant,
 }: {
   room: EditorRoom;
   index: number;
@@ -208,6 +214,7 @@ function RoomCard({
   onAnalyze: () => void;
   onAnswer: (qid: string, value: string) => void;
   onFinalize: () => void;
+  onPickVariant: (text: string) => void;
 }) {
   const canAnalyze = room.images.length > 0 && room.aiStatus !== "analyzing" && room.aiStatus !== "finalizing";
   const unanswered = useMemo(() => (room.aiAnswers ?? []).some((a) => !a.answer), [room.aiAnswers]);
@@ -354,8 +361,28 @@ function RoomCard({
               </div>
             )}
 
-            {room.aiStatus === "done" && (
-              <p className="mt-3 text-xs text-primary">✓ Text inklistrad i beskrivningen.</p>
+            {room.aiStatus === "done" && room.aiVariants && room.aiVariants.some(Boolean) && (
+              <div className="mt-4 space-y-3">
+                <div className="text-[11px] uppercase tracking-[0.16em] text-primary/70">Välj ett alternativ</div>
+                {(["Kort", "Standard", "Utförlig"] as const).map((label, i) => {
+                  const text = room.aiVariants![i];
+                  if (!text) return null;
+                  return (
+                    <div key={label} className="rounded-lg border border-border bg-black/20 p-3">
+                      <div className="mb-1.5 flex items-center justify-between">
+                        <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{label}</span>
+                        <button
+                          onClick={() => onPickVariant(text)}
+                          className="rounded-md bg-primary px-2.5 py-1 text-[11px] font-medium text-primary-foreground transition-transform hover:scale-[1.02]"
+                        >
+                          Använd →
+                        </button>
+                      </div>
+                      <p className="text-xs leading-relaxed text-foreground/80">{text}</p>
+                    </div>
+                  );
+                })}
+              </div>
             )}
           </div>
         </div>

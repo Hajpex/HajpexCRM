@@ -3,7 +3,7 @@ import { Fragment, createContext, useContext, useRef, useState, useEffect, type 
 import { AppShell } from "../components/AppShell";
 import { OBJEKT, type Objekt } from "../data/objekt";
 import { listObjekt } from "../lib/objektStore";
-import { getObjektNotes, addObjektNote, setObjektBeskrivning, setObjektStatus, setObjektMarknadText } from "../lib/objektNotesStore";
+import { getObjektNotes, addObjektNote, setObjektBeskrivning, setObjektStatus, setObjektMarknadText, setManadsavgift } from "../lib/objektNotesStore";
 import { generateMarketingText } from "../lib/ai.functions";
 import { listBud, addBud, markeraVinnare, deleteBud, dragaTillbakaBud, getBudSettings, setBudSettings, fmtBud, type Bud } from "../lib/budgivningStore";
 import { getKontrakt, saveKontrakt, type KontraktData } from "../lib/kontraktStore";
@@ -569,11 +569,11 @@ function AnteckningarCard() {
 function TrafikCard() {
   return (
     <Card title="Trafik bostadssida" icon="📊">
-        <div className="text-xs text-muted-foreground">Bostadssida trafik: 0</div>
-        <div className="mt-3 flex flex-col items-center justify-center gap-1 py-4 text-center">
-          <span className="text-2xl font-medium text-foreground">0</span>
-          <span className="text-[11px] text-muted-foreground">sidvisningar totalt</span>
-        </div>
+      <div className="flex flex-col items-center justify-center gap-2 py-4 text-center">
+        <span className="text-3xl">📡</span>
+        <span className="text-sm text-muted-foreground">Visas när annonsen är publicerad</span>
+        <span className="text-xs text-muted-foreground/60">Trafik mäts från Hemnet, Booli m.fl.</span>
+      </div>
     </Card>
   );
 }
@@ -767,22 +767,35 @@ function VisningarCard() {
 function DetaljerCard({ slug }: { slug: string }) {
   const o = getObjektBySlug(slug);
   const typ = o?.typ ?? "—";
-  const status = o?.status ?? "—";
   const storlek = o?.boarea ? `${o.boarea} m²` : "—";
   const rum = o?.rum ? String(o.rum) : "—";
   const pris = o?.pris ? fmtKrShort(o.pris) : "—";
-  const manadsavgift = "—";
   const ansvarig = o?.ansvarig || "—";
   const skapadDatum = o && "savedAt" in o ? new Date((o as { savedAt: number }).savedAt).toLocaleDateString("sv-SE") : "—";
+  const [avgift, setAvgift] = useState(() => getObjektNotes(slug).manadsavgift ?? "");
+
+  function handleAvgiftBlur() {
+    setManadsavgift(slug, avgift);
+  }
+
   return (
     <Card title="Detaljer" icon="ℹ️">
         <dl className="grid grid-cols-2 gap-y-2 text-sm">
           <Row k="Objekttyp" v={typ} />
-          <Row k="Status" v={status} />
           <Row k="Storlek" v={storlek} />
           <Row k="Antal rum" v={rum} />
           <Row k="Utgångspris" v={pris} />
-          <Row k="Månadsavgift" v={manadsavgift} />
+          <dt className="text-muted-foreground">Månadsavgift</dt>
+          <dd>
+            <input
+              type="text"
+              value={avgift}
+              onChange={(e) => setAvgift(e.target.value)}
+              onBlur={handleAvgiftBlur}
+              placeholder="t.ex. 3 500 kr/mån"
+              className="w-full border-b border-transparent bg-transparent text-sm focus:border-primary/60 focus:outline-none"
+            />
+          </dd>
           <Row k="Ansvarig mäklare" v={ansvarig} />
           <Row k="Skapat" v={skapadDatum} />
         </dl>
@@ -3551,9 +3564,9 @@ function ObjektsinfoView({ adress, slug }: { adress: string; slug: string }) {
   const objTyp = getObjektBySlug(slug)?.typ;
   const isBrf = objTyp === "Bostadsrätt";
   const [open, setOpen] = useState<Record<OiSection, boolean>>({
-    uppdrag: false, grunddata: true, boarea: false, byggnad: false,
-    el: false, ovrigt: false, rum: false, bilder: false,
-    nycklar: false, naromrade: false, omradesbesk: false,
+    uppdrag: true, grunddata: true, boarea: true, byggnad: true,
+    el: true, ovrigt: true, rum: true, bilder: true,
+    nycklar: true, naromrade: true, omradesbesk: true,
   });
   const toggle = (id: OiSection) => setOpen((o) => ({ ...o, [id]: !o[id] }));
   const [done, setDone] = useState<Record<OiSection, boolean>>(
@@ -3607,6 +3620,17 @@ function ObjektsinfoView({ adress, slug }: { adress: string; slug: string }) {
       <OiSec id="omradesbesk" title="Områdesbeskrivning" open={open.omradesbesk} onToggle={toggle} done={done.omradesbesk} onToggleDone={toggleDone}>
         <OmradesbeskBody />
       </OiSec>
+
+      {/* Objektsbeskrivning längst ner — används för kontrakt */}
+      <div className="mt-4 rounded-md border border-border bg-card">
+        <div className="border-b border-border px-4 py-3">
+          <div className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Objektsbeskrivning</div>
+          <div className="mt-0.5 text-[11px] text-muted-foreground/60">Används vid kontrakt och juridiska dokument</div>
+        </div>
+        <div className="p-4">
+          <ObjektsbeskrivningView adress={adress} slug={slug} />
+        </div>
+      </div>
     </div>
     </BlankCtx.Provider>
   );
