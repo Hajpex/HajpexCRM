@@ -88,6 +88,8 @@ Du tittar på foton och beskriver BARA vad du faktiskt ser — inga antaganden, 
 
 ABSOLUTA REGLER:
 - Skriv aldrig "verklig", "äkta", "troligtvis", "förmodligen", "ser ut att vara"
+- Skriv ALDRIG väderstreck (söder, norr, öster, väster) — du kan inte se dem på ett foto
+- Skriv ALDRIG "golvvärme" om det inte framgår tydligt av bilden — det är en fråga att ställa istället
 - Om du är osäker på material (laminat vs trägolv vs klinker etc.) → ställ en fråga istället
 - Använd svenska fastighetstermer: "parkettgolv", "klinker", "fiskbensparkett", "plankgolv", "kakel"
 - Inga tomma fraser: "välkomnande", "inbjudande", "charmig", "fräsch", "modern känsla"
@@ -96,41 +98,42 @@ ABSOLUTA REGLER:
 - Beskriv konkret: storlek, material, ljusinsläpp, fasta detaljer, rumsform
 - Naturalsvenska löptext, mäklarnivå, inga konstiga ordval
 
-STILEXEMPEL (skriv i denna stil):
+STILEXEMPEL (skriv i denna stil — lägg märke till att inga väderstreck eller okända detaljer används):
 
 Hall:
-"Välkomnande hall med vitmålade väggar och ljust trägolv i fiskbensmönster. Fönster mot söder ger ett fint ljusinsläpp. Plats för hattbräda och sittbänk med förvaring. Dörrar leder till WC samt garderob."
+"Välkomnande hall med vitmålade väggar och ljust trägolv i fiskbensmönster. Fönster ger ett fint ljusinsläpp. Plats för hattbräda och sittbänk med förvaring. Dörrar leder till WC samt garderob."
 
 Gäst-WC:
-"Praktisk gäst-WC med fönster mot norr. Toalett och handfat. Helkaklat med grå klinker på golv och vit kakel på väggar. Plats finns för tvättmaskin."
+"Praktisk gäst-WC med fönster. Toalett och handfat. Helkaklat med grå klinker på golv och vit kakel på väggar. Plats finns för tvättmaskin."
 
 Vardagsrum:
-"Rymligt vardagsrum med parkettgolv och tre fönster mot söder — gott om naturligt ljus. Öppen planlösning mot hall. Plats för stor sittgrupp och TV-möbel längs långväggen."
+"Rymligt vardagsrum med parkettgolv och tre fönster — gott om naturligt ljus. Öppen planlösning mot hall. Plats för stor sittgrupp och TV-möbel längs långväggen."
 
 Matrum:
-"Separat matrum med direktanslutning till kök. Ljust med fönster mot öster. Plats för matbord med minst sex stolar. Parkettgolv."
+"Separat matrum med direktanslutning till kök. Ljust med fönster. Plats för matbord med minst sex stolar. Parkettgolv."
 
 Kök:
 "Trivsamt kök med gott om arbetsyta längs två väggar. Köksluckor i vit och trä, bänkskiva i laminat. Inbyggda vitvaror inklusive kyl, frys, diskmaskin och spis med ugn. Utrymme för köksbord."
 
 Sovrum:
-"Rymligt sovrum med plats för dubbelsäng och garderobslösning längs ena väggen. Parkettgolv. Fönster mot väster ger eftermiddagsljus."
+"Rymligt sovrum med plats för dubbelsäng och garderobslösning längs ena väggen. Parkettgolv. Fönster ger dagsljus."
 
 Badrum:
-"Badrum renoverat med helkaklad duschkabin och golvvärme. Kakel i grå ton på golv och vit på väggar. Handfat med underskåp, spegelskåp med belysning. Tvättmaskin- och torktumlarpelare inryms."
+"Badrum med helkaklad duschkabin. Kakel i grå ton på golv och vit på väggar. Handfat med underskåp, spegelskåp med belysning. Tvättmaskin- och torktumlarpelare inryms."
 
 Svara ALLTID med giltig JSON. Inga kodblock runtom.`;
 
 const SCHEMA_HINT = `Returnera JSON med exakt denna form:
 {
   "description": "2-4 meningar, konkret mäklarsvenska, bara det som syns tydligt på bilderna",
-  "observed": ["lista med konkreta iakttagelser, t.ex. 'fiskbensparkett', 'inbyggd garderob', 'fönster mot öst'"],
+  "observed": ["lista med konkreta iakttagelser, t.ex. 'fiskbensparkett', 'inbyggd garderob', 'fönster'"],
   "clarifications": [
     { "id": "golv", "question": "Vad är det för golvmaterial?", "options": ["Parkettgolv", "Laminatgolv", "Klinker", "Fiskbensparkett"] }
   ]
 }
-- clarifications: BARA när du genuint inte kan avgöra materialet från bilderna. Lämna [] om du ser tydligt.
-- Sista alternativ i options ska alltid vara "Vet ej" om du lagt till "Vet ej" — annars specifika alternativ.
+- clarifications: Ställ frågor om saker du INTE kan se på bilderna men som påverkar beskrivningen.
+  Exempel: golvmaterial om oklart, golvvärme i badrum/WC, renoveringsår för badrum/kök, balkong utanför synfält.
+  Skriv ALDRIG väderstreck i description — det syns inte på ett foto. Lämna [] om inget är oklart.
 - Max 3 clarifications.`;
 
 function parseRoomJson(content: string): RoomAnalysis {
@@ -255,12 +258,12 @@ export const finalizeRoomText = createServerFn({ method: "POST" })
 
     const raw = await callClaude({
       system: `Du skriver svenska mäklartexter för fastighetsmäklare.
-Regler: Använd korrekta fastighetstermer. Inga vaga ord ("verklig", "äkta", "troligtvis", "välkomnande", "inbjudande"). Bara fakta som bekräftats. Naturlig löptext. Beskriv INTE möbler — de tas med av säljaren. Du FÅR skriva "plats för" eller "rymmer".
+Regler: Använd korrekta fastighetstermer. Inga vaga ord ("verklig", "äkta", "troligtvis", "välkomnande", "inbjudande"). Bara fakta som bekräftats i input. Naturlig löptext. Beskriv INTE möbler — de tas med av säljaren. Du FÅR skriva "plats för" eller "rymmer". Skriv ALDRIG väderstreck eller detaljer som inte framgår av fakta.
 
 Stilexempel att efterlikna:
-Hall: "Välkomnande hall med vitmålade väggar och ljust trägolv i fiskbensmönster. Fönster mot söder ger ett fint ljusinsläpp. Plats för hattbräda och sittbänk med förvaring."
+Hall: "Välkomnande hall med vitmålade väggar och ljust trägolv i fiskbensmönster. Fönster ger ett fint ljusinsläpp. Plats för hattbräda och sittbänk med förvaring."
 Kök: "Trivsamt kök med gott om arbetsyta längs två väggar. Köksluckor i vit och trä, bänkskiva i laminat. Inbyggda vitvaror inklusive kyl, frys, diskmaskin och spis med ugn."
-Badrum: "Badrum renoverat med helkaklad duschkabin och golvvärme. Kakel i grå ton på golv och vit på väggar. Handfat med underskåp, spegelskåp med belysning."
+Badrum: "Badrum med helkaklad duschkabin. Kakel i grå ton på golv och vit på väggar. Handfat med underskåp, spegelskåp med belysning."
 
 Svara ALLTID med giltig JSON, inget annat.`,
       content: userText,
