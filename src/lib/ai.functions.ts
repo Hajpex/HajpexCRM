@@ -98,28 +98,14 @@ ABSOLUTA REGLER:
 - Beskriv konkret: storlek, material, ljusinsläpp, fasta detaljer, rumsform
 - Naturalsvenska löptext, mäklarnivå, inga konstiga ordval
 
-STILEXEMPEL (skriv i denna stil — lägg märke till att inga väderstreck eller okända detaljer används):
+STILGUIDE — dessa exempel visar BARA ton, meningsbyggnad och ordval, INTE innehåll att kopiera.
+Allt konkret innehåll hämtar du uteslutande från bilderna och bekräftade fakta.
 
-Hall:
-"Välkomnande hall med vitmålade väggar och ljust trägolv i fiskbensmönster. Fönster ger ett fint ljusinsläpp. Plats för hattbräda och sittbänk med förvaring. Dörrar leder till WC samt garderob."
-
-Gäst-WC:
-"Praktisk gäst-WC med fönster. Toalett och handfat. Helkaklat med grå klinker på golv och vit kakel på väggar. Plats finns för tvättmaskin."
-
-Vardagsrum:
-"Rymligt vardagsrum med parkettgolv och tre fönster — gott om naturligt ljus. Öppen planlösning mot hall. Plats för stor sittgrupp och TV-möbel längs långväggen."
-
-Matrum:
-"Separat matrum med direktanslutning till kök. Ljust med fönster. Plats för matbord med minst sex stolar. Parkettgolv."
-
-Kök:
-"Trivsamt kök med gott om arbetsyta längs två väggar. Köksluckor i vit och trä, bänkskiva i laminat. Inbyggda vitvaror inklusive kyl, frys, diskmaskin och spis med ugn. Utrymme för köksbord."
-
-Sovrum:
-"Rymligt sovrum med plats för dubbelsäng och garderobslösning längs ena väggen. Parkettgolv. Fönster ger dagsljus."
-
-Badrum:
-"Badrum med helkaklad duschkabin. Kakel i grå ton på golv och vit på väggar. Handfat med underskåp, spegelskåp med belysning. Tvättmaskin- och torktumlarpelare inryms."
+Hall: "Välkomnande hall med vitmålade väggar och ljust trägolv i fiskbensmönster. Fönster ger ett fint ljusinsläpp. Plats för hattbräda och sittbänk med förvaring. Dörrar leder till WC samt garderob."
+Gäst-WC: "Praktisk gäst-WC med fönster. Toalett och handfat. Helkaklat med grå klinker på golv och vit kakel på väggar. Plats finns för tvättmaskin."
+Vardagsrum: "Rymligt vardagsrum med parkettgolv och tre fönster — gott om naturligt ljus. Öppen planlösning mot hall. Plats för stor sittgrupp och TV-möbel längs långväggen."
+Kök: "Trivsamt kök med gott om arbetsyta längs två väggar. Köksluckor i vit och trä, bänkskiva i laminat. Inbyggda vitvaror inklusive kyl, frys, diskmaskin och spis med ugn. Utrymme för köksbord."
+Badrum: "Badrum med helkaklad duschkabin. Kakel i grå ton på golv och vit på väggar. Handfat med underskåp, spegelskåp med belysning. Tvättmaskin- och torktumlarpelare inryms."
 
 Svara ALLTID med giltig JSON. Inga kodblock runtom.`;
 
@@ -258,9 +244,9 @@ export const finalizeRoomText = createServerFn({ method: "POST" })
 
     const raw = await callClaude({
       system: `Du skriver svenska mäklartexter för fastighetsmäklare.
-Regler: Använd korrekta fastighetstermer. Inga vaga ord ("verklig", "äkta", "troligtvis", "välkomnande", "inbjudande"). Bara fakta som bekräftats i input. Naturlig löptext. Beskriv INTE möbler — de tas med av säljaren. Du FÅR skriva "plats för" eller "rymmer". Skriv ALDRIG väderstreck eller detaljer som inte framgår av fakta.
+Regler: Använd korrekta fastighetstermer. Inga vaga ord ("verklig", "äkta", "troligtvis", "välkomnande", "inbjudande"). Bara fakta som bekräftats i input — hitta inte på något. Beskriv INTE möbler. Du FÅR skriva "plats för" eller "rymmer". Skriv ALDRIG väderstreck eller detaljer som inte framgår av fakta.
 
-Stilexempel att efterlikna:
+Stilguide — dessa visar TON och MENINGSBYGGNAD, inte innehåll att kopiera:
 Hall: "Välkomnande hall med vitmålade väggar och ljust trägolv i fiskbensmönster. Fönster ger ett fint ljusinsläpp. Plats för hattbräda och sittbänk med förvaring."
 Kök: "Trivsamt kök med gott om arbetsyta längs två väggar. Köksluckor i vit och trä, bänkskiva i laminat. Inbyggda vitvaror inklusive kyl, frys, diskmaskin och spis med ugn."
 Badrum: "Badrum med helkaklad duschkabin. Kakel i grå ton på golv och vit på väggar. Handfat med underskåp, spegelskåp med belysning."
