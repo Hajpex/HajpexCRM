@@ -3,7 +3,7 @@ import { Fragment, createContext, useContext, useRef, useState, useEffect, type 
 import { AppShell } from "../components/AppShell";
 import { OBJEKT, type Objekt } from "../data/objekt";
 import { listObjekt } from "../lib/objektStore";
-import { getObjektNotes, addObjektNote, setObjektBeskrivning, setObjektStatus, setObjektMarknadText } from "../lib/objektNotesStore";
+import { getObjektNotes, addObjektNote, setObjektBeskrivning, setObjektStatus, setObjektMarknadText, setManadsavgift } from "../lib/objektNotesStore";
 import { generateMarketingText } from "../lib/ai.functions";
 import { listBud, addBud, markeraVinnare, deleteBud, dragaTillbakaBud, getBudSettings, setBudSettings, fmtBud, type Bud } from "../lib/budgivningStore";
 import { getKontrakt, saveKontrakt, type KontraktData } from "../lib/kontraktStore";
@@ -69,6 +69,7 @@ function readPanelSizes(layout: Record<string, number>, firstId: string, secondI
 const pct = (n: number) => `${n}%`;
 
 import { pickImages } from "../data/images";
+import { RumSektion } from "../components/RumSektion";
 
 function hashSlug(s: string): number {
   let h = 0;
@@ -568,14 +569,11 @@ function AnteckningarCard() {
 function TrafikCard() {
   return (
     <Card title="Trafik bostadssida" icon="📊">
-        <div className="text-xs text-muted-foreground">Bostadssida trafik: 25</div>
-        <div className="mt-2 flex items-center justify-center">
-          <Donut />
-        </div>
-        <div className="mt-3 flex justify-center gap-4 text-[11px] text-muted-foreground">
-          <Legend color="bg-sky-400" label="hemsida" />
-          <Legend color="bg-emerald-400" label="övrigt" />
-        </div>
+      <div className="flex flex-col items-center justify-center gap-2 py-4 text-center">
+        <span className="text-3xl">📡</span>
+        <span className="text-sm text-muted-foreground">Visas när annonsen är publicerad</span>
+        <span className="text-xs text-muted-foreground/60">Trafik mäts från Hemnet, Booli m.fl.</span>
+      </div>
     </Card>
   );
 }
@@ -769,26 +767,33 @@ function VisningarCard() {
 function DetaljerCard({ slug }: { slug: string }) {
   const o = getObjektBySlug(slug);
   const typ = o?.typ ?? "—";
-  const status = o?.status ?? "—";
   const storlek = o?.boarea ? `${o.boarea} m²` : "—";
   const rum = o?.rum ? String(o.rum) : "—";
   const pris = o?.pris ? fmtKrShort(o.pris) : "—";
-  const manadsavgift =
-    o?.typ === "Bostadsrätt" ? `${(2500 + ((o.boarea | 0) * 35)).toLocaleString("sv-SE")} kr / mån` : "0 kr / mån";
   const ansvarig = o?.ansvarig ?? "—";
+  const skapadDatum = o && "savedAt" in o ? new Date((o as { savedAt: number }).savedAt).toLocaleDateString("sv-SE") : "—";
+  const [avgift, setAvgift] = useState(() => getObjektNotes(slug).manadsavgift ?? "");
+
   return (
     <Card title="Detaljer" icon="ℹ️">
         <dl className="grid grid-cols-2 gap-y-2 text-sm">
           <Row k="Objekttyp" v={typ} />
-          <Row k="Status" v={status} />
           <Row k="Storlek" v={storlek} />
           <Row k="Antal rum" v={rum} />
           <Row k="Utgångspris" v={pris} />
-          <Row k="Månadsavgift" v={manadsavgift} />
+          <dt className="text-muted-foreground">Månadsavgift</dt>
+          <dd>
+            <input
+              type="text"
+              value={avgift}
+              onChange={(e) => setAvgift(e.target.value)}
+              onBlur={() => setManadsavgift(slug, avgift)}
+              placeholder="t.ex. 3 500 kr/mån"
+              className="w-full border-b border-transparent bg-transparent text-sm focus:border-primary/60 focus:outline-none"
+            />
+          </dd>
           <Row k="Ansvarig mäklare" v={ansvarig} />
-          <Row k="Uppdragsdatum" v="2026-05-27" />
-          <Row k="Senast uppdaterad" v="2026-06-12 13:40" />
-          <Row k="Skapat" v="2026-05-27 09:31" />
+          <Row k="Skapat" v={skapadDatum} />
         </dl>
     </Card>
   );
@@ -3555,9 +3560,9 @@ function ObjektsinfoView({ adress, slug }: { adress: string; slug: string }) {
   const objTyp = getObjektBySlug(slug)?.typ;
   const isBrf = objTyp === "Bostadsrätt";
   const [open, setOpen] = useState<Record<OiSection, boolean>>({
-    uppdrag: false, grunddata: true, boarea: false, byggnad: false,
-    el: false, ovrigt: false, rum: false, bilder: false,
-    nycklar: false, naromrade: false, omradesbesk: false,
+    uppdrag: true, grunddata: true, boarea: true, byggnad: true,
+    el: true, ovrigt: true, rum: true, bilder: true,
+    nycklar: true, naromrade: true, omradesbesk: true,
   });
   const toggle = (id: OiSection) => setOpen((o) => ({ ...o, [id]: !o[id] }));
   const [done, setDone] = useState<Record<OiSection, boolean>>(
@@ -3597,7 +3602,7 @@ function ObjektsinfoView({ adress, slug }: { adress: string; slug: string }) {
         <OvrigtBody />
       </OiSec>
       <OiSec id="rum" title="Rum" open={open.rum} onToggle={toggle} done={done.rum} onToggleDone={toggleDone}>
-        <RumBody />
+        <RumBody slug={slug} />
       </OiSec>
       <OiSec id="bilder" title="Bilder" open={open.bilder} onToggle={toggle} done={done.bilder} onToggleDone={toggleDone}>
         <BilderSectionBody slug={slug} />
@@ -3611,6 +3616,17 @@ function ObjektsinfoView({ adress, slug }: { adress: string; slug: string }) {
       <OiSec id="omradesbesk" title="Områdesbeskrivning" open={open.omradesbesk} onToggle={toggle} done={done.omradesbesk} onToggleDone={toggleDone}>
         <OmradesbeskBody />
       </OiSec>
+
+      {/* Objektsbeskrivning längst ner — används för kontrakt */}
+      <div className="mt-2 rounded-md border border-border bg-card">
+        <div className="border-b border-border px-4 py-3">
+          <div className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Objektsbeskrivning</div>
+          <div className="mt-0.5 text-[11px] text-muted-foreground/60">Används vid kontrakt och juridiska dokument</div>
+        </div>
+        <div className="p-4">
+          <ObjektsbeskrivningView adress={adress} slug={slug} />
+        </div>
+      </div>
     </div>
     </BlankCtx.Provider>
   );
@@ -3892,24 +3908,12 @@ const ROOMS = [
   { n: "BADRUM & TVÄTT", v: "Källare", b: "Rymligt badrum på källarplanet, renoverat 2017, med klinkergolv och helkaklade väggar." },
 ];
 
-function RumBody() {
-  const blank = useContext(BlankCtx);
-  const rows = blank ? [] : ROOMS;
+function RumBody({ slug }: { slug: string }) {
+  const propertyType = getObjektBySlug(slug)?.typ;
   return (
     <div className="space-y-4">
-      <Field label="Rumsbeskrivning">
-        <textarea rows={2} className="w-full rounded-md border border-border bg-background px-2.5 py-2 text-sm focus:border-primary/40 focus:outline-none" />
-      </Field>
-      <div className="flex items-center justify-between">
-        <div className="text-sm font-medium">Övriga beskrivningar samtliga rum</div>
-        <BtnPrimary>+ Lägg till</BtnPrimary>
-      </div>
-      <div className="rounded-md border border-border px-3 py-4 text-sm text-muted-foreground">Inga poster</div>
-      <div className="flex items-center justify-between">
-        <div className="text-sm font-medium">Tillagda rum</div>
-        <BtnPrimary>+ Lägg till rum</BtnPrimary>
-      </div>
-      <div className="overflow-x-auto rounded-md border border-border">
+      <RumSektion slug={slug} propertyType={propertyType} />
+      <div className="overflow-x-auto rounded-md border border-border hidden">
         <table className="w-full text-sm">
           <thead className="bg-foreground/[0.03] text-xs uppercase tracking-wider text-muted-foreground">
             <tr>
@@ -3920,16 +3924,7 @@ function RumBody() {
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
-            {rows.length === 0 ? (
-              <tr><td colSpan={4} className="px-3 py-6 text-center text-muted-foreground">Inga rum tillagda</td></tr>
-            ) : rows.map((r, i) => (
-              <tr key={r.n}>
-                <td className="px-3 py-2 text-muted-foreground">{i + 1}</td>
-                <td className="px-3 py-2 font-medium">{r.n}</td>
-                <td className="px-3 py-2 text-muted-foreground">{r.v}</td>
-                <td className="px-3 py-2 text-muted-foreground">{r.b}</td>
-              </tr>
-            ))}
+            <tr><td colSpan={4} className="px-3 py-6 text-center text-muted-foreground">Inga rum tillagda</td></tr>
           </tbody>
         </table>
       </div>

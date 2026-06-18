@@ -205,29 +205,31 @@ const FinalizeInput = z.object({
 
 export const finalizeRoomText = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => FinalizeInput.parse(input))
-  .handler(async ({ data }): Promise<{ text: string }> => {
-    const userText = [
-      `Skriv den slutgiltiga rumsbeskrivningen för ${data.roomName}${data.floor ? ` (${data.floor})` : ""}.`,
-      "",
-      "Ursprunglig beskrivning från bildanalysen:",
-      data.baseDescription,
-      "",
+  .handler(async ({ data }): Promise<{ variants: [string, string, string] }> => {
+    const facts = [
+      `Rum: ${data.roomName}${data.floor ? ` (${data.floor})` : ""}`,
+      data.baseDescription ? `Bildanalys: ${data.baseDescription}` : "",
       data.observed.length ? `Observerat: ${data.observed.join(", ")}` : "",
-      "",
-      "Mäklarens svar på följdfrågor (använd dessa som fakta):",
       ...data.answers.map((a) => `- ${a.question} → ${a.answer}`),
-      "",
-      data.existingNotes ? `Mäklarens egna anteckningar: ${data.existingNotes}` : "",
-      "",
-      "Regler: Naturlig svenska, 3–5 meningar, löptext, inga floskler, inga påhittade detaljer. Returnera ENDAST själva texten.",
+      data.existingNotes ? `Mäklarens anteckningar: ${data.existingNotes}` : "",
     ].filter(Boolean).join("\n");
 
-    const text = await callClaude({
-      system: "Du skriver svenska mäklartexter — naturligt, korrekt, inga floskler.",
+    const userText = `Skriv 3 olika rumsbeskrivningar för ${data.roomName} baserat på dessa fakta:\n\n${facts}\n\nReturnera JSON med exakt dessa fält:\n{\n  "kort": "2–3 meningar, rak och faktabaserad",\n  "standard": "3–5 meningar, lätt säljande ton",\n  "utforlig": "5–7 meningar, detaljrik och inbjudande"\n}\nIngen annan text utanför JSON. Inga påhittade detaljer.`;
+
+    const raw = await callClaude({
+      system: "Du skriver svenska mäklartexter. Svara ALLTID med giltig JSON, inget annat.",
       content: userText,
-      maxTokens: 800,
+      maxTokens: 1200,
     });
-    return { text };
+    const cleaned = raw.replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/i, "").trim();
+    const parsed = JSON.parse(cleaned);
+    return {
+      variants: [
+        String(parsed.kort ?? "").trim(),
+        String(parsed.standard ?? "").trim(),
+        String(parsed.utforlig ?? "").trim(),
+      ],
+    };
   });
 
 // ── Visnings-fusklapp ────────────────────────────────────────────────────────
