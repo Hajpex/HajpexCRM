@@ -1694,7 +1694,7 @@ type SectionId =
 
 function IntagView({ adress }: { adress: string }) {
   const [open, setOpen] = useState<Record<SectionId, boolean>>({
-    maklarjournal: true, handlaggare: false, uppdrag: false, vardering: false,
+    maklarjournal: false, handlaggare: false, uppdrag: false, vardering: false,
     saljare: false, provision: false, dokument: false, filer: false, tjanster: false, kapitalvinst: false,
   });
   const toggle = (id: SectionId) => setOpen((o) => ({ ...o, [id]: !o[id] }));
@@ -2093,32 +2093,111 @@ const MJ_ITEMS = [
   "Objektsbeskrivning undertecknad",
 ];
 
+type MjEntry = { datum: string; utfordAv: string; kommentar: string };
+
 function MaklarjournalBody() {
-  const [openIdx, setOpenIdx] = useState<number | null>(0);
+  const today = new Date().toISOString().slice(0, 10);
+  const [entries, setEntries] = useState<MjEntry[]>(() =>
+    MJ_ITEMS.map(() => ({ datum: "", utfordAv: "", kommentar: "" }))
+  );
+  const [openIdx, setOpenIdx] = useState<number | null>(null);
+  const [checked, setChecked] = useState<boolean[]>(() => MJ_ITEMS.map(() => false));
+  const [bulkDate, setBulkDate] = useState("");
+
+  const anyChecked = checked.some(Boolean);
+
+  function toggleCheck(i: number, e: React.MouseEvent) {
+    e.stopPropagation();
+    setChecked((c) => c.map((v, j) => j === i ? !v : v));
+  }
+
+  function applyBulkDate() {
+    if (!bulkDate) return;
+    setEntries((es) => es.map((e, i) => checked[i] ? { ...e, datum: bulkDate } : e));
+    setChecked(MJ_ITEMS.map(() => false));
+    setBulkDate("");
+  }
+
+  function patchEntry(i: number, patch: Partial<MjEntry>) {
+    setEntries((es) => es.map((e, j) => j === i ? { ...e, ...patch } : e));
+  }
+
   return (
-    <div className="divide-y divide-border rounded-md border border-border">
-      {MJ_ITEMS.map((label, i) => {
-        const isOpen = openIdx === i;
-        return (
-          <div key={i}>
-            <button
-              onClick={() => setOpenIdx(isOpen ? null : i)}
-              className="flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm hover:bg-foreground/[0.02]"
-            >
-              <span className="flex h-5 w-5 items-center justify-center rounded-full border border-border text-[10px] text-muted-foreground">{i + 1}</span>
-              <span className="flex-1">{label}</span>
-              <span className="text-xs text-muted-foreground">{isOpen ? "−" : "+"}</span>
-            </button>
-            {isOpen && (
-              <div className="grid gap-3 bg-background/40 px-3 py-3 sm:grid-cols-3">
-                <Field label="Datum"><Input placeholder="ÅÅÅÅ-MM-DD" /></Field>
-                <Field label="Utförd av"><Input placeholder="Mäklare" /></Field>
-                <Field label="Kommentar"><Input placeholder="—" /></Field>
+    <div className="space-y-2">
+      {/* Bulk-datumrad */}
+      {anyChecked && (
+        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-primary/30 bg-primary/[0.06] px-3 py-2">
+          <span className="text-xs text-primary">{checked.filter(Boolean).length} markerade</span>
+          <input
+            type="date"
+            value={bulkDate}
+            onChange={(e) => setBulkDate(e.target.value)}
+            className="rounded-md border border-border bg-background px-2 py-1 text-xs focus:border-primary focus:outline-none"
+          />
+          <button
+            onClick={applyBulkDate}
+            disabled={!bulkDate}
+            className="rounded-md bg-primary px-3 py-1 text-xs font-medium text-primary-foreground disabled:opacity-40"
+          >
+            Sätt datum
+          </button>
+          <button onClick={() => setChecked(MJ_ITEMS.map(() => false))} className="ml-auto text-xs text-muted-foreground hover:text-foreground">
+            Avmarkera alla
+          </button>
+        </div>
+      )}
+
+      <div className="divide-y divide-border rounded-md border border-border">
+        {MJ_ITEMS.map((label, i) => {
+          const entry = entries[i];
+          const isOpen = openIdx === i;
+          const done = !!entry.datum;
+          return (
+            <div key={i}>
+              <div
+                onClick={() => setOpenIdx(isOpen ? null : i)}
+                className="flex cursor-pointer items-center gap-3 px-3 py-2.5 text-sm hover:bg-foreground/[0.02]"
+              >
+                <input
+                  type="checkbox"
+                  checked={checked[i]}
+                  onClick={(e) => toggleCheck(i, e)}
+                  onChange={() => {}}
+                  className="h-4 w-4 shrink-0 accent-primary"
+                />
+                <span className={["flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-[10px]",
+                  done ? "border-emerald-500/60 bg-emerald-500/15 text-emerald-400" : "border-border text-muted-foreground"].join(" ")}>
+                  {done ? "✓" : i + 1}
+                </span>
+                <span className="flex-1">{label}</span>
+                {entry.datum && (
+                  <span className="text-xs text-muted-foreground">{entry.datum}</span>
+                )}
+                <span className="text-xs text-muted-foreground">{isOpen ? "−" : "+"}</span>
               </div>
-            )}
-          </div>
-        );
-      })}
+              {isOpen && (
+                <div className="grid gap-3 bg-background/40 px-3 py-3 sm:grid-cols-3">
+                  <Field label="Datum">
+                    <input
+                      type="date"
+                      value={entry.datum}
+                      max={today}
+                      onChange={(e) => patchEntry(i, { datum: e.target.value })}
+                      className="w-full rounded-md border border-border bg-background px-2.5 py-1.5 text-sm focus:border-primary focus:outline-none"
+                    />
+                  </Field>
+                  <Field label="Utförd av">
+                    <Input value={entry.utfordAv} onChange={(e) => patchEntry(i, { utfordAv: e.target.value })} placeholder="Mäklare" />
+                  </Field>
+                  <Field label="Kommentar">
+                    <Input value={entry.kommentar} onChange={(e) => patchEntry(i, { kommentar: e.target.value })} placeholder="—" />
+                  </Field>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
