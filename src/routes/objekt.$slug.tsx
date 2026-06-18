@@ -1693,6 +1693,8 @@ type SectionId =
   | "saljare" | "provision" | "dokument" | "filer" | "tjanster" | "kapitalvinst";
 
 function IntagView({ adress }: { adress: string }) {
+  const { slug } = Route.useParams();
+  const ansvarig = getObjektBySlug(slug)?.ansvarig ?? "";
   const [open, setOpen] = useState<Record<SectionId, boolean>>({
     maklarjournal: false, handlaggare: false, uppdrag: false, vardering: false,
     saljare: false, provision: false, dokument: false, filer: false, tjanster: false, kapitalvinst: false,
@@ -1702,7 +1704,7 @@ function IntagView({ adress }: { adress: string }) {
   return (
     <div className="flex flex-col gap-2 pl-2">
       <Section id="maklarjournal" title="Mäklarjournal" badge="12" open={open.maklarjournal} onToggle={toggle}>
-        <MaklarjournalBody />
+        <MaklarjournalBody ansvarig={ansvarig} />
       </Section>
       <Section id="handlaggare" title="Handläggare" open={open.handlaggare} onToggle={toggle}>
         <HandlaggareBody />
@@ -2093,110 +2095,134 @@ const MJ_ITEMS = [
   "Objektsbeskrivning undertecknad",
 ];
 
-type MjEntry = { datum: string; utfordAv: string; kommentar: string };
+type MjEntry = { datum: string; utfordAv: string; kommentar: string; label: string; custom?: boolean };
 
-function MaklarjournalBody() {
+function MaklarjournalBody({ ansvarig }: { ansvarig: string }) {
   const today = new Date().toISOString().slice(0, 10);
-  const [entries, setEntries] = useState<MjEntry[]>(() =>
-    MJ_ITEMS.map(() => ({ datum: "", utfordAv: "", kommentar: "" }))
+  const [items, setItems] = useState<MjEntry[]>(() =>
+    MJ_ITEMS.map((label) => ({ label, datum: "", utfordAv: ansvarig, kommentar: "" }))
   );
   const [openIdx, setOpenIdx] = useState<number | null>(null);
   const [checked, setChecked] = useState<boolean[]>(() => MJ_ITEMS.map(() => false));
   const [bulkDate, setBulkDate] = useState("");
+  const [newLabel, setNewLabel] = useState("");
 
   const anyChecked = checked.some(Boolean);
 
   function toggleCheck(i: number, e: React.MouseEvent) {
     e.stopPropagation();
-    setChecked((c) => c.map((v, j) => j === i ? !v : v));
+    setChecked((c) => c.map((v, j) => (j === i ? !v : v)));
   }
 
   function applyBulkDate() {
     if (!bulkDate) return;
-    setEntries((es) => es.map((e, i) => checked[i] ? { ...e, datum: bulkDate } : e));
-    setChecked(MJ_ITEMS.map(() => false));
+    setItems((es) => es.map((e, i) => (checked[i] ? { ...e, datum: bulkDate } : e)));
+    setChecked(items.map(() => false));
     setBulkDate("");
   }
 
-  function patchEntry(i: number, patch: Partial<MjEntry>) {
-    setEntries((es) => es.map((e, j) => j === i ? { ...e, ...patch } : e));
+  function patch(i: number, p: Partial<MjEntry>) {
+    setItems((es) => es.map((e, j) => (j === i ? { ...e, ...p } : e)));
+  }
+
+  function addCustomItem() {
+    const label = newLabel.trim();
+    if (!label) return;
+    setItems((es) => [...es, { label, datum: "", utfordAv: ansvarig, kommentar: "", custom: true }]);
+    setChecked((c) => [...c, false]);
+    setNewLabel("");
+  }
+
+  function removeItem(i: number) {
+    setItems((es) => es.filter((_, j) => j !== i));
+    setChecked((c) => c.filter((_, j) => j !== i));
+    if (openIdx === i) setOpenIdx(null);
   }
 
   return (
     <div className="space-y-2">
-      {/* Bulk-datumrad */}
       {anyChecked && (
         <div className="flex flex-wrap items-center gap-2 rounded-lg border border-primary/30 bg-primary/[0.06] px-3 py-2">
           <span className="text-xs text-primary">{checked.filter(Boolean).length} markerade</span>
-          <input
-            type="date"
-            value={bulkDate}
-            onChange={(e) => setBulkDate(e.target.value)}
-            className="rounded-md border border-border bg-background px-2 py-1 text-xs focus:border-primary focus:outline-none"
-          />
-          <button
-            onClick={applyBulkDate}
-            disabled={!bulkDate}
-            className="rounded-md bg-primary px-3 py-1 text-xs font-medium text-primary-foreground disabled:opacity-40"
-          >
+          <input type="date" value={bulkDate} onChange={(e) => setBulkDate(e.target.value)}
+            className="rounded-md border border-border bg-background px-2 py-1 text-xs focus:border-primary focus:outline-none" />
+          <button onClick={applyBulkDate} disabled={!bulkDate}
+            className="rounded-md bg-primary px-3 py-1 text-xs font-medium text-primary-foreground disabled:opacity-40">
             Sätt datum
           </button>
-          <button onClick={() => setChecked(MJ_ITEMS.map(() => false))} className="ml-auto text-xs text-muted-foreground hover:text-foreground">
+          <button onClick={() => setChecked(items.map(() => false))} className="ml-auto text-xs text-muted-foreground hover:text-foreground">
             Avmarkera alla
           </button>
         </div>
       )}
 
       <div className="divide-y divide-border rounded-md border border-border">
-        {MJ_ITEMS.map((label, i) => {
-          const entry = entries[i];
+        {items.map((item, i) => {
           const isOpen = openIdx === i;
-          const done = !!entry.datum;
+          const done = !!item.datum;
           return (
             <div key={i}>
-              <div
-                onClick={() => setOpenIdx(isOpen ? null : i)}
-                className="flex cursor-pointer items-center gap-3 px-3 py-2.5 text-sm hover:bg-foreground/[0.02]"
-              >
-                <input
-                  type="checkbox"
-                  checked={checked[i]}
-                  onClick={(e) => toggleCheck(i, e)}
-                  onChange={() => {}}
-                  className="h-4 w-4 shrink-0 accent-primary"
-                />
+              <div onClick={() => setOpenIdx(isOpen ? null : i)}
+                className="flex cursor-pointer items-center gap-3 px-3 py-2.5 text-sm hover:bg-foreground/[0.02]">
+                <input type="checkbox" checked={checked[i] ?? false}
+                  onClick={(e) => toggleCheck(i, e)} onChange={() => {}}
+                  className="h-4 w-4 shrink-0 accent-primary" />
                 <span className={["flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-[10px]",
                   done ? "border-emerald-500/60 bg-emerald-500/15 text-emerald-400" : "border-border text-muted-foreground"].join(" ")}>
                   {done ? "✓" : i + 1}
                 </span>
-                <span className="flex-1">{label}</span>
-                {entry.datum && (
-                  <span className="text-xs text-muted-foreground">{entry.datum}</span>
+                <span className="flex-1">{item.label}</span>
+                {item.datum && <span className="text-xs text-muted-foreground">{item.datum}</span>}
+                {item.kommentar && !isOpen && (
+                  <span className="max-w-[140px] truncate text-xs text-muted-foreground italic">"{item.kommentar}"</span>
+                )}
+                {item.custom && (
+                  <button onClick={(e) => { e.stopPropagation(); removeItem(i); }}
+                    className="text-[11px] text-muted-foreground/50 hover:text-destructive" title="Ta bort">×</button>
                 )}
                 <span className="text-xs text-muted-foreground">{isOpen ? "−" : "+"}</span>
               </div>
               {isOpen && (
-                <div className="grid gap-3 bg-background/40 px-3 py-3 sm:grid-cols-3">
-                  <Field label="Datum">
-                    <input
-                      type="date"
-                      value={entry.datum}
-                      max={today}
-                      onChange={(e) => patchEntry(i, { datum: e.target.value })}
-                      className="w-full rounded-md border border-border bg-background px-2.5 py-1.5 text-sm focus:border-primary focus:outline-none"
-                    />
-                  </Field>
-                  <Field label="Utförd av">
-                    <Input value={entry.utfordAv} onChange={(e) => patchEntry(i, { utfordAv: e.target.value })} placeholder="Mäklare" />
-                  </Field>
+                <div className="space-y-3 bg-background/40 px-3 py-3">
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <Field label="Datum">
+                      <input type="date" value={item.datum} max={today}
+                        onChange={(e) => patch(i, { datum: e.target.value })}
+                        className="w-full rounded-md border border-border bg-background px-2.5 py-1.5 text-sm focus:border-primary focus:outline-none" />
+                    </Field>
+                    <Field label="Utförd av">
+                      <Input value={item.utfordAv} onChange={(e) => patch(i, { utfordAv: e.target.value })} placeholder={ansvarig || "Mäklare"} />
+                    </Field>
+                  </div>
                   <Field label="Kommentar">
-                    <Input value={entry.kommentar} onChange={(e) => patchEntry(i, { kommentar: e.target.value })} placeholder="—" />
+                    <textarea
+                      value={item.kommentar}
+                      onChange={(e) => patch(i, { kommentar: e.target.value })}
+                      placeholder="Anteckning om denna åtgärd..."
+                      rows={2}
+                      className="w-full resize-none rounded-md border border-border bg-background px-2.5 py-2 text-sm placeholder:text-muted-foreground/50 focus:border-primary focus:outline-none"
+                    />
                   </Field>
                 </div>
               )}
             </div>
           );
         })}
+      </div>
+
+      {/* Lägg till egen punkt */}
+      <div className="flex gap-2 pt-1">
+        <input
+          value={newLabel}
+          onChange={(e) => setNewLabel(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && addCustomItem()}
+          placeholder="Lägg till egen punkt i journalen..."
+          className="flex-1 rounded-md border border-border bg-background/60 px-3 py-2 text-sm placeholder:text-muted-foreground/50 focus:border-primary focus:outline-none"
+        />
+        <button onClick={addCustomItem} disabled={!newLabel.trim()}
+          className="rounded-md border border-border bg-muted/40 px-3 py-2 text-sm font-medium text-foreground transition-colors hover:border-primary/40 hover:text-primary disabled:opacity-40">
+          + Lägg till
+        </button>
       </div>
     </div>
   );
