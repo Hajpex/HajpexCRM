@@ -96,6 +96,29 @@ ABSOLUTA REGLER:
 - Beskriv konkret: storlek, material, ljusinsläpp, fasta detaljer, rumsform
 - Naturalsvenska löptext, mäklarnivå, inga konstiga ordval
 
+STILEXEMPEL (skriv i denna stil):
+
+Hall:
+"Välkomnande hall med vitmålade väggar och ljust trägolv i fiskbensmönster. Fönster mot söder ger ett fint ljusinsläpp. Plats för hattbräda och sittbänk med förvaring. Dörrar leder till WC samt garderob."
+
+Gäst-WC:
+"Praktisk gäst-WC med fönster mot norr. Toalett och handfat. Helkaklat med grå klinker på golv och vit kakel på väggar. Plats finns för tvättmaskin."
+
+Vardagsrum:
+"Rymligt vardagsrum med parkettgolv och tre fönster mot söder — gott om naturligt ljus. Öppen planlösning mot hall. Plats för stor sittgrupp och TV-möbel längs långväggen."
+
+Matrum:
+"Separat matrum med direktanslutning till kök. Ljust med fönster mot öster. Plats för matbord med minst sex stolar. Parkettgolv."
+
+Kök:
+"Trivsamt kök med gott om arbetsyta längs två väggar. Köksluckor i vit och trä, bänkskiva i laminat. Inbyggda vitvaror inklusive kyl, frys, diskmaskin och spis med ugn. Utrymme för köksbord."
+
+Sovrum:
+"Rymligt sovrum med plats för dubbelsäng och garderobslösning längs ena väggen. Parkettgolv. Fönster mot väster ger eftermiddagsljus."
+
+Badrum:
+"Badrum renoverat med helkaklad duschkabin och golvvärme. Kakel i grå ton på golv och vit på väggar. Handfat med underskåp, spegelskåp med belysning. Tvättmaskin- och torktumlarpelare inryms."
+
 Svara ALLTID med giltig JSON. Inga kodblock runtom.`;
 
 const SCHEMA_HINT = `Returnera JSON med exakt denna form:
@@ -169,6 +192,10 @@ export type MarketingTextResult = {
 const MARKETING_SYSTEM = `Du är en erfaren svensk fastighetsmäklare som skriver säljande annonstexter till Hemnet och Booli.
 Texterna ska vara naturliga, konkreta och säljande utan att vara överdrivna.
 Inga tomma superlativer. Framhäv det som faktiskt är bra.
+
+Stilexempel på lång beskrivning (skriv i denna stil):
+"Välkommen till ett trivsamt hus från 1944 med ett rofyllt läge och en fantastisk trädgårdstomt om hela 1 994,5 kvm. Här bor du med gott om utrymme både inne och ute, omgiven av uppvuxen grönska, blommande planteringar och generösa gräsytor som ger tomten en privat och inbjudande karaktär. Huset erbjuder en totalyta om 134 kvm, varav 69 kvm boarea och 65 kvm biarea. Entréplanet rymmer kök, vardagsrum och matplats tillsammans med två sovrum, hall och gäst-WC. Under 2025 installerades en modern bergvärmeanläggning med 260 meters borrdjup. Utomhus finns flera trevliga uteplatser att välja mellan — den rymliga altanen under tak och den stenlagda pergolan längre ner i trädgården. I området finns förskola och skola samt fina möjligheter till friluftsliv med närhet till skogsområden och sjö."
+
 Svara ENDAST med giltig JSON. Inga kodblock, ingen text utanför JSON.`;
 
 export const generateMarketingText = createServerFn({ method: "POST" })
@@ -228,7 +255,13 @@ export const finalizeRoomText = createServerFn({ method: "POST" })
 
     const raw = await callClaude({
       system: `Du skriver svenska mäklartexter för fastighetsmäklare.
-Regler: Använd korrekta fastighetstermer. Inga vaga ord ("verklig", "äkta", "troligtvis", "välkomnande", "inbjudande"). Bara fakta som bekräftats. Naturlig löptext.
+Regler: Använd korrekta fastighetstermer. Inga vaga ord ("verklig", "äkta", "troligtvis", "välkomnande", "inbjudande"). Bara fakta som bekräftats. Naturlig löptext. Beskriv INTE möbler — de tas med av säljaren. Du FÅR skriva "plats för" eller "rymmer".
+
+Stilexempel att efterlikna:
+Hall: "Välkomnande hall med vitmålade väggar och ljust trägolv i fiskbensmönster. Fönster mot söder ger ett fint ljusinsläpp. Plats för hattbräda och sittbänk med förvaring."
+Kök: "Trivsamt kök med gott om arbetsyta längs två väggar. Köksluckor i vit och trä, bänkskiva i laminat. Inbyggda vitvaror inklusive kyl, frys, diskmaskin och spis med ugn."
+Badrum: "Badrum renoverat med helkaklad duschkabin och golvvärme. Kakel i grå ton på golv och vit på väggar. Handfat med underskåp, spegelskåp med belysning."
+
 Svara ALLTID med giltig JSON, inget annat.`,
       content: userText,
       maxTokens: 1200,
