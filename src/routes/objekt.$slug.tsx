@@ -1156,7 +1156,6 @@ function SpekulanterTopView({ slug }: { slug: string }) {
   });
 
   const selectedVals = spekulanter.filter((k) => selected.has(k.id));
-  const aiInsikt = spekulantAiInsikt(spekulanter, slug);
 
   return (
     <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
@@ -1181,13 +1180,6 @@ function SpekulanterTopView({ slug }: { slug: string }) {
         </div>
       </div>
 
-      {/* AI-insikt */}
-      {spekulanter.length > 0 && (
-        <div className="mb-5 flex items-start gap-2.5 rounded-lg border border-border bg-muted/40 px-4 py-3">
-          <span className="mt-0.5 text-sm">✦</span>
-          <p className="text-sm text-foreground">{aiInsikt}</p>
-        </div>
-      )}
 
       {spekulanter.length === 0 ? (
         <div className="py-12 text-center text-sm text-muted-foreground">
@@ -1374,65 +1366,60 @@ function SpekulantKort({
             )}
           </div>
         )}
+        {intresse === "budgivare" && !showBudForm && (
+          <button
+            onClick={() => setShowBudForm(true)}
+            className={`${actionBtn} border-emerald-500/30 text-emerald-400 hover:border-emerald-500/60 hover:text-emerald-300`}
+          >
+            + Lägg bud
+          </button>
+        )}
       </div>
 
-      {/* Lägg bud — visas bara för budgivare */}
-      {intresse === "budgivare" && (
-        <div className="border-t border-border/40">
-          {!showBudForm ? (
-            <div className="px-4 py-2.5">
-              <button
-                onClick={() => setShowBudForm(true)}
-                className="rounded-md border border-primary/30 bg-primary/5 px-3 py-1.5 text-[11px] font-medium text-primary transition-colors hover:bg-primary/10"
-              >
-                + Lägg bud
-              </button>
-            </div>
-          ) : (
-            <div className="flex flex-col gap-2 px-4 py-3">
-              <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground/60">Registrera bud</div>
-              <div className="flex flex-wrap gap-2">
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  placeholder="Belopp (kr)"
-                  value={budBelopp}
-                  onChange={(e) => setBudBelopp(e.target.value.replace(/[^0-9]/g, ""))}
-                  className="h-8 w-36 rounded-md border border-border bg-background px-2.5 text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-primary"
-                />
-                <input
-                  type="text"
-                  placeholder="Villkor (valfritt)"
-                  value={budVillkor}
-                  onChange={(e) => setBudVillkor(e.target.value)}
-                  className="h-8 flex-1 min-w-[140px] rounded-md border border-border bg-background px-2.5 text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-primary"
-                />
-              </div>
-              <div className="flex gap-2">
-                <button
-                  disabled={!budBelopp}
-                  onClick={() => {
-                    const belopp = parseInt(budBelopp, 10);
-                    if (!belopp) return;
-                    const namn = `${k.fornamn} ${k.efternamn}`;
-                    addBud(slug, { belopp, namn, telefon: k.telefon ?? "", villkor: budVillkor.trim() });
-                    setBudBelopp("");
-                    setBudVillkor("");
-                    setShowBudForm(false);
-                  }}
-                  className="rounded-md bg-primary px-3 py-1.5 text-[11px] font-medium text-primary-foreground transition-opacity disabled:opacity-40"
-                >
-                  Spara bud
-                </button>
-                <button
-                  onClick={() => { setShowBudForm(false); setBudBelopp(""); setBudVillkor(""); }}
-                  className="rounded-md border border-border px-3 py-1.5 text-[11px] text-muted-foreground hover:text-foreground"
-                >
-                  Avbryt
-                </button>
-              </div>
-            </div>
-          )}
+      {/* Inline budformulär */}
+      {intresse === "budgivare" && showBudForm && (
+        <div className="flex flex-col gap-2 border-t border-border/40 px-4 py-3">
+          <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground/60">Registrera bud</div>
+          <div className="flex flex-wrap gap-2">
+            <input
+              type="text"
+              inputMode="numeric"
+              placeholder="Belopp (kr)"
+              value={budBelopp}
+              onChange={(e) => setBudBelopp(e.target.value.replace(/[^0-9]/g, ""))}
+              className="h-8 w-36 rounded-md border border-border bg-background px-2.5 text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-primary"
+            />
+            <input
+              type="text"
+              placeholder="Villkor (valfritt)"
+              value={budVillkor}
+              onChange={(e) => setBudVillkor(e.target.value)}
+              className="h-8 flex-1 min-w-[140px] rounded-md border border-border bg-background px-2.5 text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-primary"
+            />
+          </div>
+          <div className="flex gap-2">
+            <button
+              disabled={!budBelopp}
+              onClick={() => {
+                const belopp = parseInt(budBelopp, 10);
+                if (!belopp) return;
+                const namn = `${k.fornamn} ${k.efternamn}`;
+                addBud(slug, { belopp, namn, telefon: k.telefon ?? "", villkor: budVillkor.trim() });
+                setBudBelopp("");
+                setBudVillkor("");
+                setShowBudForm(false);
+              }}
+              className="rounded-md bg-primary px-3 py-1.5 text-[11px] font-medium text-primary-foreground transition-opacity disabled:opacity-40"
+            >
+              Spara bud
+            </button>
+            <button
+              onClick={() => { setShowBudForm(false); setBudBelopp(""); setBudVillkor(""); }}
+              className="rounded-md border border-border px-3 py-1.5 text-[11px] text-muted-foreground hover:text-foreground"
+            >
+              Avbryt
+            </button>
+          </div>
         </div>
       )}
 
