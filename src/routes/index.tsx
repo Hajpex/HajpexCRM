@@ -238,6 +238,7 @@ function DashboardPage() {
   const [briefLoading, setBriefLoading] = useState(false);
   const [widgets, setWidgets] = useState<WidgetSettings>(DEFAULT_WIDGETS);
   const [editingLayout, setEditingLayout] = useState(false);
+  const [editingOrder, setEditingOrder] = useState(false);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
   const [klistrar, setKlistrar] = useState<Klisterlapp[]>([]);
@@ -396,11 +397,21 @@ function DashboardPage() {
               >
                 ⊞ Redigera widgets
               </button>
-              <button
-                className="rounded-lg border border-border bg-card px-3.5 py-2 text-xs font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary"
-              >
-                ⊟ Redigera layout
-              </button>
+              {editingOrder ? (
+                <button
+                  onClick={() => setEditingOrder(false)}
+                  className="rounded-lg border border-primary bg-primary/10 px-3.5 py-2 text-xs font-medium text-primary transition-colors hover:bg-primary/20"
+                >
+                  ✓ Klar med layout
+                </button>
+              ) : (
+                <button
+                  onClick={() => setEditingOrder(true)}
+                  className="rounded-lg border border-border bg-card px-3.5 py-2 text-xs font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary"
+                >
+                  ⠿ Redigera layout
+                </button>
+              )}
               <button
                 onClick={() => setNyKontaktOpen(true)}
                 className="rounded-lg border border-border bg-card px-3.5 py-2 text-xs font-medium text-foreground transition-colors hover:border-primary/40 hover:text-primary"
@@ -515,7 +526,7 @@ function DashboardPage() {
               if (id === "tilltraden" && widgets.tilltraden) card = <TilltrádenWidget />;
               if (!card) return null;
               return (
-                <DraggableCard key={id} id={id} column="left" editMode={editingLayout}
+                <DraggableCard key={id} id={id} column="left" editMode={editingOrder}
                   draggingId={draggingId} dragOverId={dragOverId}
                   onDragStart={handleDragStart} onDragOver={handleDragOver}
                   onDrop={handleDrop} onDragEnd={handleDragEnd}>
@@ -565,7 +576,7 @@ function DashboardPage() {
               if (id === "nyaSpekulanter" && widgets.nyaSpekulanter) card = <NyaSpekulanterWidget kontakter={kontakter} />;
               if (!card) return null;
               return (
-                <DraggableCard key={id} id={id} column="right" editMode={editingLayout}
+                <DraggableCard key={id} id={id} column="right" editMode={editingOrder}
                   draggingId={draggingId} dragOverId={dragOverId}
                   onDragStart={handleDragStart} onDragOver={handleDragOver}
                   onDrop={handleDrop} onDragEnd={handleDragEnd}>
@@ -818,7 +829,7 @@ function DraggableCard({ id, column, editMode, draggingId, dragOverId, onDragSta
       onDragEnd={onDragEnd}
       className={[
         "relative transition-all duration-150",
-        editMode ? "cursor-grab select-none" : "",
+        editMode ? "cursor-grab select-none ring-1 ring-border rounded-xl" : "",
         isBeingDragged ? "opacity-40 scale-[0.98]" : "",
       ].join(" ")}
     >
@@ -866,7 +877,7 @@ function RantekollenWidget() {
 
   return (
     <section className="rounded-xl border border-border bg-card/70 p-5 shadow-[0_8px_30px_-12px_rgba(0,0,0,0.15)]">
-      <p className="text-[10px] uppercase tracking-[0.2em] text-primary/60">Mäklarsaker</p>
+      <p className="text-[10px] uppercase tracking-[0.2em] text-primary/60">Verktyg</p>
       <h2 className="mt-0.5 mb-3 text-base font-medium text-foreground" style={serif}>Räntekollen</h2>
       {error ? (
         <p className="text-xs text-muted-foreground">Riksbank-data ej tillgänglig just nu</p>
@@ -907,7 +918,7 @@ function TilltrádenWidget() {
 
   return (
     <section className="rounded-xl border border-border bg-card/70 p-5 shadow-[0_8px_30px_-12px_rgba(0,0,0,0.15)]">
-      <p className="text-[10px] uppercase tracking-[0.2em] text-primary/60">Mäklarsaker</p>
+      <p className="text-[10px] uppercase tracking-[0.2em] text-primary/60">Verktyg</p>
       <h2 className="mt-0.5 mb-3 text-base font-medium text-foreground" style={serif}>Tillträden snart</h2>
       {items.length === 0 ? (
         <p className="text-xs text-muted-foreground">Inga tillträden inom 60 dagar</p>
@@ -1163,7 +1174,7 @@ function VaderWidget({ ort }: { ort: string }) {
 
   return (
     <section className="rounded-xl border border-border bg-card/70 p-5 shadow-[0_8px_30px_-12px_rgba(0,0,0,0.15)]">
-      <p className="text-[10px] uppercase tracking-[0.2em] text-primary/60">Mäklarsaker</p>
+      <p className="text-[10px] uppercase tracking-[0.2em] text-primary/60">Verktyg</p>
       <h2 className="mt-0.5 mb-3 text-base font-medium text-foreground" style={serif}>Väder</h2>
       {error ? (
         <p className="text-xs text-muted-foreground">Kunde inte hämta väder för "{ort}"</p>
@@ -1193,7 +1204,7 @@ function VaderWidget({ ort }: { ort: string }) {
 function SnabblänkarWidget({ links }: { links: QuickLink[] }) {
   return (
     <section className="rounded-xl border border-border bg-card/70 p-5 shadow-[0_8px_30px_-12px_rgba(0,0,0,0.15)]">
-      <p className="text-[10px] uppercase tracking-[0.2em] text-primary/60">Mäklarsaker</p>
+      <p className="text-[10px] uppercase tracking-[0.2em] text-primary/60">Verktyg</p>
       <h2 className="mt-0.5 mb-3 text-base font-medium text-foreground" style={serif}>Snabblänkar</h2>
       <div className="flex flex-wrap gap-2">
         {links.map((l) => (
