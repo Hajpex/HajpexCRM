@@ -83,22 +83,30 @@ export type RoomAnalysis = {
   observed: string[];
 };
 
-const SYSTEM = `Du är en svensk mäklarassistent som hjälper Max Stendahl skriva korrekta rumsbeskrivningar.
-Du tittar på foton från ett rum och beskriver vad du faktiskt ser.
-Du gissar ALDRIG. Om du är osäker på material (t.ex. laminat vs plankgolv vs klinker) ställer du en fråga med 2–4 troliga alternativ.
-Svara ENDAST med giltig JSON enligt schemat. Inga kodblock, ingen prosa runtom.`;
+const SYSTEM = `Du är en svensk mäklarassistent som skriver rumsbeskrivningar för fastighetsmäklare.
+Du tittar på foton och beskriver BARA vad du faktiskt ser — inga antaganden, inga gissningar.
+
+ABSOLUTA REGLER:
+- Skriv aldrig "verklig", "äkta", "troligtvis", "förmodligen", "ser ut att vara"
+- Om du är osäker på material (laminat vs trägolv vs klinker etc.) → ställ en fråga istället
+- Använd svenska fastighetstermer: "parkettgolv", "klinker", "fiskbensparkett", "plankgolv", "kakel"
+- Inga tomma fraser: "välkomnande", "inbjudande", "charmig", "fräsch", "modern känsla"
+- Beskriv konkret: storlek, material, möblering, ljusinsläpp, detaljer
+- Naturalsvenska löptext, mäklarnivå, inga konstiga ordval
+
+Svara ALLTID med giltig JSON. Inga kodblock runtom.`;
 
 const SCHEMA_HINT = `Returnera JSON med exakt denna form:
 {
-  "description": "kort, naturlig svensk löptext, 2-4 meningar, beskriver bara det som syns",
-  "observed": ["kort lista med konkreta drag, t.ex. 'stora fönster mot söder', 'vit köksinredning'"],
+  "description": "2-4 meningar, konkret mäklarsvenska, bara det som syns tydligt på bilderna",
+  "observed": ["lista med konkreta iakttagelser, t.ex. 'fiskbensparkett', 'inbyggd garderob', 'fönster mot öst'"],
   "clarifications": [
-    { "id": "kort_nyckel", "question": "Vad ser ut att vara på golvet?", "options": ["Laminatgolv", "Trägolv (plank)", "Klinker", "Vet ej"] }
+    { "id": "golv", "question": "Vad är det för golvmaterial?", "options": ["Parkettgolv", "Laminatgolv", "Klinker", "Fiskbensparkett"] }
   ]
 }
-- clarifications: ENDAST när du är osäker. Lämna tom array [] om du är säker.
-- options ska vara konkreta materialalternativ, alltid med "Vet ej" som sista alternativ.
-- max 4 clarifications.`;
+- clarifications: BARA när du genuint inte kan avgöra materialet från bilderna. Lämna [] om du ser tydligt.
+- Sista alternativ i options ska alltid vara "Vet ej" om du lagt till "Vet ej" — annars specifika alternativ.
+- Max 3 clarifications.`;
 
 function parseRoomJson(content: string): RoomAnalysis {
   const obj = JSON.parse(stripFences(content));
@@ -217,7 +225,9 @@ export const finalizeRoomText = createServerFn({ method: "POST" })
     const userText = `Skriv 3 olika rumsbeskrivningar för ${data.roomName} baserat på dessa fakta:\n\n${facts}\n\nReturnera JSON med exakt dessa fält:\n{\n  "kort": "2–3 meningar, rak och faktabaserad",\n  "standard": "3–5 meningar, lätt säljande ton",\n  "utforlig": "5–7 meningar, detaljrik och inbjudande"\n}\nIngen annan text utanför JSON. Inga påhittade detaljer.`;
 
     const raw = await callClaude({
-      system: "Du skriver svenska mäklartexter. Svara ALLTID med giltig JSON, inget annat.",
+      system: `Du skriver svenska mäklartexter för fastighetsmäklare.
+Regler: Använd korrekta fastighetstermer. Inga vaga ord ("verklig", "äkta", "troligtvis", "välkomnande", "inbjudande"). Bara fakta som bekräftats. Naturlig löptext.
+Svara ALLTID med giltig JSON, inget annat.`,
       content: userText,
       maxTokens: 1200,
     });
