@@ -291,10 +291,9 @@ const SECONDARY_TABS: SideTab[] = [
   "Säljare", "Köpare", "Mäklarräkenskap",
 ];
 
-function Sidebar({ tab, setTab }: { tab: SideTab; setTab: (t: SideTab) => void }) {
-  const [showMore, setShowMore] = useState(SECONDARY_TABS.includes(tab));
-  const allTabsForMobile = [...PRIMARY_TABS, ...(showMore ? SECONDARY_TABS : [])];
+const ALL_TABS: SideTab[] = [...PRIMARY_TABS, ...SECONDARY_TABS];
 
+function Sidebar({ tab, setTab }: { tab: SideTab; setTab: (t: SideTab) => void }) {
   function TabBtn({ t, mobile }: { t: SideTab; mobile?: boolean }) {
     const active = tab === t;
     if (mobile) {
@@ -330,36 +329,13 @@ function Sidebar({ tab, setTab }: { tab: SideTab; setTab: (t: SideTab) => void }
       {/* Mobile: horizontal scrollable strip */}
       <div className="lg:hidden -mx-4 mb-4 overflow-x-auto px-4">
         <div className="flex gap-1.5 pb-1">
-          {allTabsForMobile.map((t) => <TabBtn key={t} t={t} mobile />)}
-          {!showMore && (
-            <button
-              onClick={() => setShowMore(true)}
-              className="whitespace-nowrap rounded-full px-3.5 py-1.5 text-sm text-muted-foreground/60"
-            >
-              ⋯ Mer
-            </button>
-          )}
+          {ALL_TABS.map((t) => <TabBtn key={t} t={t} mobile />)}
         </div>
       </div>
 
       {/* Desktop: vertical sidebar */}
       <aside className="hidden h-full space-y-0.5 overflow-y-auto pr-2 lg:block">
-        {PRIMARY_TABS.map((t) => <TabBtn key={t} t={t} />)}
-
-        <div className="pt-2">
-          <button
-            onClick={() => setShowMore((v) => !v)}
-            className="flex w-full items-center gap-1 rounded-md px-3 py-2 text-left text-[11px] text-muted-foreground/60 hover:text-muted-foreground"
-          >
-            <span className={`transition-transform text-[10px] ${showMore ? "rotate-90" : ""}`}>›</span>
-            {showMore ? "Dölj" : "Fler flikar"}
-          </button>
-          {showMore && (
-            <div className="space-y-0.5">
-              {SECONDARY_TABS.map((t) => <TabBtn key={t} t={t} />)}
-            </div>
-          )}
-        </div>
+        {ALL_TABS.map((t) => <TabBtn key={t} t={t} />)}
       </aside>
     </>
   );
