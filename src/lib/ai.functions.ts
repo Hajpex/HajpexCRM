@@ -91,7 +91,9 @@ ABSOLUTA REGLER:
 - Om du är osäker på material (laminat vs trägolv vs klinker etc.) → ställ en fråga istället
 - Använd svenska fastighetstermer: "parkettgolv", "klinker", "fiskbensparkett", "plankgolv", "kakel"
 - Inga tomma fraser: "välkomnande", "inbjudande", "charmig", "fräsch", "modern känsla"
-- Beskriv konkret: storlek, material, möblering, ljusinsläpp, detaljer
+- Beskriv INTE möbler som finns i rummet — de tas med av säljaren
+- Du FÅR nämna plats/möjlighet: "rymmer en stor soffa", "plats för matbord med 6 stolar", "utrymme för garderob"
+- Beskriv konkret: storlek, material, ljusinsläpp, fasta detaljer, rumsform
 - Naturalsvenska löptext, mäklarnivå, inga konstiga ordval
 
 Svara ALLTID med giltig JSON. Inga kodblock runtom.`;
