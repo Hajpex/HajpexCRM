@@ -394,7 +394,12 @@ function DashboardPage() {
                 onClick={() => setEditingLayout(true)}
                 className="rounded-lg border border-border bg-card px-3.5 py-2 text-xs font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary"
               >
-                ⊞ Redigera layout
+                ⊞ Redigera widgets
+              </button>
+              <button
+                className="rounded-lg border border-border bg-card px-3.5 py-2 text-xs font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary"
+              >
+                ⊟ Redigera layout
               </button>
               <button
                 onClick={() => setNyKontaktOpen(true)}
@@ -1272,7 +1277,7 @@ function LayoutEditor({
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-card px-5 py-4">
           <div>
             <p className="text-[10px] uppercase tracking-[0.2em] text-primary/60">Anpassa</p>
-            <h2 className="text-base font-medium text-foreground" style={serif}>Redigera layout</h2>
+            <h2 className="text-base font-medium text-foreground" style={serif}>Redigera widgets</h2>
           </div>
           <button
             onClick={onClose}

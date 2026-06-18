@@ -284,12 +284,12 @@ function ObjektDetailPage() {
 }
 
 const PRIMARY_TABS: SideTab[] = [
-  "Start", "Intag", "Visningar", "Budgivning", "Marknad", "Dokument",
+  "Start", "Intag", "Objektsinfo", "Marknad", "Visningar", "Budgivning",
+  "Kontrakt", "Säljare", "Köpare", "Mäklarräkenskap", "Objektsbeskrivning",
 ];
 
 const SECONDARY_TABS: SideTab[] = [
-  "Objektsinfo", "Objektsbeskrivning", "Kontrakt", "Tillträde",
-  "Säljare", "Köpare", "Mäklarräkenskap",
+  "Tillträde", "Dokument",
 ];
 
 const ALL_TABS: SideTab[] = [...PRIMARY_TABS, ...SECONDARY_TABS];
