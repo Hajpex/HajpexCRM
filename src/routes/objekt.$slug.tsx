@@ -1730,7 +1730,7 @@ function IntagView({ adress }: { adress: string }) {
         <DokumentBody />
       </Section>
       <Section id="filer" title="Filer" open={open.filer} onToggle={toggle}>
-        <FilerBody />
+        <FilerBody isBrf={getObjektBySlug(slug)?.typ === "Bostadsrätt"} />
       </Section>
       <Section id="tjanster" title="Tjänster" open={open.tjanster} onToggle={toggle}>
         <TjansterBody />
@@ -2539,6 +2539,8 @@ type TiSection =
   | "dokument" | "filer" | "efterarbete" | "kapitalvinst";
 
 function TilltradeView() {
+  const { slug } = Route.useParams();
+  const isBrfTi = getObjektBySlug(slug)?.typ === "Bostadsrätt";
   const [open, setOpen] = useState<Record<TiSection, boolean>>({
     mj: false, kopare: false, forbered: false, likvid: false,
     dokument: false, filer: false, efterarbete: false, kapitalvinst: false,
@@ -2568,7 +2570,7 @@ function TilltradeView() {
         <DokumentBody />
       </TiSec>
       <TiSec id="filer" title="Filer" open={open.filer} onToggle={toggle} done={done.filer} onToggleDone={toggleDone}>
-        <FilerBody />
+        <FilerBody isBrf={isBrfTi} />
       </TiSec>
       <TiSec id="efterarbete" title="Efterarbete tillträde" open={open.efterarbete} onToggle={toggle} done={done.efterarbete} onToggleDone={toggleDone}>
         <TiEfterarbeteBody />
@@ -2892,10 +2894,12 @@ function DokumentView({ slug, onTabChange }: { slug: string; onTabChange: (tab: 
             <BtnPrimary onClick={() => filRef.current?.click()}>+ Lägg till</BtnPrimary>
             <BtnGhost>🔒 Multiutskrift / E-post</BtnGhost>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <BtnGhost>🗺 Beställ lantmäterikarta</BtnGhost>
-            <BtnGhost>🗺 Beställ från Lantmäteriet</BtnGhost>
-          </div>
+          {!isBrf && (
+            <div className="flex flex-wrap gap-2">
+              <BtnGhost>🗺 Beställ lantmäterikarta</BtnGhost>
+              <BtnGhost>🗺 Beställ från Lantmäteriet</BtnGhost>
+            </div>
+          )}
         </div>
         <div className="overflow-x-auto rounded-md border border-border">
           <table className="w-full text-sm">
@@ -3378,12 +3382,15 @@ function UppdragBody({ adress }: { adress: string }) {
   const o = getObjektBySlug(slugifyAddr(adress));
   const prisStr = o?.pris ? o.pris.toLocaleString("sv-SE") : "0";
   const statusStr = o?.status ?? "Under intag";
+  const isBrfUppdrag = o?.typ === "Bostadsrätt";
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap justify-end gap-2">
-        <BtnGhost>Beställ lantmäterikarta</BtnGhost>
-        <BtnGhost>Beställ från Lantmäteriet</BtnGhost>
-      </div>
+      {!isBrfUppdrag && (
+        <div className="flex flex-wrap justify-end gap-2">
+          <BtnGhost>Beställ lantmäterikarta</BtnGhost>
+          <BtnGhost>Beställ från Lantmäteriet</BtnGhost>
+        </div>
+      )}
       <Field label="Uppdragsnamn"><Input value={propertyFullAddr(slugifyAddr(adress))} /></Field>
       <div className="flex flex-wrap gap-6">
         <Checkbox label="Utland" />
@@ -3545,7 +3552,7 @@ function DokumentBody() {
 
 /* ---------- Filer ---------- */
 
-function FilerBody() {
+function FilerBody({ isBrf = false }: { isBrf?: boolean }) {
   const files = [
     { t: "Fastighetsutdrag", titel: "HUDDINGE NYINGEN 5 2026-05-27 0931", net: false, mark: false, kund: false, d: "2026-05-27" },
     { t: "", titel: "Nordkyc 2026-05-27", besk: "Nordkyc pdf", net: false, mark: false, kund: false, d: "2026-05-27" },
@@ -3564,10 +3571,12 @@ function FilerBody() {
           <BtnPrimary>+ Lägg till</BtnPrimary>
           <BtnGhost>Multiutskrift / e-post</BtnGhost>
         </div>
-        <div className="flex gap-2">
-          <BtnGhost>Beställ lantmäterikarta</BtnGhost>
-          <BtnGhost>Beställ från Lantmäteriet</BtnGhost>
-        </div>
+        {!isBrf && (
+          <div className="flex gap-2">
+            <BtnGhost>Beställ lantmäterikarta</BtnGhost>
+            <BtnGhost>Beställ från Lantmäteriet</BtnGhost>
+          </div>
+        )}
       </div>
       <div className="overflow-x-auto rounded-md border border-border">
         <table className="w-full text-sm">
@@ -4233,7 +4242,7 @@ function KontraktView({ slug, onTabChange }: { slug: string; onTabChange: (tab: 
         <DokumentBody />
       </KoSec>
       <KoSec id="filer" title="Filer" open={open.filer} onToggle={toggle} done={done.filer} onToggleDone={toggleDone}>
-        <FilerBody />
+        <FilerBody isBrf={getObjektBySlug(slug)?.typ === "Bostadsrätt"} />
       </KoSec>
       <KoSec id="efterarbete" title="Efterarbete kontrakt" open={open.efterarbete} onToggle={toggle} done={done.efterarbete} onToggleDone={toggleDone} helpLabel="Hantera handpenningen">
         <KoEfterarbeteBody slug={slug} />
@@ -4557,7 +4566,7 @@ function BudgivningView({ slug }: { slug: string }) {
         <DokumentBody />
       </BuSec>
       <BuSec id="filer" title="Filer" open={open.filer} onToggle={toggle} done={done.filer} onToggleDone={toggleDone}>
-        <FilerBody />
+        <FilerBody isBrf={getObjektBySlug(slug)?.typ === "Bostadsrätt"} />
       </BuSec>
     </div>
   );
@@ -5128,6 +5137,8 @@ type MaSection =
   | "boende" | "dokument" | "filer" | "tjanster";
 
 function MarknadView() {
+  const { slug } = Route.useParams();
+  const isBrfMa = getObjektBySlug(slug)?.typ === "Bostadsrätt";
   const [open, setOpen] = useState<Record<MaSection, boolean>>({
     mj: true, marknad: false, visningar: false, publicera: false,
     boende: false, dokument: false, filer: false, tjanster: false,
@@ -5160,7 +5171,7 @@ function MarknadView() {
         <DokumentBody />
       </MaSec>
       <MaSec id="filer" title="Filer" open={open.filer} onToggle={toggle} done={done.filer} onToggleDone={toggleDone}>
-        <FilerBody />
+        <FilerBody isBrf={isBrfMa} />
       </MaSec>
       <MaSec id="tjanster" title="Tjänster" open={open.tjanster} onToggle={toggle} done={done.tjanster} onToggleDone={toggleDone}>
         <TjansterBody />
