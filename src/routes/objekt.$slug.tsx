@@ -2108,6 +2108,11 @@ function MaklarjournalBody({ ansvarig }: { ansvarig: string }) {
   const [newLabel, setNewLabel] = useState("");
 
   const anyChecked = checked.some(Boolean);
+  const allChecked = checked.length > 0 && checked.every(Boolean);
+
+  function toggleCheckAll() {
+    setChecked(items.map(() => !allChecked));
+  }
 
   function toggleCheck(i: number, e: React.MouseEvent) {
     e.stopPropagation();
@@ -2157,6 +2162,14 @@ function MaklarjournalBody({ ansvarig }: { ansvarig: string }) {
       )}
 
       <div className="divide-y divide-border rounded-md border border-border">
+        {/* Markera alla-rad */}
+        <div className="flex items-center gap-3 bg-foreground/[0.02] px-3 py-2">
+          <input type="checkbox" checked={allChecked} onChange={toggleCheckAll}
+            className="h-4 w-4 shrink-0 accent-primary" />
+          <span className="text-xs text-muted-foreground cursor-pointer select-none" onClick={toggleCheckAll}>
+            {allChecked ? "Avmarkera alla" : "Markera alla"}
+          </span>
+        </div>
         {items.map((item, i) => {
           const isOpen = openIdx === i;
           const done = !!item.datum;
