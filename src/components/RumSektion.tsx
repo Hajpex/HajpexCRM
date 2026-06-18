@@ -6,6 +6,7 @@ import {
   type RoomClarification,
 } from "../lib/ai.functions";
 import { listRum, addRum, updateRum, deleteRum } from "../lib/rumStore";
+import { listBilder, type ObjektBild } from "../lib/objektBilderStore";
 
 const serifStyle = { fontFamily: '"Instrument Serif", ui-serif, Georgia, serif', letterSpacing: "-0.01em" } as const;
 
@@ -36,6 +37,7 @@ export function RumSektion({ slug, propertyType }: { slug: string; propertyType?
   const [rooms, setRooms] = useState<EditorRoom[]>(() =>
     listRum(slug).map((r) => ({ ...r, images: [], collapsed: !!r.description, aiStatus: "idle" as const }))
   );
+  const [objektBilder] = useState<ObjektBild[]>(() => listBilder(slug));
 
   const analyzeFn = useServerFn(analyzeRoomImages);
   const finalizeFn = useServerFn(finalizeRoomText);
@@ -189,12 +191,20 @@ export function RumSektion({ slug, propertyType }: { slug: string; propertyType?
                 key={room.id}
                 room={room}
                 index={idx + 1}
+                objektBilder={objektBilder}
                 onName={(v) => persist(room.id, { name: v })}
                 onFloor={(v) => persist(room.id, { floor: v })}
                 onDescription={(v) => persist(room.id, { description: v })}
                 onDelete={() => handleDeleteRoom(room.id)}
                 onUpload={(files) => handleFiles(room.id, files)}
                 onRemoveImage={(imgId) => removeImage(room.id, imgId)}
+                onAddFromGallery={(bild) => {
+                  setRooms((rs) => rs.map((r) => r.id === room.id ? {
+                    ...r,
+                    images: r.images.some((i) => i.id === bild.id) ? r.images
+                           : [...r.images, { id: bild.id, name: bild.name, dataUrl: bild.dataUrl }],
+                  } : r));
+                }}
                 onAnalyze={() => analyzeRoom(room)}
                 onAnswer={(qid, val) => setAnswer(room.id, qid, val)}
                 onFinalize={() => finalizeRoom(room)}
@@ -211,16 +221,18 @@ export function RumSektion({ slug, propertyType }: { slug: string; propertyType?
 }
 
 function RoomCard({
-  room, index, onName, onFloor, onDescription, onDelete, onUpload, onRemoveImage, onAnalyze, onAnswer, onFinalize, onPickVariant, onToggleCollapse,
+  room, index, objektBilder, onName, onFloor, onDescription, onDelete, onUpload, onRemoveImage, onAddFromGallery, onAnalyze, onAnswer, onFinalize, onPickVariant, onToggleCollapse,
 }: {
   room: EditorRoom;
   index: number;
+  objektBilder: ObjektBild[];
   onName: (v: string) => void;
   onFloor: (v: string) => void;
   onDescription: (v: string) => void;
   onDelete: () => void;
   onUpload: (files: FileList | null) => void;
   onRemoveImage: (id: string) => void;
+  onAddFromGallery: (bild: ObjektBild) => void;
   onAnalyze: () => void;
   onAnswer: (qid: string, value: string) => void;
   onFinalize: () => void;
@@ -308,8 +320,37 @@ function RoomCard({
 
         {/* Right: photos + AI */}
         <div>
-          <MiniLabel>Foton</MiniLabel>
-          {room.images.length === 0 ? (
+          <div className="flex items-center justify-between">
+            <MiniLabel>Foton för AI-analys</MiniLabel>
+            {room.images.length > 0 && (
+              <span className="text-[10px] text-muted-foreground">{room.images.length} vald{room.images.length > 1 ? "a" : ""}</span>
+            )}
+          </div>
+
+          {/* Gallery picker — visas om det finns bilder uppladdade på objektet */}
+          {objektBilder.length > 0 && (
+            <div className="mt-2 mb-3">
+              <div className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground mb-1.5">Välj från objektets bilder</div>
+              <div className="grid grid-cols-4 gap-1.5 sm:grid-cols-5">
+                {objektBilder.map((b) => {
+                  const selected = room.images.some((i) => i.id === b.id);
+                  return (
+                    <button key={b.id} onClick={() => selected ? onRemoveImage(b.id) : onAddFromGallery(b)}
+                      className={["relative aspect-square overflow-hidden rounded-md border-2 transition-all", selected ? "border-primary ring-1 ring-primary/40" : "border-transparent opacity-60 hover:opacity-100 hover:border-border"].join(" ")}>
+                      <img src={b.dataUrl} alt={b.name} className="h-full w-full object-cover" />
+                      {selected && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-primary/20">
+                          <span className="rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-bold text-white">✓</span>
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {room.images.length === 0 && objektBilder.length === 0 ? (
             <label className="mt-2 flex cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-border bg-muted/30 px-5 py-8 text-center transition-colors hover:border-primary/50 hover:bg-primary/[0.04]">
               <input type="file" multiple accept="image/*" className="hidden"
                 onChange={(e) => { onUpload(e.target.files); e.currentTarget.value = ""; }} />

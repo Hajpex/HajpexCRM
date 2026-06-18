@@ -3,6 +3,7 @@ import { Fragment, createContext, useContext, useRef, useState, useEffect, type 
 import { AppShell } from "../components/AppShell";
 import { OBJEKT, type Objekt } from "../data/objekt";
 import { listObjekt } from "../lib/objektStore";
+import { listBilder, addBilder, removeBild } from "../lib/objektBilderStore";
 import { getObjektNotes, addObjektNote, setObjektBeskrivning, setObjektStatus, setObjektMarknadText, setManadsavgift } from "../lib/objektNotesStore";
 import { generateMarketingText } from "../lib/ai.functions";
 import { listBud, addBud, markeraVinnare, deleteBud, dragaTillbakaBud, getBudSettings, setBudSettings, fmtBud, type Bud } from "../lib/budgivningStore";
@@ -406,33 +407,84 @@ function StartView({
 function BilderCard({ adress, slug }: { adress: string; slug: string }) {
   const o = getObjektBySlug(slug);
   const blank = isUserCreatedSlug(slug);
+  const [uploadedBilder, setUploadedBilder] = useState(() => listBilder(slug));
+  const [idx, setIdx] = useState(0);
+
+  function handleUpload(files: FileList | null) {
+    if (!files) return;
+    Array.from(files).forEach((file) => {
+      compressImageCard(file).then((dataUrl) => {
+        const added = addBilder(slug, [{ name: file.name, dataUrl }]);
+        setUploadedBilder((prev) => [...prev, ...added]);
+      });
+    });
+  }
+
+  function handleRemove(id: string) {
+    removeBild(slug, id);
+    setUploadedBilder((prev) => {
+      const next = prev.filter((b) => b.id !== id);
+      if (idx >= next.length) setIdx(Math.max(0, next.length - 1));
+      return next;
+    });
+  }
+
   if (blank) {
+    if (uploadedBilder.length === 0) {
+      return (
+        <Card title="Bilder" icon="📷">
+          <label className="flex cursor-pointer aspect-[16/10] flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-border bg-muted/40 text-center hover:border-primary/50 hover:bg-primary/[0.03] transition-colors">
+            <input type="file" multiple accept="image/*" className="hidden" onChange={(e) => handleUpload(e.target.files)} />
+            <div className="text-3xl opacity-60">📷</div>
+            <div className="text-sm text-muted-foreground">Klicka för att ladda upp bilder</div>
+            <div className="text-xs text-muted-foreground/60">JPG, PNG · Flera bilder samtidigt</div>
+          </label>
+        </Card>
+      );
+    }
+    const total = uploadedBilder.length;
+    const cur = uploadedBilder[Math.min(idx, total - 1)];
     return (
       <Card title="Bilder" icon="📷">
-        <div className="flex aspect-[16/10] flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-border bg-muted/40 text-center">
-          <div className="text-3xl opacity-60">📷</div>
-          <div className="text-sm text-muted-foreground">Inga bilder uppladdade ännu</div>
-          <button className="rounded-md border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground hover:border-primary/40 hover:text-primary">
-            + Ladda upp bilder
+        <div className="relative aspect-[16/10] overflow-hidden rounded-lg bg-muted">
+          <img src={cur.dataUrl} alt={cur.name} className="h-full w-full object-cover" />
+          <button onClick={() => handleRemove(cur.id)}
+            className="absolute right-2 top-2 rounded-full bg-black/60 px-2.5 py-1 text-xs text-white hover:bg-destructive/80">
+            Ta bort
           </button>
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
+          {total > 1 && (
+            <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between text-xs text-white">
+              <button onClick={() => setIdx((i) => (i - 1 + total) % total)} className="pointer-events-auto rounded-full bg-black/40 px-3 py-1 backdrop-blur hover:bg-black/60">←</button>
+              <span className="rounded-full bg-black/40 px-3 py-1 backdrop-blur">{Math.min(idx, total - 1) + 1} / {total}</span>
+              <button onClick={() => setIdx((i) => (i + 1) % total)} className="pointer-events-auto rounded-full bg-black/40 px-3 py-1 backdrop-blur hover:bg-black/60">→</button>
+            </div>
+          )}
+        </div>
+        <div className="mt-3 grid grid-cols-5 gap-2">
+          {uploadedBilder.map((b, i) => (
+            <button key={b.id} onClick={() => setIdx(i)}
+              className={["aspect-[4/3] overflow-hidden rounded-md border transition", i === idx ? "border-primary ring-1 ring-primary/40" : "border-border opacity-70 hover:opacity-100"].join(" ")}>
+              <img src={b.dataUrl} alt={b.name} className="h-full w-full object-cover" />
+            </button>
+          ))}
+          <label className="flex aspect-[4/3] cursor-pointer flex-col items-center justify-center rounded-md border border-dashed border-border bg-muted/30 text-muted-foreground hover:border-primary/50 hover:text-primary transition-colors">
+            <input type="file" multiple accept="image/*" className="hidden" onChange={(e) => handleUpload(e.target.files)} />
+            <span className="text-lg leading-none">+</span>
+          </label>
         </div>
       </Card>
     );
   }
+
   const images = pickImages(slug, o?.typ, o?.boarea);
-  const [idx, setIdx] = useState(0);
   const total = images.length;
   const prev = () => setIdx((i) => (i - 1 + total) % total);
   const next = () => setIdx((i) => (i + 1) % total);
   return (
     <Card title="Bilder" icon="📷">
       <div className="relative aspect-[16/10] overflow-hidden rounded-lg bg-muted">
-        <img
-          src={images[idx]}
-          alt={`Bild ${idx + 1} av ${adress}`}
-          className="h-full w-full object-cover"
-          loading="lazy"
-        />
+        <img src={images[idx]} alt={`Bild ${idx + 1} av ${adress}`} className="h-full w-full object-cover" loading="lazy" />
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
         <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between text-xs text-white">
           <button onClick={prev} className="pointer-events-auto rounded-full bg-black/40 px-3 py-1 backdrop-blur hover:bg-black/60">←</button>
@@ -442,20 +494,33 @@ function BilderCard({ adress, slug }: { adress: string; slug: string }) {
       </div>
       <div className="mt-3 grid grid-cols-5 gap-2">
         {images.map((src, i) => (
-          <button
-            key={src}
-            onClick={() => setIdx(i)}
-            className={[
-              "aspect-[4/3] overflow-hidden rounded-md border transition",
-              i === idx ? "border-primary ring-1 ring-primary/40" : "border-border opacity-70 hover:opacity-100",
-            ].join(" ")}
-          >
+          <button key={src} onClick={() => setIdx(i)}
+            className={["aspect-[4/3] overflow-hidden rounded-md border transition", i === idx ? "border-primary ring-1 ring-primary/40" : "border-border opacity-70 hover:opacity-100"].join(" ")}>
             <img src={src} alt="" className="h-full w-full object-cover" loading="lazy" />
           </button>
         ))}
       </div>
     </Card>
   );
+}
+
+function compressImageCard(file: File): Promise<string> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const scale = Math.min(1, 1200 / Math.max(img.width, img.height));
+      const w = Math.round(img.width * scale);
+      const h = Math.round(img.height * scale);
+      const canvas = document.createElement("canvas");
+      canvas.width = w; canvas.height = h;
+      canvas.getContext("2d")!.drawImage(img, 0, 0, w, h);
+      resolve(canvas.toDataURL("image/jpeg", 0.82));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); const r = new FileReader(); r.onload = (e) => resolve(String(e.target?.result ?? "")); r.readAsDataURL(file); };
+    img.src = url;
+  });
 }
 
 function AktivitetCard() {
@@ -3912,21 +3977,57 @@ function RumBody({ slug }: { slug: string }) {
 
 function BilderSectionBody({ slug }: { slug: string }) {
   const blank = isUserCreatedSlug(slug);
+  const [bilder, setBilder] = useState(() => listBilder(slug));
+
+  function handleUpload(files: FileList | null) {
+    if (!files) return;
+    Array.from(files).forEach((file) => {
+      compressImageCard(file).then((dataUrl) => {
+        const added = addBilder(slug, [{ name: file.name, dataUrl }]);
+        setBilder((prev) => [...prev, ...added]);
+      });
+    });
+  }
+
+  function handleRemove(id: string) {
+    removeBild(slug, id);
+    setBilder((prev) => prev.filter((b) => b.id !== id));
+  }
+
   if (blank) {
     return (
       <div className="space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <div className="text-sm font-medium">Uppdragets bilder</div>
-            <div className="text-xs text-muted-foreground">Inga bilder uppladdade ännu</div>
+            <div className="text-xs text-muted-foreground">{bilder.length === 0 ? "Inga bilder uppladdade ännu" : `${bilder.length} bild${bilder.length > 1 ? "er" : ""}`}</div>
           </div>
-          <div className="flex gap-2">
-            <BtnPrimary>+ Lägg till bilder</BtnPrimary>
+          <label className="cursor-pointer rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 transition-colors">
+            <input type="file" multiple accept="image/*" className="hidden" onChange={(e) => handleUpload(e.target.files)} />
+            + Lägg till bilder
+          </label>
+        </div>
+        {bilder.length === 0 ? (
+          <label className="flex cursor-pointer flex-col items-center justify-center rounded-md border border-dashed border-border px-3 py-10 text-center text-sm text-muted-foreground hover:border-primary/50 hover:bg-primary/[0.02] transition-colors">
+            <input type="file" multiple accept="image/*" className="hidden" onChange={(e) => handleUpload(e.target.files)} />
+            <div className="text-2xl mb-2 opacity-50">📷</div>
+            Klicka för att ladda upp bilder
+          </label>
+        ) : (
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+            {bilder.map((b, i) => (
+              <div key={b.id} className="group overflow-hidden rounded-md border border-border bg-background/40">
+                <div className="relative aspect-[4/3]">
+                  <img src={b.dataUrl} alt={b.name} loading="lazy" className="h-full w-full object-cover" />
+                  <span className="absolute left-1.5 top-1.5 rounded bg-black/60 px-1.5 py-0.5 text-[10px] text-white">{i + 1}</span>
+                  <button onClick={() => handleRemove(b.id)}
+                    className="absolute right-1 top-1 hidden h-6 w-6 items-center justify-center rounded-full bg-black/70 text-xs text-white group-hover:flex">×</button>
+                </div>
+                <div className="px-2 py-1.5 text-xs truncate text-muted-foreground">{b.name}</div>
+              </div>
+            ))}
           </div>
-        </div>
-        <div className="rounded-md border border-dashed border-border px-3 py-10 text-center text-sm text-muted-foreground">
-          Ladda upp bilder för att komma igång
-        </div>
+        )}
       </div>
     );
   }
