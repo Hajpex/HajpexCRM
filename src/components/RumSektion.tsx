@@ -62,15 +62,12 @@ export function RumSektion({ slug, propertyType }: { slug: string; propertyType?
   function handleFiles(id: string, fileList: FileList | null) {
     if (!fileList) return;
     Array.from(fileList).forEach((file) => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const dataUrl = String(e.target?.result ?? "");
+      compressImage(file, 1200, 0.82).then((dataUrl) => {
         setRooms((rs) => rs.map((r) => r.id === id ? {
           ...r,
           images: [...r.images, { id: `${file.name}-${Date.now()}-${Math.random()}`, name: file.name, dataUrl }],
         } : r));
-      };
-      reader.readAsDataURL(file);
+      });
     });
   }
 
@@ -90,7 +87,7 @@ export function RumSektion({ slug, propertyType }: { slug: string; propertyType?
           floor: room.floor,
           propertyType: propertyType ?? "",
           existingNotes: room.description,
-          images: room.images.map((i) => ({ name: i.name, dataUrl: i.dataUrl })),
+          images: room.images.slice(0, 4).map((i) => ({ name: i.name, dataUrl: i.dataUrl })),
         },
       });
       const answers: Answer[] = res.clarifications.map((c) => ({ id: c.id, question: c.question, answer: "" }));
@@ -393,6 +390,31 @@ function RoomCard({
 
 function MiniLabel({ children, className = "" }: { children: ReactNode; className?: string }) {
   return <div className={`text-[10px] font-semibold uppercase tracking-[0.22em] text-primary/70 ${className}`}>{children}</div>;
+}
+
+function compressImage(file: File, maxDim: number, quality: number): Promise<string> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+      const w = Math.round(img.width * scale);
+      const h = Math.round(img.height * scale);
+      const canvas = document.createElement("canvas");
+      canvas.width = w;
+      canvas.height = h;
+      canvas.getContext("2d")!.drawImage(img, 0, 0, w, h);
+      resolve(canvas.toDataURL("image/jpeg", quality));
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      const reader = new FileReader();
+      reader.onload = (e) => resolve(String(e.target?.result ?? ""));
+      reader.readAsDataURL(file);
+    };
+    img.src = url;
+  });
 }
 
 function UploadIcon() {
