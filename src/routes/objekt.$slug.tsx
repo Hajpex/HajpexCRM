@@ -560,13 +560,19 @@ function Lightbox({ images, startIdx, onClose }: { images: string[]; startIdx: n
 
   return (
     <div
-      className="fixed inset-0 z-[200] flex flex-col bg-black/95 backdrop-blur-sm"
+      className="fixed inset-0 z-[200] flex flex-col bg-white/95 backdrop-blur-sm"
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
       {/* Header */}
       <div className="flex items-center justify-between px-5 py-3 shrink-0">
-        <span className="text-sm text-white/50">{idx + 1} / {total}</span>
-        <button onClick={onClose} className="rounded-full p-2 text-white/60 hover:bg-white/10 hover:text-white text-xl leading-none">✕</button>
+        <span className="text-sm text-black/40">{idx + 1} / {total}</span>
+        <button
+          onClick={onClose}
+          className="flex h-9 w-9 items-center justify-center rounded-full bg-black/8 text-black/70 text-lg leading-none hover:bg-black/15 hover:text-black transition-colors"
+          aria-label="Stäng"
+        >
+          ✕
+        </button>
       </div>
 
       {/* Bild */}
@@ -574,20 +580,20 @@ function Lightbox({ images, startIdx, onClose }: { images: string[]; startIdx: n
         <img
           src={images[idx]}
           alt={`Bild ${idx + 1}`}
-          className="max-h-full max-w-full rounded-lg object-contain shadow-2xl select-none"
+          className="max-h-full max-w-full rounded-lg object-contain shadow-lg select-none"
           draggable={false}
         />
         {total > 1 && (
           <>
             <button
               onClick={prev}
-              className="absolute left-3 top-1/2 -translate-y-1/2 flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 transition-colors"
+              className="absolute left-3 top-1/2 -translate-y-1/2 flex h-10 w-10 items-center justify-center rounded-full bg-black/8 text-black/70 hover:bg-black/15 hover:text-black transition-colors"
             >
               ←
             </button>
             <button
               onClick={next}
-              className="absolute right-3 top-1/2 -translate-y-1/2 flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 transition-colors"
+              className="absolute right-3 top-1/2 -translate-y-1/2 flex h-10 w-10 items-center justify-center rounded-full bg-black/8 text-black/70 hover:bg-black/15 hover:text-black transition-colors"
             >
               →
             </button>
@@ -604,7 +610,7 @@ function Lightbox({ images, startIdx, onClose }: { images: string[]; startIdx: n
               onClick={() => setIdx(i)}
               className={[
                 "h-14 w-20 shrink-0 overflow-hidden rounded-md border-2 transition",
-                i === idx ? "border-white opacity-100" : "border-transparent opacity-40 hover:opacity-70",
+                i === idx ? "border-black/50 opacity-100" : "border-transparent opacity-40 hover:opacity-70",
               ].join(" ")}
             >
               <img src={src} alt="" className="h-full w-full object-cover" draggable={false} />
