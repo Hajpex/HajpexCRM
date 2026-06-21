@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Fragment, createContext, useContext, useRef, useState, useEffect, type ReactNode } from "react";
+import { Fragment, createContext, useContext, useRef, useState, useEffect, useCallback, type ReactNode } from "react";
 import { AppShell } from "../components/AppShell";
 import { OBJEKT, type Objekt } from "../data/objekt";
 import { listObjekt } from "../lib/objektStore";
@@ -409,6 +409,7 @@ function BilderCard({ adress, slug }: { adress: string; slug: string }) {
   const blank = isUserCreatedSlug(slug);
   const [uploadedBilder, setUploadedBilder] = useState(() => listBilder(slug));
   const [idx, setIdx] = useState(0);
+  const [lightboxIdx, setLightboxIdx] = useState<number | null>(null);
 
   function handleUpload(files: FileList | null) {
     if (!files) return;
@@ -443,11 +444,20 @@ function BilderCard({ adress, slug }: { adress: string; slug: string }) {
       );
     }
     const total = uploadedBilder.length;
-    const cur = uploadedBilder[Math.min(idx, total - 1)];
+    const curIdx = Math.min(idx, total - 1);
+    const cur = uploadedBilder[curIdx];
+    const allUrls = uploadedBilder.map((b) => b.dataUrl);
     return (
       <Card title="Bilder" icon="📷">
+        {lightboxIdx !== null && (
+          <Lightbox images={allUrls} startIdx={lightboxIdx} onClose={() => setLightboxIdx(null)} />
+        )}
         <div className="relative aspect-[16/10] overflow-hidden rounded-lg bg-muted">
-          <img src={cur.dataUrl} alt={cur.name} className="h-full w-full object-cover" />
+          <img
+            src={cur.dataUrl} alt={cur.name}
+            className="h-full w-full cursor-zoom-in object-cover"
+            onClick={() => setLightboxIdx(curIdx)}
+          />
           <button onClick={() => handleRemove(cur.id)}
             className="absolute right-2 top-2 rounded-full bg-black/60 px-2.5 py-1 text-xs text-white hover:bg-destructive/80">
             Ta bort
@@ -456,7 +466,7 @@ function BilderCard({ adress, slug }: { adress: string; slug: string }) {
           {total > 1 && (
             <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between text-xs text-white">
               <button onClick={() => setIdx((i) => (i - 1 + total) % total)} className="pointer-events-auto rounded-full bg-black/40 px-3 py-1 backdrop-blur hover:bg-black/60">←</button>
-              <span className="rounded-full bg-black/40 px-3 py-1 backdrop-blur">{Math.min(idx, total - 1) + 1} / {total}</span>
+              <span className="rounded-full bg-black/40 px-3 py-1 backdrop-blur">{curIdx + 1} / {total}</span>
               <button onClick={() => setIdx((i) => (i + 1) % total)} className="pointer-events-auto rounded-full bg-black/40 px-3 py-1 backdrop-blur hover:bg-black/60">→</button>
             </div>
           )}
@@ -483,8 +493,16 @@ function BilderCard({ adress, slug }: { adress: string; slug: string }) {
   const next = () => setIdx((i) => (i + 1) % total);
   return (
     <Card title="Bilder" icon="📷">
+      {lightboxIdx !== null && (
+        <Lightbox images={images} startIdx={lightboxIdx} onClose={() => setLightboxIdx(null)} />
+      )}
       <div className="relative aspect-[16/10] overflow-hidden rounded-lg bg-muted">
-        <img src={images[idx]} alt={`Bild ${idx + 1} av ${adress}`} className="h-full w-full object-cover" loading="lazy" />
+        <img
+          src={images[idx]} alt={`Bild ${idx + 1} av ${adress}`}
+          className="h-full w-full cursor-zoom-in object-cover"
+          loading="lazy"
+          onClick={() => setLightboxIdx(idx)}
+        />
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
         <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between text-xs text-white">
           <button onClick={prev} className="pointer-events-auto rounded-full bg-black/40 px-3 py-1 backdrop-blur hover:bg-black/60">←</button>
@@ -521,6 +539,81 @@ function compressImageCard(file: File): Promise<string> {
     img.onerror = () => { URL.revokeObjectURL(url); const r = new FileReader(); r.onload = (e) => resolve(String(e.target?.result ?? "")); r.readAsDataURL(file); };
     img.src = url;
   });
+}
+
+/* ── Lightbox ── */
+function Lightbox({ images, startIdx, onClose }: { images: string[]; startIdx: number; onClose: () => void }) {
+  const [idx, setIdx] = useState(startIdx);
+  const total = images.length;
+  const prev = useCallback(() => setIdx((i) => (i - 1 + total) % total), [total]);
+  const next = useCallback(() => setIdx((i) => (i + 1) % total), [total]);
+
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+      if (e.key === "ArrowLeft") prev();
+      if (e.key === "ArrowRight") next();
+    };
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  }, [onClose, prev, next]);
+
+  return (
+    <div
+      className="fixed inset-0 z-[200] flex flex-col bg-black/95 backdrop-blur-sm"
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
+      {/* Header */}
+      <div className="flex items-center justify-between px-5 py-3 shrink-0">
+        <span className="text-sm text-white/50">{idx + 1} / {total}</span>
+        <button onClick={onClose} className="rounded-full p-2 text-white/60 hover:bg-white/10 hover:text-white text-xl leading-none">✕</button>
+      </div>
+
+      {/* Bild */}
+      <div className="relative flex flex-1 items-center justify-center min-h-0 px-14">
+        <img
+          src={images[idx]}
+          alt={`Bild ${idx + 1}`}
+          className="max-h-full max-w-full rounded-lg object-contain shadow-2xl select-none"
+          draggable={false}
+        />
+        {total > 1 && (
+          <>
+            <button
+              onClick={prev}
+              className="absolute left-3 top-1/2 -translate-y-1/2 flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 transition-colors"
+            >
+              ←
+            </button>
+            <button
+              onClick={next}
+              className="absolute right-3 top-1/2 -translate-y-1/2 flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 transition-colors"
+            >
+              →
+            </button>
+          </>
+        )}
+      </div>
+
+      {/* Miniatyrer */}
+      {total > 1 && (
+        <div className="flex gap-2 overflow-x-auto px-5 py-4 shrink-0 justify-center">
+          {images.map((src, i) => (
+            <button
+              key={i}
+              onClick={() => setIdx(i)}
+              className={[
+                "h-14 w-20 shrink-0 overflow-hidden rounded-md border-2 transition",
+                i === idx ? "border-white opacity-100" : "border-transparent opacity-40 hover:opacity-70",
+              ].join(" ")}
+            >
+              <img src={src} alt="" className="h-full w-full object-cover" draggable={false} />
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 function AktivitetCard() {
