@@ -3,7 +3,7 @@ import { Fragment, createContext, useContext, useRef, useState, useEffect, useCa
 import { AppShell } from "../components/AppShell";
 import { OBJEKT, type Objekt } from "../data/objekt";
 import { listObjekt } from "../lib/objektStore";
-import { listBilder, addBilder, removeBild } from "../lib/objektBilderStore";
+import { listBilder, addBilder, removeBild, reorderBilder } from "../lib/objektBilderStore";
 import { getObjektNotes, addObjektNote, setObjektBeskrivning, setObjektStatus, setObjektMarknadText, setManadsavgift } from "../lib/objektNotesStore";
 import { generateMarketingText } from "../lib/ai.functions";
 import { listBud, addBud, markeraVinnare, deleteBud, dragaTillbakaBud, getBudSettings, setBudSettings, fmtBud, type Bud } from "../lib/budgivningStore";
@@ -4267,6 +4267,14 @@ function RumBody({ slug }: { slug: string }) {
 function BilderSectionBody({ slug }: { slug: string }) {
   const blank = isUserCreatedSlug(slug);
   const [bilder, setBilder] = useState(() => listBilder(slug));
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [dragOverId, setDragOverId] = useState<string | null>(null);
+
+  function handleDrop(targetId: string) {
+    if (dragId && dragId !== targetId) setBilder(reorderBilder(slug, dragId, targetId));
+    setDragId(null);
+    setDragOverId(null);
+  }
 
   function handleUpload(files: FileList | null) {
     if (!files) return;
@@ -4303,19 +4311,38 @@ function BilderSectionBody({ slug }: { slug: string }) {
             Klicka för att ladda upp bilder
           </label>
         ) : (
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
-            {bilder.map((b, i) => (
-              <div key={b.id} className="group overflow-hidden rounded-md border border-border bg-background/40">
-                <div className="relative aspect-[4/3]">
-                  <img src={b.dataUrl} alt={b.name} loading="lazy" className="h-full w-full object-cover" />
-                  <span className="absolute left-1.5 top-1.5 rounded bg-black/60 px-1.5 py-0.5 text-[10px] text-white">{i + 1}</span>
-                  <button onClick={() => handleRemove(b.id)}
-                    className="absolute right-1 top-1 hidden h-6 w-6 items-center justify-center rounded-full bg-black/70 text-xs text-white group-hover:flex">×</button>
-                </div>
-                <div className="px-2 py-1.5 text-xs truncate text-muted-foreground">{b.name}</div>
-              </div>
-            ))}
-          </div>
+          <>
+            <div className="mb-2 text-[11px] text-muted-foreground">Dra bilderna för att ändra ordning.</div>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+              {bilder.map((b, i) => {
+                const dragging = dragId === b.id;
+                const over = dragOverId === b.id && dragId !== b.id;
+                return (
+                  <div
+                    key={b.id}
+                    draggable
+                    onDragStart={() => setDragId(b.id)}
+                    onDragEnd={() => { setDragId(null); setDragOverId(null); }}
+                    onDragOver={(e) => { e.preventDefault(); if (dragOverId !== b.id) setDragOverId(b.id); }}
+                    onDrop={(e) => { e.preventDefault(); handleDrop(b.id); }}
+                    className={[
+                      "group cursor-move overflow-hidden rounded-md border bg-background/40 transition-all",
+                      dragging ? "opacity-40" : "opacity-100",
+                      over ? "border-primary ring-2 ring-primary/40" : "border-border",
+                    ].join(" ")}
+                  >
+                    <div className="relative aspect-[4/3]">
+                      <img src={b.dataUrl} alt={b.name} loading="lazy" draggable={false} className="h-full w-full object-cover" />
+                      <span className="absolute left-1.5 top-1.5 rounded bg-black/60 px-1.5 py-0.5 text-[10px] text-white">{i + 1}</span>
+                      <button onClick={() => handleRemove(b.id)}
+                        className="absolute right-1 top-1 hidden h-6 w-6 items-center justify-center rounded-full bg-black/70 text-xs text-white group-hover:flex">×</button>
+                    </div>
+                    <div className="truncate px-2 py-1.5 text-xs text-muted-foreground">{b.name}</div>
+                  </div>
+                );
+              })}
+            </div>
+          </>
         )}
       </div>
     );

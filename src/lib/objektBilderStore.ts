@@ -57,3 +57,17 @@ export function removeBild(slug: string, id: string) {
   data[slug] = (data[slug] ?? []).filter((b) => b.id !== id);
   write(data);
 }
+
+/** Flytta bild (fromId) till positionen där toId ligger. Returnerar ny ordning. */
+export function reorderBilder(slug: string, fromId: string, toId: string): ObjektBild[] {
+  const data = read();
+  const list = [...(data[slug] ?? [])];
+  const from = list.findIndex((b) => b.id === fromId);
+  const to = list.findIndex((b) => b.id === toId);
+  if (from === -1 || to === -1 || from === to) return list;
+  const [moved] = list.splice(from, 1);
+  list.splice(to, 0, moved);
+  data[slug] = list;
+  write(data);
+  return list;
+}
