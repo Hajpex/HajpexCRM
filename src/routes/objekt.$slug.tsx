@@ -237,7 +237,7 @@ function ObjektDetailPage() {
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-[200px_1fr] lg:gap-6">
             <Sidebar tab={tab} setTab={setTab} />
-            <div>
+            <div className="min-w-0">
               {tab === "Start" ? (
                 <StartView adress={adress} slug={slug} editLayout={editLayout} layoutKey={layoutKey} innerSizes={innerSizes} onInnerLayout={setInnerSizes} />
               ) : tab === "Intag" ? (
@@ -3921,7 +3921,7 @@ function ObjektsinfoView({ adress, slug }: { adress: string; slug: string }) {
 
   return (
     <BlankCtx.Provider value={blank}>
-    <div className="flex flex-col gap-2 pl-2">
+    <div className="flex min-w-0 flex-col gap-2 pl-2">
       <OiSec id="uppdrag" title="Uppdrag" open={open.uppdrag} onToggle={toggle} done={done.uppdrag} onToggleDone={toggleDone}>
         <UppdragBody adress={adress} />
       </OiSec>
