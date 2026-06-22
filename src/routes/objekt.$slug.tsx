@@ -1492,9 +1492,9 @@ function SpekulantKort({
               type="text"
               inputMode="numeric"
               placeholder="Belopp (kr)"
-              value={budBelopp}
+              value={groupDigits(budBelopp)}
               onChange={(e) => setBudBelopp(e.target.value.replace(/[^0-9]/g, ""))}
-              className="h-8 w-36 rounded-md border border-border bg-background px-2.5 text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-primary"
+              className="h-8 w-44 rounded-md border border-border bg-background px-2.5 text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-primary"
             />
             <input
               type="text"
