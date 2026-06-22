@@ -734,28 +734,21 @@ function toLocalDT(d: Date) {
 function BokaNyVisningModal({ slug, adress, onClose, onSaved }: { slug: string; adress: string; onClose: () => void; onSaved: () => void }) {
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
-  tomorrow.setHours(10, 0, 0, 0);
-  const tomorrowEnd = new Date(tomorrow);
-  tomorrowEnd.setHours(12, 0, 0, 0);
+  const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
-  const [datum, setDatum] = useState(toLocalDT(tomorrow));
-  const [sluttid, setSluttid] = useState(toLocalDT(tomorrowEnd));
+  const [dateStr, setDateStr] = useState(ymd(tomorrow));
+  const [startTime, setStartTime] = useState("10:00");
+  const [endTime, setEndTime] = useState("12:00");
   const [typ, setTyp] = useState<VisningTyp>("Öppen");
   const [anteckningar, setAnteckningar] = useState("");
 
-  function handleDatumChange(val: string) {
-    setDatum(val);
-    const newStart = new Date(val).getTime();
-    const currentEnd = new Date(sluttid).getTime();
-    if (!isNaN(newStart) && !isNaN(currentEnd) && currentEnd <= newStart) {
-      setSluttid(toLocalDT(new Date(newStart + 2 * 60 * 60 * 1000)));
-    }
-  }
+  const TYP_LABEL: Record<VisningTyp, string> = { "Öppen": "Öppen visning", "Privat": "Privatvisning", "Budvisning": "Budvisning" };
 
   function handleSave() {
-    const datumTs = new Date(datum).getTime();
-    const sluttidTs = new Date(sluttid).getTime();
-    if (isNaN(datumTs) || isNaN(sluttidTs)) return;
+    const datumTs = new Date(`${dateStr}T${startTime}`).getTime();
+    let sluttidTs = new Date(`${dateStr}T${endTime}`).getTime();
+    if (isNaN(datumTs)) return;
+    if (isNaN(sluttidTs) || sluttidTs <= datumTs) sluttidTs = datumTs + 60 * 60 * 1000;
     saveVisning({ slug, datum: datumTs, sluttid: sluttidTs, typ, anteckningar, deltagare: [] });
     onSaved();
   }
@@ -780,28 +773,33 @@ function BokaNyVisningModal({ slug, adress, onClose, onSaved }: { slug: string; 
                     typ === t ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:border-primary/50"
                   }`}
                 >
-                  {t}
+                  {TYP_LABEL[t]}
                 </button>
               ))}
             </div>
           </div>
 
+          <div>
+            <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Datum</label>
+            <DatePickerInput value={dateStr} onChange={(v) => setDateStr(v)} />
+          </div>
+
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Start</label>
+              <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Starttid</label>
               <input
-                type="datetime-local"
-                value={datum}
-                onChange={(e) => handleDatumChange(e.target.value)}
+                type="time"
+                value={startTime}
+                onChange={(e) => setStartTime(e.target.value)}
                 className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none"
               />
             </div>
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Slut</label>
+              <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Sluttid</label>
               <input
-                type="datetime-local"
-                value={sluttid}
-                onChange={(e) => setSluttid(e.target.value)}
+                type="time"
+                value={endTime}
+                onChange={(e) => setEndTime(e.target.value)}
                 className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none"
               />
             </div>
