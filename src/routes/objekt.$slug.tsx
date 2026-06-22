@@ -575,11 +575,11 @@ function Lightbox({ images, startIdx, onClose }: { images: string[]; startIdx: n
           <img
             src={images[idx]}
             alt={`Bild ${idx + 1}`}
-            className="block max-h-[82vh] max-w-[92vw] rounded-lg object-contain shadow-lg select-none"
+            className="block max-h-[82vh] max-w-[86vw] rounded-lg object-contain shadow-lg select-none"
             draggable={false}
           />
 
-          {/* Stäng — strax ovanför bildens högra hörn */}
+          {/* Stäng — i det vita, vid bildens övre högra hörn */}
           <button
             onClick={onClose}
             className="absolute -right-3 -top-3 flex h-9 w-9 items-center justify-center rounded-full bg-black/75 text-base leading-none text-white shadow-lg transition-colors hover:bg-black"
@@ -592,14 +592,14 @@ function Lightbox({ images, startIdx, onClose }: { images: string[]; startIdx: n
             <>
               <button
                 onClick={prev}
-                className="absolute left-2 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-white transition-colors hover:bg-black/70"
+                className="absolute -left-12 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/10 text-black/70 shadow-sm transition-colors hover:bg-black/20 hover:text-black"
                 aria-label="Föregående"
               >
                 ←
               </button>
               <button
                 onClick={next}
-                className="absolute right-2 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-white transition-colors hover:bg-black/70"
+                className="absolute -right-12 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/10 text-black/70 shadow-sm transition-colors hover:bg-black/20 hover:text-black"
                 aria-label="Nästa"
               >
                 →
