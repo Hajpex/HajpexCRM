@@ -563,42 +563,50 @@ function Lightbox({ images, startIdx, onClose }: { images: string[]; startIdx: n
       className="fixed inset-0 z-[200] flex flex-col bg-white/95 backdrop-blur-sm"
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
-      {/* Header */}
-      <div className="flex items-center justify-between px-5 py-3 shrink-0">
-        <span className="text-sm text-black/40">{idx + 1} / {total}</span>
-        <button
-          onClick={onClose}
-          className="flex h-9 w-9 items-center justify-center rounded-full bg-black/8 text-black/70 text-lg leading-none hover:bg-black/15 hover:text-black transition-colors"
-          aria-label="Stäng"
-        >
-          ✕
-        </button>
-      </div>
+      {/* Räknare uppe till vänster */}
+      <span className="absolute left-4 top-4 z-10 text-sm text-black/40">{idx + 1} / {total}</span>
 
-      {/* Bild */}
-      <div className="relative flex flex-1 items-center justify-center min-h-0 px-14">
-        <img
-          src={images[idx]}
-          alt={`Bild ${idx + 1}`}
-          className="max-h-full max-w-full rounded-lg object-contain shadow-lg select-none"
-          draggable={false}
-        />
-        {total > 1 && (
-          <>
-            <button
-              onClick={prev}
-              className="absolute left-3 top-1/2 -translate-y-1/2 flex h-10 w-10 items-center justify-center rounded-full bg-black/8 text-black/70 hover:bg-black/15 hover:text-black transition-colors"
-            >
-              ←
-            </button>
-            <button
-              onClick={next}
-              className="absolute right-3 top-1/2 -translate-y-1/2 flex h-10 w-10 items-center justify-center rounded-full bg-black/8 text-black/70 hover:bg-black/15 hover:text-black transition-colors"
-            >
-              →
-            </button>
-          </>
-        )}
+      {/* Bild + kontroller som sitter runt SJÄLVA bilden */}
+      <div
+        className="relative flex flex-1 items-center justify-center min-h-0 p-4"
+        onClick={(e) => e.target === e.currentTarget && onClose()}
+      >
+        <div className="relative">
+          <img
+            src={images[idx]}
+            alt={`Bild ${idx + 1}`}
+            className="block max-h-[82vh] max-w-[92vw] rounded-lg object-contain shadow-lg select-none"
+            draggable={false}
+          />
+
+          {/* Stäng — strax ovanför bildens högra hörn */}
+          <button
+            onClick={onClose}
+            className="absolute -right-3 -top-3 flex h-9 w-9 items-center justify-center rounded-full bg-black/75 text-base leading-none text-white shadow-lg transition-colors hover:bg-black"
+            aria-label="Stäng"
+          >
+            ✕
+          </button>
+
+          {total > 1 && (
+            <>
+              <button
+                onClick={prev}
+                className="absolute left-2 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-white transition-colors hover:bg-black/70"
+                aria-label="Föregående"
+              >
+                ←
+              </button>
+              <button
+                onClick={next}
+                className="absolute right-2 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-white transition-colors hover:bg-black/70"
+                aria-label="Nästa"
+              >
+                →
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Miniatyrer */}
@@ -2353,7 +2361,7 @@ function MaklarjournalBody({ ansvarig }: { ansvarig: string }) {
                         className="w-full rounded-md border border-border bg-background px-2.5 py-1.5 text-sm focus:border-primary focus:outline-none" />
                     </Field>
                     <Field label="Utförd av">
-                      <Input value={item.utfordAv} onChange={(e) => patch(i, { utfordAv: e.target.value })} placeholder={ansvarig || "Mäklare"} />
+                      <Input value={item.utfordAv} onChange={(v) => patch(i, { utfordAv: v })} placeholder={ansvarig || "Mäklare"} />
                     </Field>
                   </div>
                   <Field label="Kommentar">
