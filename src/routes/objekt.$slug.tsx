@@ -1948,17 +1948,25 @@ function Field({ label, children, hint }: { label: string; children: ReactNode; 
 
 const BlankCtx = createContext(false);
 
-function Input({ value, placeholder, suffix, readOnly, onChange }: { value?: string; placeholder?: string; suffix?: string; readOnly?: boolean; onChange?: (v: string) => void }) {
+function groupDigits(s: string): string {
+  const d = (s ?? "").replace(/\D/g, "");
+  return d.replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+}
+
+function Input({ value, placeholder, suffix, readOnly, onChange, money }: { value?: string; placeholder?: string; suffix?: string; readOnly?: boolean; onChange?: (v: string) => void; money?: boolean }) {
   const blank = useContext(BlankCtx);
   const v = blank ? undefined : value;
   const controlled = onChange !== undefined;
+  // money: visa grupperat (1 500 000), spara råa siffror (1500000) så beräkningar funkar.
+  const display = money && v != null ? groupDigits(v) : v;
   return (
     <div className="flex items-center gap-2">
       <input
-        {...(controlled ? { value: v ?? "" } : { defaultValue: v })}
+        {...(controlled ? { value: money ? (display ?? "") : (v ?? "") } : { defaultValue: money ? groupDigits(v ?? "") : v })}
         placeholder={placeholder}
         readOnly={readOnly}
-        onChange={onChange ? (e) => onChange(e.target.value) : undefined}
+        inputMode={money ? "numeric" : undefined}
+        onChange={onChange ? (e) => onChange(money ? e.target.value.replace(/\D/g, "") : e.target.value) : undefined}
         className="h-9 w-full rounded-md border border-border bg-background px-2.5 text-sm text-foreground placeholder:text-muted-foreground/50 focus:border-primary/40 focus:outline-none"
       />
       {suffix && <span className="shrink-0 text-xs text-muted-foreground">{suffix}</span>}
@@ -3947,17 +3955,8 @@ function ObjektsinfoView({ adress, slug }: { adress: string; slug: string }) {
       <OiSec id="omradesbesk" title="Områdesbeskrivning" open={open.omradesbesk} onToggle={toggle} done={done.omradesbesk} onToggleDone={toggleDone}>
         <OmradesbeskBody />
       </OiSec>
-
-      {/* Objektsbeskrivning längst ner — används för kontrakt */}
-      <div className="mt-2 rounded-md border border-border bg-card">
-        <div className="border-b border-border px-4 py-3">
-          <div className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Objektsbeskrivning</div>
-          <div className="mt-0.5 text-[11px] text-muted-foreground/60">Används vid kontrakt och juridiska dokument</div>
-        </div>
-        <div className="p-4">
-          <ObjektsbeskrivningView adress={adress} slug={slug} />
-        </div>
-      </div>
+      {/* Objektsbeskrivningen togs bort härifrån — den används bara för
+          kontraktsutskrift och finns kvar som egen flik i sidomenyn. */}
     </div>
     </BlankCtx.Provider>
   );
@@ -4566,10 +4565,10 @@ function KoKontraktinfoBody({ slug, onSaved }: { slug: string; onSaved: () => vo
           <DatePickerInput value={form.tilltradesdatum} onChange={(v) => set("tilltradesdatum", v)} />
         </Field>
         <Field label="Slutpris" hint={form.slutpris ? `= ${Number(form.slutpris).toLocaleString("sv-SE")} kr` : undefined}>
-          <Input value={form.slutpris} onChange={(v) => set("slutpris", v)} placeholder="0" suffix="SEK" />
+          <Input value={form.slutpris} onChange={(v) => set("slutpris", v)} placeholder="0" suffix="SEK" money />
         </Field>
         <Field label="Handpenning">
-          <Input value={form.handpenning} onChange={(v) => set("handpenning", v)} placeholder="0" suffix="SEK" />
+          <Input value={form.handpenning} onChange={(v) => set("handpenning", v)} placeholder="0" suffix="SEK" money />
         </Field>
         <Field label="Handpenning betalas senast">
           <DatePickerInput value={form.handpenningDatum} onChange={(v) => set("handpenningDatum", v)} />
@@ -4645,7 +4644,7 @@ function KoEfterarbeteBody({ slug }: { slug: string }) {
       </div>
       <div className="grid gap-4 md:grid-cols-2">
         <Field label="Betalad handpenning">
-          <Input value={form.betaladHandpenning} onChange={(v) => set("betaladHandpenning", v)} placeholder="0" suffix="SEK" />
+          <Input value={form.betaladHandpenning} onChange={(v) => set("betaladHandpenning", v)} placeholder="0" suffix="SEK" money />
         </Field>
         <Field label="Betaldatum">
           <DatePickerInput value={form.betaldatum} onChange={(v) => set("betaldatum", v)} />

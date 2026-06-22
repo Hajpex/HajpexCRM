@@ -431,6 +431,20 @@ function RoomCard({
                             </button>
                           );
                         })}
+                        {/* Slipp tvånget att välja ett av alternativen */}
+                        {(() => {
+                          const sel = ans?.answer === "Vet ej";
+                          return (
+                            <button onClick={() => onAnswer(q.id, "Vet ej")}
+                              className={[
+                                "rounded-md border border-dashed px-2.5 py-1 text-xs transition-colors",
+                                sel ? "border-primary bg-primary/15 text-primary"
+                                    : "border-border/60 text-muted-foreground hover:border-primary/40 hover:text-foreground",
+                              ].join(" ")}>
+                              Vet ej
+                            </button>
+                          );
+                        })()}
                       </div>
                     </div>
                   );
