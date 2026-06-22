@@ -1256,10 +1256,12 @@ function SpekulanterTopView({ slug }: { slug: string }) {
     });
   }
 
+  // Stabil ordning (efter när de kopplades) så korten INTE hoppar runt när
+  // man byter status. Status visas via färgad badge i stället för via sortering.
   const sorted = [...spekulanter].sort((a, b) => {
-    const ia = a.objektKopplingar.find((kp) => kp.slug === slug && kp.relation === "spekulant")?.intresse ?? "aktiv";
-    const ib = b.objektKopplingar.find((kp) => kp.slug === slug && kp.relation === "spekulant")?.intresse ?? "aktiv";
-    return INTRESSE_ORDER.indexOf(ia) - INTRESSE_ORDER.indexOf(ib);
+    const aa = a.objektKopplingar.find((kp) => kp.slug === slug && kp.relation === "spekulant")?.addedAt ?? 0;
+    const ab = b.objektKopplingar.find((kp) => kp.slug === slug && kp.relation === "spekulant")?.addedAt ?? 0;
+    return aa - ab;
   });
 
   const selectedVals = spekulanter.filter((k) => selected.has(k.id));
@@ -1473,7 +1475,7 @@ function SpekulantKort({
             )}
           </div>
         )}
-        {intresse === "budgivare" && !showBudForm && (
+        {!showBudForm && (
           <button
             onClick={() => setShowBudForm(true)}
             className={`${actionBtn} border-emerald-500/30 text-emerald-400 hover:border-emerald-500/60 hover:text-emerald-300`}
@@ -1484,7 +1486,7 @@ function SpekulantKort({
       </div>
 
       {/* Inline budformulär */}
-      {intresse === "budgivare" && showBudForm && (
+      {showBudForm && (
         <div className="flex flex-col gap-2 border-t border-border/40 px-4 py-3">
           <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground/60">Registrera bud</div>
           <div className="flex flex-wrap gap-2">
@@ -1512,6 +1514,8 @@ function SpekulantKort({
                 if (!belopp) return;
                 const namn = `${k.fornamn} ${k.efternamn}`;
                 addBud(slug, { belopp, namn, telefon: k.telefon ?? "", villkor: budVillkor.trim() });
+                // Den som lägger bud blir budgivare (om den inte redan är det)
+                if (intresse !== "budgivare") onChangeIntresse("budgivare");
                 setBudBelopp("");
                 setBudVillkor("");
                 setShowBudForm(false);
