@@ -5029,11 +5029,23 @@ function LäggTillBudDialog({ slug, onClose, onSaved }: { slug: string; onClose:
     ? kontakter.filter((k) => `${k.fornamn} ${k.efternamn} ${k.telefon}`.toLowerCase().includes(kontaktQ.toLowerCase()))
     : [];
 
+  // Befintliga budgivare på detta objekt — snabbval så man slipper söka varje gång
+  const tidigareBudgivare = (() => {
+    const seen = new Map<string, { namn: string; telefon: string }>();
+    for (const b of listBud(slug)) {
+      const key = (b.namn + "|" + (b.telefon ?? "")).toLowerCase();
+      if (!seen.has(key)) seen.set(key, { namn: b.namn, telefon: b.telefon ?? "" });
+    }
+    return [...seen.values()];
+  })();
+
   function fillFromContact(k: Kontakt) {
     setNamn(`${k.fornamn} ${k.efternamn}`);
     setTelefon(k.telefon ?? "");
     setKontaktQ("");
   }
+
+  const activeNamn = namn.trim().toLowerCase();
 
   function handleSave() {
     const belopp = parseInt(beloppRaw.replace(/\D/g, ""), 10);
@@ -5051,6 +5063,32 @@ function LäggTillBudDialog({ slug, onClose, onSaved }: { slug: string; onClose:
         <button onClick={onClose} className="absolute right-5 top-5 text-xl text-muted-foreground hover:text-foreground">✕</button>
         <div className="mb-1 text-[11px] uppercase tracking-[0.22em] text-primary/80">Registrera bud</div>
         <h2 className="mb-5 text-xl font-medium" style={serif}>Nytt bud<span className="text-primary">.</span></h2>
+
+        {/* Snabbval: budgivare som redan lagt bud */}
+        {tidigareBudgivare.length > 0 && (
+          <div className="mb-4">
+            <label className="mb-1.5 block text-xs text-muted-foreground">Befintlig budgivare</label>
+            <div className="flex flex-wrap gap-1.5">
+              {tidigareBudgivare.map((b) => {
+                const aktiv = activeNamn === b.namn.toLowerCase();
+                return (
+                  <button
+                    key={b.namn + b.telefon}
+                    onClick={() => { setNamn(b.namn); setTelefon(b.telefon); setKontaktQ(""); }}
+                    className={[
+                      "rounded-full border px-3 py-1 text-[12px] transition-colors",
+                      aktiv
+                        ? "border-primary bg-primary/10 text-primary"
+                        : "border-border text-muted-foreground hover:border-primary/40 hover:text-foreground",
+                    ].join(" ")}
+                  >
+                    {b.namn}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Optional contact search */}
         <div className="mb-4">
