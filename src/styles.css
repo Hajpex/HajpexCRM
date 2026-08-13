@@ -145,12 +145,14 @@
   }
 }
 
-/* Nytt-bud-blink: mjuk pulsering när ett nyss inkommet bud visas */
+/* Nytt-bud-blink: tydlig pulsering när ett nyss inkommet bud visas */
 @keyframes budFlash {
-  0%   { background-color: oklch(0.75 0.15 155 / 0.28); }
-  60%  { background-color: oklch(0.75 0.15 155 / 0.14); }
+  0%   { background-color: oklch(0.72 0.17 155 / 0.55); }
+  20%  { background-color: oklch(0.72 0.17 155 / 0.30); }
+  50%  { background-color: oklch(0.72 0.17 155 / 0.42); }
   100% { background-color: transparent; }
 }
 .bud-flash {
-  animation: budFlash 2.4s ease-out 1;
+  animation: budFlash 3s ease-out 2;
+  box-shadow: inset 3px 0 0 0 oklch(0.72 0.17 155 / 0.9);
 }
