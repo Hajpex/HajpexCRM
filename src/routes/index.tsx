@@ -551,8 +551,10 @@ function DashboardPage() {
                       {objsWithBids.slice(0, 6).map(({ o, slug, bids }) => {
                         const highest = bids[0];
                         const hasWinner = bids.some((b) => b.vinnare);
+                        const senasteBud = Math.max(...bids.map((b) => b.tidpunkt ?? 0));
+                        const isFresh = !hasWinner && Date.now() - senasteBud < 60_000;
                         return (
-                          <Link key={slug} to="/objekt/$slug" params={{ slug }} search={{ tab: "Budgivning", q: undefined }} className="group block py-3">
+                          <Link key={slug} to="/objekt/$slug" params={{ slug }} search={{ tab: "Budgivning", q: undefined }} className={`group block py-3 ${isFresh ? "bud-flash rounded-md pl-3" : ""}`}>
                             <div className="flex items-start justify-between gap-2">
                               <div className="min-w-0"><p className="truncate text-sm font-medium text-foreground group-hover:text-primary">{o.adress}</p><p className="text-[10px] text-muted-foreground">{bids.length} bud · {relTime(highest.tidpunkt ?? Date.now())}</p></div>
                               <div className="flex-shrink-0 text-right"><p className="font-mono text-sm font-semibold text-primary">{fmtBud(highest.belopp)}</p>{hasWinner && <span className="text-[9px] font-medium text-emerald-500">✓ Klar</span>}</div>
