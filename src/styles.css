@@ -144,3 +144,13 @@
     color: var(--color-foreground);
   }
 }
+
+/* Nytt-bud-blink: mjuk pulsering när ett nyss inkommet bud visas */
+@keyframes budFlash {
+  0%   { background-color: oklch(0.75 0.15 155 / 0.28); }
+  60%  { background-color: oklch(0.75 0.15 155 / 0.14); }
+  100% { background-color: transparent; }
+}
+.bud-flash {
+  animation: budFlash 2.4s ease-out 1;
+}

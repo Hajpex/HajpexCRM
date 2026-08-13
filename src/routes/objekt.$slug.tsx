@@ -4901,8 +4901,10 @@ function BuBudgivningBody({ slug }: { slug: string }) {
             <tbody className="divide-y divide-border">
               {activeBids.length === 0 ? (
                 <tr><td colSpan={8} className="px-3 py-8 text-center text-sm text-muted-foreground">Inga aktiva bud — klicka "+ Lägg till bud" för att registrera det första</td></tr>
-              ) : activeBids.map((b, i) => (
-                <tr key={b.id} className={b.vinnare ? "bg-emerald-500/5" : ""}>
+              ) : activeBids.map((b, i) => {
+                const isFresh = Date.now() - b.tidpunkt < 15_000;
+                return (
+                <tr key={b.id} className={[b.vinnare ? "bg-emerald-500/5" : "", isFresh ? "bud-flash" : ""].join(" ")}>
                   <td className="px-3 py-2.5 text-muted-foreground">{i + 1}</td>
                   <td className="px-3 py-2.5 font-medium text-foreground">{b.namn}</td>
                   <td className="px-3 py-2.5 text-muted-foreground">{b.telefon || "—"}</td>
@@ -4937,7 +4939,8 @@ function BuBudgivningBody({ slug }: { slug: string }) {
                     </div>
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>
