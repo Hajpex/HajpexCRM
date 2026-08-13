@@ -5030,14 +5030,25 @@ function LäggTillBudDialog({ slug, onClose, onSaved }: { slug: string; onClose:
     : [];
 
   // Befintliga budgivare på detta objekt — snabbval så man slipper söka varje gång
+  const befintligaBud = listBud(slug);
   const tidigareBudgivare = (() => {
     const seen = new Map<string, { namn: string; telefon: string }>();
-    for (const b of listBud(slug)) {
+    for (const b of befintligaBud) {
       const key = (b.namn + "|" + (b.telefon ?? "")).toLowerCase();
       if (!seen.has(key)) seen.set(key, { namn: b.namn, telefon: b.telefon ?? "" });
     }
     return [...seen.values()];
   })();
+
+  // Objektets spekulanter som ännu inte lagt bud — snabbval för första budet
+  const spekulantChips = kontakter
+    .filter((k) => k.objektKopplingar.some((kp) => kp.slug === slug && kp.relation === "spekulant"))
+    .map((k) => ({ namn: `${k.fornamn} ${k.efternamn}`.trim(), telefon: k.telefon ?? "" }))
+    .filter((s) => !tidigareBudgivare.some((t) => t.namn.toLowerCase() === s.namn.toLowerCase()));
+
+  const highestBid = befintligaBud
+    .filter((b) => !b.tillbakadragen)
+    .reduce((m, b) => Math.max(m, b.belopp), 0);
 
   function fillFromContact(k: Kontakt) {
     setNamn(`${k.fornamn} ${k.efternamn}`);
@@ -5090,6 +5101,32 @@ function LäggTillBudDialog({ slug, onClose, onSaved }: { slug: string; onClose:
           </div>
         )}
 
+        {/* Snabbval: spekulanter som ännu inte lagt bud */}
+        {spekulantChips.length > 0 && (
+          <div className="mb-4">
+            <label className="mb-1.5 block text-xs text-muted-foreground">Spekulant</label>
+            <div className="flex flex-wrap gap-1.5">
+              {spekulantChips.map((s) => {
+                const aktiv = activeNamn === s.namn.toLowerCase();
+                return (
+                  <button
+                    key={s.namn + s.telefon}
+                    onClick={() => { setNamn(s.namn); setTelefon(s.telefon); setKontaktQ(""); }}
+                    className={[
+                      "rounded-full border px-3 py-1 text-[12px] transition-colors",
+                      aktiv
+                        ? "border-primary bg-primary/10 text-primary"
+                        : "border-border text-muted-foreground hover:border-primary/40 hover:text-foreground",
+                    ].join(" ")}
+                  >
+                    {s.namn}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* Optional contact search */}
         <div className="mb-4">
           <label className="mb-1.5 block text-xs text-muted-foreground">Hämta från kontakt (valfritt)</label>
@@ -5134,6 +5171,20 @@ function LäggTillBudDialog({ slug, onClose, onSaved }: { slug: string; onClose:
               inputMode="numeric"
               className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm font-mono focus:border-primary focus:outline-none"
             />
+            {highestBid > 0 && (
+              <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                <span className="text-[11px] text-muted-foreground">Höj från {fmtBud(highestBid)}:</span>
+                {[25_000, 50_000, 100_000].map((step) => (
+                  <button
+                    key={step}
+                    onClick={() => setBeloppRaw(String(highestBid + step))}
+                    className="rounded-md border border-border px-2 py-0.5 text-[11px] text-muted-foreground hover:border-primary/40 hover:text-primary"
+                  >
+                    +{(step / 1000)}k
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
           <div>
             <label className="mb-1.5 block text-xs text-muted-foreground">Villkor</label>
