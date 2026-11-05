@@ -2,6 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState, useEffect, useRef, type ReactNode } from "react";
 import { AppShell } from "../components/AppShell";
 import { getKontakt, updateKontakt, addAktivitet, deleteKontakt, setNastaSteg } from "../lib/kontaktStore";
+import { trackVisit } from "../lib/recentStore";
 import { getObjektBySlug, slugifyAddr } from "./objekt.$slug";
 import type { Kontakt, Aktivitet, AktivitetTyp, NastaSteg, NastaStegTyp } from "../lib/kontaktTypes";
 import { fmtSweNum, handleNumberInput } from "../lib/formatters";
@@ -71,7 +72,10 @@ function KontaktDetailPage() {
   function load() {
     const k = getKontakt(id);
     if (!k) navigate({ to: "/kunder" });
-    else setKontakt(k);
+    else {
+      setKontakt(k);
+      trackVisit({ kind: "kontakt", id: k.id, label: `${k.fornamn} ${k.efternamn}`.trim(), sub: k.telefon || k.ort || "" });
+    }
   }
 
   useEffect(() => { load(); }, [id]);

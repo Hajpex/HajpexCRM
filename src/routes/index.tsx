@@ -12,6 +12,7 @@ import { listAllaVisningar, type Visning } from "../lib/visningarStore";
 import type { Kontakt, NastaSteg } from "../lib/kontaktTypes";
 import { generateMorningBrief } from "../lib/ai.functions";
 import { listKontrakt } from "../lib/kontraktStore";
+import { listRecent, type RecentItem } from "../lib/recentStore";
 
 /* ═══════════════════════════════════════════════════════════
    WIDGET STORE
@@ -36,6 +37,7 @@ type WidgetSettings = {
   rantekollen: boolean;
   tilltraden: boolean;
   nyaSpekulanter: boolean;
+  senaste: boolean;
   klisterlapp: boolean;
   /* order */
   leftOrder: string[];
@@ -47,7 +49,7 @@ type WidgetSettings = {
 };
 
 const DEFAULT_LEFT_ORDER  = ["idag", "kommande", "aktiva-objekt", "vader", "rantekollen", "tilltraden"];
-const DEFAULT_RIGHT_ORDER = ["snabblänkar", "budgivning", "nasta-steg", "att-gora", "nyaSpekulanter"];
+const DEFAULT_RIGHT_ORDER = ["senaste", "snabblänkar", "budgivning", "nasta-steg", "att-gora", "nyaSpekulanter"];
 
 const DEFAULT_WIDGETS: WidgetSettings = {
   idag: true, kommande: true, "aktiva-objekt": true,
@@ -59,6 +61,7 @@ const DEFAULT_WIDGETS: WidgetSettings = {
     { label: "Vitec", url: "https://vitec.net" },
   ],
   rantekollen: false, tilltraden: false, nyaSpekulanter: false,
+  senaste: true,
   klisterlapp: false,
   leftOrder: DEFAULT_LEFT_ORDER,
   rightOrder: DEFAULT_RIGHT_ORDER,
@@ -127,6 +130,13 @@ function deleteKlisterlapp(id: string) {
   writeKlistrar(readKlistrar().filter((k) => k.id !== id));
 }
 
+function mergeOrder(stored: string[] | undefined, def: string[]): string[] {
+  if (!stored?.length) return def;
+  // Lägg till nya widgetar (som tillkommit sedan användaren sparade) sist.
+  const missing = def.filter((id) => !stored.includes(id));
+  return [...stored, ...missing];
+}
+
 function readWidgets(): WidgetSettings {
   try {
     const raw = localStorage.getItem(WIDGET_KEY);
@@ -135,8 +145,8 @@ function readWidgets(): WidgetSettings {
     return {
       ...DEFAULT_WIDGETS,
       ...parsed,
-      leftOrder: parsed.leftOrder?.length ? parsed.leftOrder : DEFAULT_LEFT_ORDER,
-      rightOrder: parsed.rightOrder?.length ? parsed.rightOrder : DEFAULT_RIGHT_ORDER,
+      leftOrder: mergeOrder(parsed.leftOrder, DEFAULT_LEFT_ORDER),
+      rightOrder: mergeOrder(parsed.rightOrder, DEFAULT_RIGHT_ORDER),
     };
   } catch { return DEFAULT_WIDGETS; }
 }
@@ -576,6 +586,7 @@ function DashboardPage() {
               );
               if (id === "att-gora" && widgets["att-gora"]) card = <SmartAttGora objs={objs} kontakter={kontakter} budMap={budMap} />;
               if (id === "nyaSpekulanter" && widgets.nyaSpekulanter) card = <NyaSpekulanterWidget kontakter={kontakter} />;
+              if (id === "senaste" && widgets.senaste) card = <SenasteBesoktaWidget />;
               if (!card) return null;
               return (
                 <DraggableCard key={id} id={id} column="right" editMode={editingOrder}
@@ -982,6 +993,48 @@ function NyaSpekulanterWidget({ kontakter }: { kontakter: Kontakt[] }) {
   );
 }
 
+/* ── Senaste besökta (navigering) ── */
+function SenasteBesoktaWidget() {
+  const [items, setItems] = useState<RecentItem[]>([]);
+  useEffect(() => { setItems(listRecent(undefined, 7)); }, []);
+
+  return (
+    <section className="rounded-xl border border-border bg-card/70 p-5 shadow-[0_8px_30px_-12px_rgba(0,0,0,0.15)]">
+      <p className="text-[10px] uppercase tracking-[0.2em] text-primary/60">Snabbnavigering</p>
+      <h2 className="mt-0.5 mb-3 text-base font-medium text-foreground" style={serif}>Senaste besökta</h2>
+      {items.length === 0 ? (
+        <p className="text-xs text-muted-foreground">Här dyker kontakter och objekt du öppnar upp, för snabb åtkomst.</p>
+      ) : (
+        <div className="divide-y divide-border">
+          {items.map((r) => {
+            const inner = (
+              <>
+                <div className={`flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg text-[13px] ${r.kind === "objekt" ? "bg-primary/10" : "bg-emerald-500/10"}`}>
+                  {r.kind === "objekt" ? "🏠" : "👤"}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium text-foreground group-hover:text-primary">{r.label}</p>
+                  {r.sub && <p className="truncate text-[10px] text-muted-foreground">{r.sub}</p>}
+                </div>
+                <span className="flex-shrink-0 text-[10px] text-muted-foreground/50">{relTime(r.ts)}</span>
+              </>
+            );
+            return r.kind === "objekt" ? (
+              <Link key={`o-${r.id}`} to="/objekt/$slug" params={{ slug: r.id }} search={{ tab: undefined, q: undefined }} className="group flex items-center gap-3 py-2.5">
+                {inner}
+              </Link>
+            ) : (
+              <Link key={`k-${r.id}`} to="/kunder/$id" params={{ id: r.id }} className="group flex items-center gap-3 py-2.5">
+                {inner}
+              </Link>
+            );
+          })}
+        </div>
+      )}
+    </section>
+  );
+}
+
 /* ── Klisterlapp (floating post-it) ── */
 
 function KlisterlappFloat({ lapp, onUpdate, onDelete }: {
@@ -1238,6 +1291,7 @@ const WIDGET_META: Array<{ id: string; label: string; desc: string; category: st
   { id: "rantekollen",    label: "Räntekollen",        desc: "Riksbankens styrränta live",          category: "Widgets" },
   { id: "tilltraden",     label: "Tillträden snart",   desc: "Objekt med tillträde inom 60 dagar",  category: "Widgets" },
   { id: "nyaSpekulanter", label: "Nya spekulanter",    desc: "Spekulanter tillagda senaste 7 dagar", category: "Widgets" },
+  { id: "senaste",        label: "Senaste besökta",    desc: "Kontakter och objekt du nyss öppnat", category: "Widgets" },
   { id: "snabblänkar",    label: "Snabblänkar",        desc: "Hemnet, Lantmäteriet m.fl.",          category: "Widgets" },
   { id: "klisterlapp",    label: "Klisterlapp",        desc: "Fri anteckning, dra vart du vill",    category: "Widgets" },
 ];

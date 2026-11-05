@@ -5,6 +5,7 @@ import { OBJEKT, type Objekt } from "../data/objekt";
 import { listObjekt } from "../lib/objektStore";
 import { listBilder, addBilder, removeBild, reorderBilder } from "../lib/objektBilderStore";
 import { getObjektNotes, addObjektNote, setObjektBeskrivning, setObjektStatus, setObjektMarknadText, setManadsavgift } from "../lib/objektNotesStore";
+import { trackVisit } from "../lib/recentStore";
 import { generateMarketingText } from "../lib/ai.functions";
 import { listBud, addBud, markeraVinnare, deleteBud, dragaTillbakaBud, getBudSettings, setBudSettings, fmtBud, type Bud } from "../lib/budgivningStore";
 import { getKontrakt, saveKontrakt, type KontraktData } from "../lib/kontraktStore";
@@ -94,6 +95,9 @@ function ObjektDetailPage() {
 
   const adress = prettyAddr(slug);
   const o = getObjektBySlug(slug);
+  useEffect(() => {
+    trackVisit({ kind: "objekt", id: slug, label: adress, sub: [o?.typ, o?.status].filter(Boolean).join(" · ") });
+  }, [slug, adress, o?.typ, o?.status]);
   const [statusOverride, setStatusOverrideState] = useState<string | undefined>(
     () => getObjektNotes(slug).statusOverride
   );
