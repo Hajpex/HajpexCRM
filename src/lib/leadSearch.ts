@@ -62,8 +62,17 @@ export function parseLeadQuery(raw: string): ParsedLeadQuery {
   const pris = parsePris(tokens);
   const rum = parseRum(tokens);
 
+  // Fyllnadsord som inte är ort/adress — ignoreras i sökningen.
+  const STOPP = new Set([
+    "max", "maximalt", "högst", "hogst", "runt", "ca", "cirka", "omkring",
+    "under", "över", "over", "upp", "till", "för", "for", "pris", "kr",
+    "kronor", "i", "en", "ett", "med", "på", "pa", "som", "har", "nån",
+    "någon", "nagon", "rum", "rok", "rok,",
+  ]);
+
   // Ord som varken är pris- eller rumstermer → ort/adress
   const ord = tokens.filter((t) => {
+    if (STOPP.has(t)) return false;
     if (ROOM_WORDS[t]) return false;
     if (/^(\d)(?::?a|or|rum|rok|r)$/.test(t)) return false;
     if (/^\d+(?:[.,]\d+)?(?:mil|milj|miljoner|mkr|mnkr|m|k|tkr)$/i.test(t)) return false;
