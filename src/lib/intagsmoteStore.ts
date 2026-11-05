@@ -23,23 +23,24 @@ export type Intagsmote = {
   vaning?: string | null;        // t.ex. "3 av 5" (lägenhet)
   boddSedan?: string | null;     // hur länge de bott där, t.ex. "2015" eller "8 år"
   inkopsPris?: number | null;    // vad de köpte bostaden för
-  syfte?: IntagSyfte | null;     // varför de ville ha ett möte
+  syfte?: IntagSyfte | null;     // situation vid intaget
   onskatPris?: number | null;    // vad säljaren vill ha (fylls i EFTER mötet)
-  saljTidpunkt?: SaljTidpunkt | null;
+  saljTidpunkt?: SaljTidpunkt | null;  // när de vill sälja (fylls i EFTER mötet)
+  saljVillkor?: string | null;   // t.ex. "säljer vid 2 200 000" (EFTER mötet)
   objektSlug: string | null;  // fylls i när bostad skapas
   objektTyp: string | null;   // "Bostadsrätt" | "Villa" | etc, sätts vid skapande av bostad
   skapad: number;
 };
 
 export type IntagSyfte =
-  | "Planerar att sälja"
-  | "Värdering för bank"
-  | "Vill bara veta värdet";
+  | "Sälja nu"
+  | "Värdering (t.ex. till banken)"
+  | "Endast intresserad av värdet";
 
 export const INTAG_SYFTEN: IntagSyfte[] = [
-  "Planerar att sälja",
-  "Värdering för bank",
-  "Vill bara veta värdet",
+  "Sälja nu",
+  "Värdering (t.ex. till banken)",
+  "Endast intresserad av värdet",
 ];
 
 export type SaljTidpunkt =

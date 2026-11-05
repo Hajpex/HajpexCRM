@@ -879,6 +879,12 @@ function defaultSluttid(start: string) {
 function dateTimeToMs(date: string, time: string): number {
   return new Date(`${date}T${time || "00:00"}`).getTime();
 }
+/** "2100000" → "2 100 000" medan man skriver. Returnerar bara siffror formaterade. */
+function fmtThousands(raw: string): string {
+  const digits = raw.replace(/\D/g, "");
+  if (!digits) return "";
+  return digits.replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+}
 function msFmt(ts: number) {
   return new Date(ts).toLocaleString("sv-SE", {
     day: "numeric", month: "short", year: "numeric",
@@ -1006,6 +1012,9 @@ function IntagsmotenTab({ kontakt }: { kontakt: Kontakt }) {
                         {m.saljTidpunkt && (
                           <DetailRow label="Vill sälja" value={m.saljTidpunkt} />
                         )}
+                        {m.saljVillkor && (
+                          <DetailRow label="Säljvillkor" value={m.saljVillkor} />
+                        )}
                         {m.anteckningar && (
                           <DetailRow label="Anteckningar" value={m.anteckningar} />
                         )}
@@ -1126,16 +1135,24 @@ function DetailRow({ label, value, children }: { label: string; value?: string; 
 function EfterMotetBox({ mote, onSaved }: { mote: Intagsmote; onSaved: () => void }) {
   const [vardering, setVardering] = useState(mote.vardering != null ? String(mote.vardering) : "");
   const [onskatPris, setOnskatPris] = useState(mote.onskatPris != null ? String(mote.onskatPris) : "");
+  const [saljTidpunkt, setSaljTidpunkt] = useState<SaljTidpunkt | "">(mote.saljTidpunkt ?? "");
+  const [saljVillkor, setSaljVillkor] = useState(mote.saljVillkor ?? "");
   const [saved, setSaved] = useState(false);
 
+  const vNum = vardering ? Number(vardering.replace(/\D/g, "")) : null;
+  const oNum = onskatPris ? Number(onskatPris.replace(/\D/g, "")) : null;
   const dirty =
-    (vardering ? Number(vardering.replace(/\D/g, "")) : null) !== (mote.vardering ?? null) ||
-    (onskatPris ? Number(onskatPris.replace(/\D/g, "")) : null) !== (mote.onskatPris ?? null);
+    vNum !== (mote.vardering ?? null) ||
+    oNum !== (mote.onskatPris ?? null) ||
+    (saljTidpunkt || null) !== (mote.saljTidpunkt ?? null) ||
+    (saljVillkor.trim() || null) !== (mote.saljVillkor ?? null);
 
   function save() {
     updateIntagsmote(mote.id, {
-      vardering: vardering ? Number(vardering.replace(/\D/g, "")) : null,
-      onskatPris: onskatPris ? Number(onskatPris.replace(/\D/g, "")) : null,
+      vardering: vNum,
+      onskatPris: oNum,
+      saljTidpunkt: saljTidpunkt || null,
+      saljVillkor: saljVillkor.trim() || null,
     });
     setSaved(true);
     setTimeout(() => setSaved(false), 1500);
@@ -1149,8 +1166,8 @@ function EfterMotetBox({ mote, onSaved }: { mote: Intagsmote; onSaved: () => voi
         <div>
           <label className="mb-1 block text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Din värdering (kr)</label>
           <input
-            type="text" inputMode="numeric" value={vardering}
-            onChange={(e) => setVardering(e.target.value)}
+            type="text" inputMode="numeric" value={fmtThousands(vardering)}
+            onChange={(e) => setVardering(e.target.value.replace(/\D/g, ""))}
             placeholder="t.ex. 1 800 000"
             className="w-full rounded-md border border-input bg-background px-2.5 py-1.5 text-sm focus:border-primary focus:outline-none"
           />
@@ -1158,12 +1175,33 @@ function EfterMotetBox({ mote, onSaved }: { mote: Intagsmote; onSaved: () => voi
         <div>
           <label className="mb-1 block text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Säljaren vill ha (kr)</label>
           <input
-            type="text" inputMode="numeric" value={onskatPris}
-            onChange={(e) => setOnskatPris(e.target.value)}
+            type="text" inputMode="numeric" value={fmtThousands(onskatPris)}
+            onChange={(e) => setOnskatPris(e.target.value.replace(/\D/g, ""))}
             placeholder="t.ex. 2 000 000"
             className="w-full rounded-md border border-input bg-background px-2.5 py-1.5 text-sm focus:border-primary focus:outline-none"
           />
         </div>
+      </div>
+      <div className="mt-2">
+        <label className="mb-1 block text-[10px] uppercase tracking-[0.12em] text-muted-foreground">När vill de sälja</label>
+        <select
+          value={saljTidpunkt}
+          onChange={(e) => setSaljTidpunkt(e.target.value as SaljTidpunkt | "")}
+          className="w-full rounded-md border border-input bg-background px-2.5 py-1.5 text-sm focus:border-primary focus:outline-none"
+        >
+          <option value="">— välj —</option>
+          {SALJTIDPUNKTER.map((s) => <option key={s} value={s}>{s}</option>)}
+        </select>
+      </div>
+      <div className="mt-2">
+        <label className="mb-1 block text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Säljvillkor / notering</label>
+        <textarea
+          value={saljVillkor}
+          onChange={(e) => setSaljVillkor(e.target.value)}
+          rows={2}
+          placeholder="t.ex. Säljer vid 2 200 000 kr"
+          className="w-full resize-none rounded-md border border-input bg-background px-2.5 py-1.5 text-sm placeholder:text-muted-foreground/40 focus:border-primary focus:outline-none"
+        />
       </div>
       <button
         onClick={save}
@@ -1198,7 +1236,6 @@ function NyttIntagsmoteModal({
   const [boddSedan, setBoddSedan] = useState("");
   const [inkopsPris, setInkopsPris] = useState("");
   const [syfte, setSyfte] = useState<IntagSyfte | "">("");
-  const [saljTidpunkt, setSaljTidpunkt] = useState<SaljTidpunkt | "">("");
 
   const canSave = adress.trim().length > 2 && datum;
 
@@ -1223,7 +1260,8 @@ function NyttIntagsmoteModal({
       inkopsPris: inkopsPris ? Number(inkopsPris.replace(/\D/g, "")) : null,
       syfte: syfte || null,
       onskatPris: null,
-      saljTidpunkt: saljTidpunkt || null,
+      saljTidpunkt: null,
+      saljVillkor: null,
       objektSlug: null,
       objektTyp: null,
     });
@@ -1366,22 +1404,11 @@ function NyttIntagsmoteModal({
               <div>
                 <label className="mb-1 block text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Inköpspris (kr)</label>
                 <input
-                  type="text" inputMode="numeric" value={inkopsPris}
-                  onChange={(e) => setInkopsPris(e.target.value)}
+                  type="text" inputMode="numeric" value={fmtThousands(inkopsPris)}
+                  onChange={(e) => setInkopsPris(e.target.value.replace(/\D/g, ""))}
                   placeholder="vad de köpte för"
                   className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm focus:border-primary focus:outline-none"
                 />
-              </div>
-              <div>
-                <label className="mb-1 block text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Vill sälja</label>
-                <select
-                  value={saljTidpunkt}
-                  onChange={(e) => setSaljTidpunkt(e.target.value as SaljTidpunkt | "")}
-                  className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm focus:border-primary focus:outline-none"
-                >
-                  <option value="">— välj —</option>
-                  {SALJTIDPUNKTER.map((s) => <option key={s} value={s}>{s}</option>)}
-                </select>
               </div>
             </div>
             <div className="mt-3">
@@ -1396,7 +1423,7 @@ function NyttIntagsmoteModal({
               </select>
             </div>
             <p className="mt-3 text-[11px] text-muted-foreground/70">
-              Värdering och säljarens önskade pris fyller du i efter mötet.
+              Värdering, säljtidpunkt och önskat pris fyller du i efter mötet.
             </p>
           </div>
 
