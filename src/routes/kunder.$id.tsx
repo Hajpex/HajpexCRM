@@ -80,7 +80,15 @@ function KontaktDetailPage() {
 
   useEffect(() => { load(); }, [id]);
 
+  // Öppna Intagsmöten-fliken direkt om personen har möten (annars Historik)
+  useEffect(() => {
+    if (listIntagsmotenForKontakt(id).length > 0) setTab("intagsmoten");
+  }, [id]);
+
   if (!kontakt) return null;
+
+  const moten = listIntagsmotenForKontakt(id);
+  const obehandladeMoten = moten.some((m) => m.status === "Planerat");
 
   function patch(p: Partial<Kontakt>) {
     updateKontakt(id, p);
@@ -192,7 +200,17 @@ function KontaktDetailPage() {
                     tab === t ? "text-foreground" : "text-muted-foreground hover:text-foreground",
                   ].join(" ")}
                 >
-                  {t === "intagsmoten" && "Intagsmöten"}
+                  {t === "intagsmoten" && (
+                    <span className="inline-flex items-center gap-1.5">
+                      Intagsmöten
+                      {moten.length > 0 && (
+                        <span className="rounded-full bg-muted px-1.5 text-[10px] text-muted-foreground">{moten.length}</span>
+                      )}
+                      {obehandladeMoten && (
+                        <span className="h-1.5 w-1.5 rounded-full bg-amber-500" title="Ohanterat möte" />
+                      )}
+                    </span>
+                  )}
                   {t === "historik" && "Historik"}
                   {t === "objekt" && `Objekt (${kontakt.objektKopplingar.length})`}
                   {t === "anteckningar" && "Anteckningar"}
@@ -908,7 +926,12 @@ function IntagsmotenTab({ kontakt }: { kontakt: Kontakt }) {
   function reload() {
     setMoten(listIntagsmotenForKontakt(kontakt.id));
   }
-  useEffect(() => { reload(); }, [kontakt.id]);
+  useEffect(() => {
+    const list = listIntagsmotenForKontakt(kontakt.id);
+    setMoten(list);
+    // Expandera senaste mötet direkt så det syns utan att klicka
+    setSelected((cur) => cur ?? list[0]?.id ?? null);
+  }, [kontakt.id]);
 
   const selectedMote = moten.find((m) => m.id === selected) ?? null;
 
