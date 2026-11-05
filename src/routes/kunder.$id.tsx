@@ -8,8 +8,8 @@ import type { Kontakt, Aktivitet, AktivitetTyp, NastaSteg, NastaStegTyp } from "
 import { fmtSweNum, handleNumberInput } from "../lib/formatters";
 import {
   listIntagsmotenForKontakt, saveIntagsmote, updateIntagsmote, deleteIntagsmote,
-  exportToICS, KALLOR, SALJTIDPUNKTER,
-  type Intagsmote, type IntagsmoteStatus, type SaljTidpunkt,
+  exportToICS, KALLOR, SALJTIDPUNKTER, INTAG_SYFTEN,
+  type Intagsmote, type IntagsmoteStatus, type SaljTidpunkt, type IntagSyfte,
 } from "../lib/intagsmoteStore";
 import { saveObjekt } from "../lib/objektStore";
 import type { Typ } from "../data/objekt";
@@ -985,8 +985,8 @@ function IntagsmotenTab({ kontakt }: { kontakt: Kontakt }) {
                           </select>
                         </DetailRow>
                         <DetailRow label="Källa" value={m.kalla || "—"} />
-                        {m.vardering != null && (
-                          <DetailRow label="Värdering" value={`${m.vardering.toLocaleString("sv-SE")} kr`} />
+                        {m.syfte && (
+                          <DetailRow label="Syfte" value={m.syfte} />
                         )}
                         {m.boarea != null && (
                           <DetailRow label="Boarea" value={`${m.boarea} kvm`} />
@@ -994,8 +994,14 @@ function IntagsmotenTab({ kontakt }: { kontakt: Kontakt }) {
                         {m.antalRum != null && (
                           <DetailRow label="Antal rum" value={`${m.antalRum} rum`} />
                         )}
-                        {m.onskatPris != null && (
-                          <DetailRow label="Önskat pris" value={`${m.onskatPris.toLocaleString("sv-SE")} kr`} />
+                        {m.vaning && (
+                          <DetailRow label="Våning" value={m.vaning} />
+                        )}
+                        {m.boddSedan && (
+                          <DetailRow label="Bott sedan" value={m.boddSedan} />
+                        )}
+                        {m.inkopsPris != null && (
+                          <DetailRow label="Inköpspris" value={`${m.inkopsPris.toLocaleString("sv-SE")} kr`} />
                         )}
                         {m.saljTidpunkt && (
                           <DetailRow label="Vill sälja" value={m.saljTidpunkt} />
@@ -1005,6 +1011,8 @@ function IntagsmotenTab({ kontakt }: { kontakt: Kontakt }) {
                         )}
                       </div>
                       <div className="space-y-2">
+                        {/* Efter mötet — värdering + säljarens önskade pris */}
+                        <EfterMotetBox mote={m} onSaved={reload} />
                         {obj ? (
                           <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3">
                             <div className="mb-1 text-[10px] uppercase tracking-widest text-emerald-400/70">Kopplat objekt</div>
@@ -1114,6 +1122,60 @@ function DetailRow({ label, value, children }: { label: string; value?: string; 
   );
 }
 
+/* ─── Efter mötet: värdering + säljarens önskade pris (redigerbart) ─── */
+function EfterMotetBox({ mote, onSaved }: { mote: Intagsmote; onSaved: () => void }) {
+  const [vardering, setVardering] = useState(mote.vardering != null ? String(mote.vardering) : "");
+  const [onskatPris, setOnskatPris] = useState(mote.onskatPris != null ? String(mote.onskatPris) : "");
+  const [saved, setSaved] = useState(false);
+
+  const dirty =
+    (vardering ? Number(vardering.replace(/\D/g, "")) : null) !== (mote.vardering ?? null) ||
+    (onskatPris ? Number(onskatPris.replace(/\D/g, "")) : null) !== (mote.onskatPris ?? null);
+
+  function save() {
+    updateIntagsmote(mote.id, {
+      vardering: vardering ? Number(vardering.replace(/\D/g, "")) : null,
+      onskatPris: onskatPris ? Number(onskatPris.replace(/\D/g, "")) : null,
+    });
+    setSaved(true);
+    setTimeout(() => setSaved(false), 1500);
+    onSaved();
+  }
+
+  return (
+    <div className="rounded-lg border border-primary/20 bg-primary/[0.04] p-3">
+      <div className="mb-2 text-[10px] uppercase tracking-widest text-primary/70">Efter mötet</div>
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <label className="mb-1 block text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Din värdering (kr)</label>
+          <input
+            type="text" inputMode="numeric" value={vardering}
+            onChange={(e) => setVardering(e.target.value)}
+            placeholder="t.ex. 1 800 000"
+            className="w-full rounded-md border border-input bg-background px-2.5 py-1.5 text-sm focus:border-primary focus:outline-none"
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Säljaren vill ha (kr)</label>
+          <input
+            type="text" inputMode="numeric" value={onskatPris}
+            onChange={(e) => setOnskatPris(e.target.value)}
+            placeholder="t.ex. 2 000 000"
+            className="w-full rounded-md border border-input bg-background px-2.5 py-1.5 text-sm focus:border-primary focus:outline-none"
+          />
+        </div>
+      </div>
+      <button
+        onClick={save}
+        disabled={!dirty && !saved}
+        className="mt-2.5 w-full rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-opacity disabled:opacity-40"
+      >
+        {saved ? "✓ Sparat" : "Spara"}
+      </button>
+    </div>
+  );
+}
+
 /* ─── Nytt intagsmöte modal ─── */
 function NyttIntagsmoteModal({
   kontakt, onSave, onClose,
@@ -1130,10 +1192,12 @@ function NyttIntagsmoteModal({
   const [sluttid, setSluttid] = useState("11:00");
   const [kalla, setKalla] = useState<string>(KALLOR[0]);
   const [anteckningar, setAnteckningar] = useState("");
-  const [vardering, setVardering] = useState("");
   const [boarea, setBoarea] = useState("");
   const [antalRum, setAntalRum] = useState("");
-  const [onskatPris, setOnskatPris] = useState("");
+  const [vaning, setVaning] = useState("");
+  const [boddSedan, setBoddSedan] = useState("");
+  const [inkopsPris, setInkopsPris] = useState("");
+  const [syfte, setSyfte] = useState<IntagSyfte | "">("");
   const [saljTidpunkt, setSaljTidpunkt] = useState<SaljTidpunkt | "">("");
 
   const canSave = adress.trim().length > 2 && datum;
@@ -1150,11 +1214,15 @@ function NyttIntagsmoteModal({
       kalla,
       anteckningar: anteckningar.trim(),
       status: "Planerat",
-      vardering: vardering ? Number(vardering.replace(/\D/g, "")) : null,
+      vardering: null,
       varderingKommentar: "",
       boarea: boarea ? Number(boarea.replace(/\D/g, "")) : null,
       antalRum: antalRum ? Number(antalRum.replace(",", ".")) : null,
-      onskatPris: onskatPris ? Number(onskatPris.replace(/\D/g, "")) : null,
+      vaning: vaning.trim() || null,
+      boddSedan: boddSedan.trim() || null,
+      inkopsPris: inkopsPris ? Number(inkopsPris.replace(/\D/g, "")) : null,
+      syfte: syfte || null,
+      onskatPris: null,
       saljTidpunkt: saljTidpunkt || null,
       objektSlug: null,
       objektTyp: null,
@@ -1253,24 +1321,10 @@ function NyttIntagsmoteModal({
             </select>
           </div>
 
-          <div>
-            <label className="mb-1 block text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
-              Värdering (kr)
-            </label>
-            <input
-              type="text"
-              inputMode="numeric"
-              value={vardering}
-              onChange={(e) => setVardering(e.target.value)}
-              placeholder=""
-              className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm focus:border-primary focus:outline-none"
-            />
-          </div>
-
-          {/* Säljlead-fält */}
+          {/* Om bostaden — fylls i före/under mötet */}
           <div className="rounded-lg border border-primary/15 bg-primary/[0.03] p-4">
             <div className="mb-3 text-[11px] uppercase tracking-[0.14em] text-primary/70">
-              Om bostaden &amp; säljaren
+              Om bostaden
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -1292,11 +1346,29 @@ function NyttIntagsmoteModal({
                 />
               </div>
               <div>
-                <label className="mb-1 block text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Önskat pris (kr)</label>
+                <label className="mb-1 block text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Våning (om lägenhet)</label>
                 <input
-                  type="text" inputMode="numeric" value={onskatPris}
-                  onChange={(e) => setOnskatPris(e.target.value)}
-                  placeholder="t.ex. 2 000 000"
+                  type="text" value={vaning}
+                  onChange={(e) => setVaning(e.target.value)}
+                  placeholder="t.ex. 3 av 5"
+                  className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm focus:border-primary focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Bott sedan</label>
+                <input
+                  type="text" value={boddSedan}
+                  onChange={(e) => setBoddSedan(e.target.value)}
+                  placeholder="t.ex. 2015 / 8 år"
+                  className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm focus:border-primary focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Inköpspris (kr)</label>
+                <input
+                  type="text" inputMode="numeric" value={inkopsPris}
+                  onChange={(e) => setInkopsPris(e.target.value)}
+                  placeholder="vad de köpte för"
                   className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm focus:border-primary focus:outline-none"
                 />
               </div>
@@ -1312,6 +1384,20 @@ function NyttIntagsmoteModal({
                 </select>
               </div>
             </div>
+            <div className="mt-3">
+              <label className="mb-1 block text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Syfte med mötet</label>
+              <select
+                value={syfte}
+                onChange={(e) => setSyfte(e.target.value as IntagSyfte | "")}
+                className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm focus:border-primary focus:outline-none"
+              >
+                <option value="">— välj —</option>
+                {INTAG_SYFTEN.map((s) => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+            <p className="mt-3 text-[11px] text-muted-foreground/70">
+              Värdering och säljarens önskade pris fyller du i efter mötet.
+            </p>
           </div>
 
           <div>

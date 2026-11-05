@@ -13,10 +13,12 @@ function parseItem(item: Record<string, unknown>): Suggestion | null {
   const house = a.house_number ?? "";
   const raw = (a.postcode ?? "").replace(/\s/g, "");
   const postcode = raw.length === 5 ? raw.slice(0, 3) + " " + raw.slice(3) : raw;
-  // Postort ligger i city/town/village. suburb/neighbourhood (t.ex. "Fållan")
-  // är en stadsdel och ska INTE visas som ort — använd bara som sista utväg.
-  const city =
-    a.city ?? a.town ?? a.village ?? a.municipality ?? a.suburb ?? a.county ?? "";
+  // Visa bara postort/område (Trångsund, Skogås …), aldrig kvarter/stadsdel
+  // (t.ex. "Fållan"). suburb/neighbourhood/quarter utelämnas helt — mäklaren
+  // skriver själv in en stadsdel om det behövs. Faller tillbaka på kommun
+  // (utan "kommun") om ingen postort finns.
+  let city = a.city ?? a.town ?? a.village ?? "";
+  if (!city && a.municipality) city = a.municipality.replace(/\s*kommun$/i, "");
   return {
     road: road + (house ? " " + house : ""),
     postcode,

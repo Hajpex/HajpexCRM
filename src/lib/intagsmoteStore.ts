@@ -20,12 +20,27 @@ export type Intagsmote = {
   // Säljlead-fält (valfria – fångas vid intaget för att kunna matcha mot köpare)
   boarea?: number | null;        // kvm
   antalRum?: number | null;
-  onskatPris?: number | null;    // vad säljaren vill ha
+  vaning?: string | null;        // t.ex. "3 av 5" (lägenhet)
+  boddSedan?: string | null;     // hur länge de bott där, t.ex. "2015" eller "8 år"
+  inkopsPris?: number | null;    // vad de köpte bostaden för
+  syfte?: IntagSyfte | null;     // varför de ville ha ett möte
+  onskatPris?: number | null;    // vad säljaren vill ha (fylls i EFTER mötet)
   saljTidpunkt?: SaljTidpunkt | null;
   objektSlug: string | null;  // fylls i när bostad skapas
   objektTyp: string | null;   // "Bostadsrätt" | "Villa" | etc, sätts vid skapande av bostad
   skapad: number;
 };
+
+export type IntagSyfte =
+  | "Planerar att sälja"
+  | "Värdering för bank"
+  | "Vill bara veta värdet";
+
+export const INTAG_SYFTEN: IntagSyfte[] = [
+  "Planerar att sälja",
+  "Värdering för bank",
+  "Vill bara veta värdet",
+];
 
 export type SaljTidpunkt =
   | "Nu"
