@@ -13,13 +13,14 @@ function parseItem(item: Record<string, unknown>): Suggestion | null {
   const house = a.house_number ?? "";
   const raw = (a.postcode ?? "").replace(/\s/g, "");
   const postcode = raw.length === 5 ? raw.slice(0, 3) + " " + raw.slice(3) : raw;
+  // Postort ligger i city/town/village. suburb/neighbourhood (t.ex. "Fållan")
+  // är en stadsdel och ska INTE visas som ort — använd bara som sista utväg.
   const city =
-    a.city ?? a.town ?? a.village ?? a.municipality ?? a.county ?? "";
-  const suburb = a.suburb ?? a.neighbourhood ?? a.quarter ?? "";
+    a.city ?? a.town ?? a.village ?? a.municipality ?? a.suburb ?? a.county ?? "";
   return {
     road: road + (house ? " " + house : ""),
     postcode,
-    city: suburb && suburb !== city ? suburb + ", " + city : city,
+    city,
   };
 }
 
