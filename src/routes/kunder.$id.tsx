@@ -65,7 +65,13 @@ function KontaktDetailPage() {
   const { id } = Route.useParams();
   const navigate = useNavigate();
   const [kontakt, setKontakt] = useState<Kontakt | null>(null);
-  const [tab, setTab] = useState<Tab>("historik");
+  const [tab, setTab] = useState<Tab>(() => {
+    try {
+      return listIntagsmotenForKontakt(id).length > 0 ? "intagsmoten" : "historik";
+    } catch {
+      return "historik";
+    }
+  });
   const [editMode, setEditMode] = useState(false);
   const [logSamtalOpen, setLogSamtalOpen] = useState(false);
 
@@ -80,9 +86,11 @@ function KontaktDetailPage() {
 
   useEffect(() => { load(); }, [id]);
 
-  // Öppna Intagsmöten-fliken direkt om personen har möten (annars Historik)
+  // Vid byte till en annan person: öppna Intagsmöten om de har möten, annars Historik
+  const firstTab = useRef(true);
   useEffect(() => {
-    if (listIntagsmotenForKontakt(id).length > 0) setTab("intagsmoten");
+    if (firstTab.current) { firstTab.current = false; return; }
+    setTab(listIntagsmotenForKontakt(id).length > 0 ? "intagsmoten" : "historik");
   }, [id]);
 
   if (!kontakt) return null;
