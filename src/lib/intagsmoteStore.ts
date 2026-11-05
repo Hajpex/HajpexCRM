@@ -17,10 +17,32 @@ export type Intagsmote = {
   status: IntagsmoteStatus;
   vardering: number | null;
   varderingKommentar: string;
+  // Säljlead-fält (valfria – fångas vid intaget för att kunna matcha mot köpare)
+  boarea?: number | null;        // kvm
+  antalRum?: number | null;
+  onskatPris?: number | null;    // vad säljaren vill ha
+  saljTidpunkt?: SaljTidpunkt | null;
   objektSlug: string | null;  // fylls i när bostad skapas
   objektTyp: string | null;   // "Bostadsrätt" | "Villa" | etc, sätts vid skapande av bostad
   skapad: number;
 };
+
+export type SaljTidpunkt =
+  | "Nu"
+  | "Inom 3 månader"
+  | "Inom 6 månader"
+  | "Inom 1 år"
+  | "Längre fram"
+  | "Osäker";
+
+export const SALJTIDPUNKTER: SaljTidpunkt[] = [
+  "Nu",
+  "Inom 3 månader",
+  "Inom 6 månader",
+  "Inom 1 år",
+  "Längre fram",
+  "Osäker",
+];
 
 const KEY = "hajpex.intagsmoten.v1";
 

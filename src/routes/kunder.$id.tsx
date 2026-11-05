@@ -7,8 +7,8 @@ import type { Kontakt, Aktivitet, AktivitetTyp, NastaSteg, NastaStegTyp } from "
 import { fmtSweNum, handleNumberInput } from "../lib/formatters";
 import {
   listIntagsmotenForKontakt, saveIntagsmote, updateIntagsmote, deleteIntagsmote,
-  exportToICS, KALLOR,
-  type Intagsmote, type IntagsmoteStatus,
+  exportToICS, KALLOR, SALJTIDPUNKTER,
+  type Intagsmote, type IntagsmoteStatus, type SaljTidpunkt,
 } from "../lib/intagsmoteStore";
 import { saveObjekt } from "../lib/objektStore";
 import type { Typ } from "../data/objekt";
@@ -984,6 +984,18 @@ function IntagsmotenTab({ kontakt }: { kontakt: Kontakt }) {
                         {m.vardering != null && (
                           <DetailRow label="Värdering" value={`${m.vardering.toLocaleString("sv-SE")} kr`} />
                         )}
+                        {m.boarea != null && (
+                          <DetailRow label="Boarea" value={`${m.boarea} kvm`} />
+                        )}
+                        {m.antalRum != null && (
+                          <DetailRow label="Antal rum" value={`${m.antalRum} rum`} />
+                        )}
+                        {m.onskatPris != null && (
+                          <DetailRow label="Önskat pris" value={`${m.onskatPris.toLocaleString("sv-SE")} kr`} />
+                        )}
+                        {m.saljTidpunkt && (
+                          <DetailRow label="Vill sälja" value={m.saljTidpunkt} />
+                        )}
                         {m.anteckningar && (
                           <DetailRow label="Anteckningar" value={m.anteckningar} />
                         )}
@@ -1115,6 +1127,10 @@ function NyttIntagsmoteModal({
   const [kalla, setKalla] = useState<string>(KALLOR[0]);
   const [anteckningar, setAnteckningar] = useState("");
   const [vardering, setVardering] = useState("");
+  const [boarea, setBoarea] = useState("");
+  const [antalRum, setAntalRum] = useState("");
+  const [onskatPris, setOnskatPris] = useState("");
+  const [saljTidpunkt, setSaljTidpunkt] = useState<SaljTidpunkt | "">("");
 
   const canSave = adress.trim().length > 2 && datum;
 
@@ -1132,6 +1148,10 @@ function NyttIntagsmoteModal({
       status: "Planerat",
       vardering: vardering ? Number(vardering.replace(/\D/g, "")) : null,
       varderingKommentar: "",
+      boarea: boarea ? Number(boarea.replace(/\D/g, "")) : null,
+      antalRum: antalRum ? Number(antalRum.replace(",", ".")) : null,
+      onskatPris: onskatPris ? Number(onskatPris.replace(/\D/g, "")) : null,
+      saljTidpunkt: saljTidpunkt || null,
       objektSlug: null,
       objektTyp: null,
     });
@@ -1241,6 +1261,53 @@ function NyttIntagsmoteModal({
               placeholder=""
               className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm focus:border-primary focus:outline-none"
             />
+          </div>
+
+          {/* Säljlead-fält */}
+          <div className="rounded-lg border border-primary/15 bg-primary/[0.03] p-4">
+            <div className="mb-3 text-[11px] uppercase tracking-[0.14em] text-primary/70">
+              Om bostaden &amp; säljaren
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="mb-1 block text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Boarea (kvm)</label>
+                <input
+                  type="text" inputMode="numeric" value={boarea}
+                  onChange={(e) => setBoarea(e.target.value)}
+                  placeholder="t.ex. 58"
+                  className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm focus:border-primary focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Antal rum</label>
+                <input
+                  type="text" inputMode="decimal" value={antalRum}
+                  onChange={(e) => setAntalRum(e.target.value)}
+                  placeholder="t.ex. 2"
+                  className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm focus:border-primary focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Önskat pris (kr)</label>
+                <input
+                  type="text" inputMode="numeric" value={onskatPris}
+                  onChange={(e) => setOnskatPris(e.target.value)}
+                  placeholder="t.ex. 2 000 000"
+                  className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm focus:border-primary focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Vill sälja</label>
+                <select
+                  value={saljTidpunkt}
+                  onChange={(e) => setSaljTidpunkt(e.target.value as SaljTidpunkt | "")}
+                  className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm focus:border-primary focus:outline-none"
+                >
+                  <option value="">— välj —</option>
+                  {SALJTIDPUNKTER.map((s) => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+            </div>
           </div>
 
           <div>
