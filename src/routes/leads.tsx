@@ -1,9 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { AppShell } from "../components/AppShell";
 import { listIntagsmoten } from "../lib/intagsmoteStore";
 import { getKontakt } from "../lib/kontaktStore";
 import { searchLeads, type LeadColor } from "../lib/leadSearch";
+import { seedFakeIntag, clearFakeIntag, countTestdata } from "../lib/seedTestdata";
 
 export const Route = createFileRoute("/leads")({
   head: () => ({ meta: [{ title: "Säljleads · Hajpex CRM" }] }),
@@ -25,7 +26,10 @@ function fmtKr(n: number | null | undefined): string {
 
 function LeadsPage() {
   const [q, setQ] = useState("");
-  const moten = useMemo(() => listIntagsmoten(), []);
+  const [reloadKey, setReloadKey] = useState(0);
+  const moten = useMemo(() => listIntagsmoten(), [reloadKey]);
+  const [testCount, setTestCount] = useState(0);
+  useEffect(() => { setTestCount(countTestdata()); }, [reloadKey]);
 
   const { parsed, matches } = useMemo(() => searchLeads(moten, q), [moten, q]);
   const hasQuery = q.trim().length > 0;
@@ -39,7 +43,7 @@ function LeadsPage() {
         <div className="mb-1 text-[11px] uppercase tracking-[0.22em] text-primary/80">Matcha köpare mot säljare</div>
         <h1 className="mb-2 text-3xl font-medium" style={serif}>Säljleads<span className="text-primary">.</span></h1>
         <p className="mb-6 max-w-2xl text-sm text-muted-foreground">
-          Sök fritt, t.ex. <em>"2a trångsund 2mil"</em>. Systemet förstår rum, ort och pris och
+          Sök fritt, t.ex. <em>"2a johanneshov 3mil"</em>. Systemet förstår rum, ort och pris och
           färgkodar träffarna: <span className="text-emerald-600">grönt</span> inom budget,
           {" "}<span className="text-amber-600">orange</span> nästan, <span className="text-red-500">rött</span> långt ifrån.
         </p>
@@ -50,7 +54,7 @@ function LeadsPage() {
             autoFocus
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder='Sök säljleads — t.ex. "2a trångsund 2mil"'
+            placeholder='Sök säljleads — t.ex. "2a johanneshov 3mil"'
             className="w-full rounded-xl border border-input bg-background px-4 py-3 text-base focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/10"
           />
           {hasQuery && (
@@ -121,6 +125,26 @@ function LeadsPage() {
             })}
           </div>
         )}
+
+        {/* Testdata-verktyg */}
+        <div className="mt-10 flex flex-wrap items-center gap-3 border-t border-border/60 pt-5 text-xs">
+          <span className="text-muted-foreground/70">Demo:</span>
+          <button
+            onClick={() => { seedFakeIntag(100); setReloadKey((k) => k + 1); }}
+            className="rounded-md border border-border px-3 py-1.5 text-muted-foreground hover:border-primary/40 hover:text-primary"
+          >
+            + Skapa 100 testintag
+          </button>
+          {testCount > 0 && (
+            <button
+              onClick={() => { if (window.confirm(`Ta bort ${testCount} testintag (och deras kontakter)?`)) { clearFakeIntag(); setReloadKey((k) => k + 1); } }}
+              className="rounded-md border border-border px-3 py-1.5 text-muted-foreground hover:border-red-400/50 hover:text-red-400"
+            >
+              Rensa testdata ({testCount})
+            </button>
+          )}
+          <span className="text-muted-foreground/50">Testdata är tydligt taggad och rör inte din riktiga data.</span>
+        </div>
       </div>
     </AppShell>
   );
