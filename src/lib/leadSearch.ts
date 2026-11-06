@@ -93,7 +93,53 @@ export type LeadMatch = {
   score: number;             // högre = bättre träff
   ortMatch: boolean;
   rumMatch: boolean | null;  // null = rum ej angivet i sökningen
+  distanceKm: number | null; // avstånd till sökt område (null om ej närhetssökning)
 };
+
+// Ungefärliga koordinater för söderort-områdena (lat, lng)
+const OMRADE_COORD: Record<string, { lat: number; lng: number }> = {
+  "johanneshov":      { lat: 59.295, lng: 18.085 },
+  "globen":           { lat: 59.293, lng: 18.083 },
+  "gullmarsplan":     { lat: 59.298, lng: 18.080 },
+  "hammarby sjöstad": { lat: 59.305, lng: 18.095 },
+  "hammarby":         { lat: 59.305, lng: 18.095 },
+  "enskede":          { lat: 59.282, lng: 18.078 },
+  "gubbängen":        { lat: 59.262, lng: 18.080 },
+  "bagarmossen":      { lat: 59.273, lng: 18.130 },
+  "sköndal":          { lat: 59.252, lng: 18.110 },
+  "farsta":           { lat: 59.243, lng: 18.095 },
+  "trångsund":        { lat: 59.230, lng: 18.140 },
+  "skogås":           { lat: 59.223, lng: 18.155 },
+};
+
+const MAX_NARHET_KM = 12;
+
+function haversineKm(a: { lat: number; lng: number }, b: { lat: number; lng: number }): number {
+  const R = 6371;
+  const dLat = ((b.lat - a.lat) * Math.PI) / 180;
+  const dLng = ((b.lng - a.lng) * Math.PI) / 180;
+  const la1 = (a.lat * Math.PI) / 180;
+  const la2 = (b.lat * Math.PI) / 180;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(la1) * Math.cos(la2) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+
+/** Hitta vilket känt område som söks (stödjer flerordsnamn som "hammarby sjöstad"). */
+function findSearchedArea(ord: string[]): { name: string; coord: { lat: number; lng: number } } | null {
+  const joined = ord.join(" ");
+  // Längsta namnet först så "hammarby sjöstad" matchar före "hammarby"
+  const names = Object.keys(OMRADE_COORD).sort((a, b) => b.length - a.length);
+  for (const name of names) {
+    if (joined.includes(name)) return { name, coord: OMRADE_COORD[name] };
+  }
+  return null;
+}
+
+function leadCoord(m: Intagsmote): { lat: number; lng: number } | null {
+  const ort = (m.ort || "").toLowerCase().trim();
+  return OMRADE_COORD[ort] ?? null;
+}
+
 
 /** Pris säljaren förväntar sig – önskat pris, annars värdering. */
 function leadPris(m: Intagsmote): number | null {
@@ -115,9 +161,10 @@ function prisFarg(sellerPris: number | null, target: number | null): { color: Le
  * Returnerar bara träffar som matchar angivna hårda kriterier (ort/rum) om de anges,
  * sorterade med bästa pristräff först.
  */
-export function searchLeads(moten: Intagsmote[], raw: string): { parsed: ParsedLeadQuery; matches: LeadMatch[] } {
+export function searchLeads(moten: Intagsmote[], raw: string): { parsed: ParsedLeadQuery; matches: LeadMatch[]; area: string | null } {
   const parsed = parseLeadQuery(raw);
   const hasQuery = parsed.rum != null || parsed.pris != null || parsed.ord.length > 0;
+  const searchedArea = findSearchedArea(parsed.ord);
 
   const matches: LeadMatch[] = moten.map((m) => {
     const hay = `${m.adress} ${m.ort} ${m.postnr}`.toLowerCase();
@@ -125,27 +172,63 @@ export function searchLeads(moten: Intagsmote[], raw: string): { parsed: ParsedL
     const rumMatch = parsed.rum == null ? null : m.antalRum != null && m.antalRum === parsed.rum;
     const { color, diff } = prisFarg(leadPris(m), parsed.pris);
 
-    // Poäng: ortträff väger tungt, därefter rätt rum, därefter prisfärg.
+    // Avstånd till sökt område (om vi känner både sökt område och objektets ort)
+    let distanceKm: number | null = null;
+    if (searchedArea) {
+      const lc = leadCoord(m);
+      distanceKm = lc ? haversineKm(searchedArea.coord, lc) : null;
+    }
+
+    // Poäng: närhet/ortträff väger tungt, därefter rätt rum, därefter prisfärg.
     let score = 0;
-    if (ortMatch && parsed.ord.length > 0) score += 100;
+    if (searchedArea && distanceKm != null) score += Math.max(0, 120 - distanceKm * 10);
+    else if (ortMatch && parsed.ord.length > 0) score += 100;
     if (rumMatch) score += 50;
     if (color === "green") score += 30;
     else if (color === "orange") score += 15;
     else if (color === "red") score += 2;
-    // Närmare pris → lite högre
     if (diff != null) score += Math.max(0, 10 - Math.abs(diff) * 50);
 
-    return { mote: m, color, priceDiff: diff, score, ortMatch, rumMatch };
+    return { mote: m, color, priceDiff: diff, score, ortMatch, rumMatch, distanceKm };
   });
 
-  // Filtrera bort poster som inte matchar angiven ort, och rum-mismatch om rum angavs.
+  // Filtrera: rum/pris som förut; ort via närhet om känt område, annars via text.
   const filtered = matches.filter((x) => {
     if (!hasQuery) return true;
-    if (parsed.ord.length > 0 && !x.ortMatch) return false;
+    if (searchedArea) {
+      if (x.distanceKm == null || x.distanceKm > MAX_NARHET_KM) return false;
+    } else if (parsed.ord.length > 0 && !x.ortMatch) {
+      return false;
+    }
     if (parsed.rum != null && x.rumMatch === false) return false;
     return true;
   });
 
-  filtered.sort((a, b) => b.score - a.score || b.mote.tidpunkt - a.mote.tidpunkt);
-  return { parsed, matches: filtered };
+  // Närhetssökning: närmast först. Annars efter poäng.
+  if (searchedArea) {
+    filtered.sort((a, b) =>
+      (a.distanceKm ?? 1e9) - (b.distanceKm ?? 1e9) || b.score - a.score || b.mote.tidpunkt - a.mote.tidpunkt
+    );
+  } else {
+    filtered.sort((a, b) => b.score - a.score || b.mote.tidpunkt - a.mote.tidpunkt);
+  }
+  return { parsed, matches: filtered, area: searchedArea?.name ?? null };
 }
+
+/** Avståndsgrupp för UI-rubriker. */
+export type NarhetBucket = "iomradet" | "narliggande" | "lite_langre" | "langre";
+
+export function narhetBucket(distanceKm: number | null): NarhetBucket | null {
+  if (distanceKm == null) return null;
+  if (distanceKm <= 1.3) return "iomradet";
+  if (distanceKm <= 3.5) return "narliggande";
+  if (distanceKm <= 7) return "lite_langre";
+  return "langre";
+}
+
+export const NARHET_LABEL: Record<NarhetBucket, string> = {
+  iomradet: "I området",
+  narliggande: "Närliggande (ca 2–3 km)",
+  lite_langre: "Lite längre bort",
+  langre: "Längre bort",
+};

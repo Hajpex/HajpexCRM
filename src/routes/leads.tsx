@@ -3,7 +3,7 @@ import { useState, useMemo, useEffect } from "react";
 import { AppShell } from "../components/AppShell";
 import { listIntagsmoten } from "../lib/intagsmoteStore";
 import { getKontakt } from "../lib/kontaktStore";
-import { searchLeads, type LeadColor } from "../lib/leadSearch";
+import { searchLeads, narhetBucket, NARHET_LABEL, type LeadColor, type LeadMatch, type NarhetBucket } from "../lib/leadSearch";
 import { seedFakeIntag, clearFakeIntag, countTestdata } from "../lib/seedTestdata";
 
 export const Route = createFileRoute("/leads")({
@@ -24,6 +24,46 @@ function fmtKr(n: number | null | undefined): string {
   return n == null ? "—" : n.toLocaleString("sv-SE") + " kr";
 }
 
+function LeadRow({ match, showDistance }: { match: LeadMatch; showDistance?: boolean }) {
+  const { mote: m, color, priceDiff, distanceKm } = match;
+  const k = getKontakt(m.kontaktId);
+  const cs = COLOR_STYLE[color];
+  const sellerPris = m.onskatPris ?? m.vardering;
+  return (
+    <div className="flex items-start gap-3 rounded-xl border border-border bg-card/60 p-4 transition-colors hover:border-white/[0.14]">
+      <span className={`mt-1.5 h-2.5 w-2.5 flex-shrink-0 rounded-full ${cs.dot}`} />
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="font-medium text-foreground" style={serif}>{m.adress}</span>
+          {m.ort && <span className="text-xs text-muted-foreground">{m.ort}</span>}
+          {showDistance && distanceKm != null && distanceKm > 0.2 && (
+            <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">~{distanceKm.toFixed(1)} km</span>
+          )}
+          {color !== "none" && (
+            <span className={`rounded-full border px-2 py-0.5 text-[10px] font-medium ${cs.badge}`}>
+              {cs.label}{priceDiff != null && priceDiff > 0 ? ` (+${Math.round(priceDiff * 100)}%)` : ""}
+            </span>
+          )}
+        </div>
+        <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[12px] text-muted-foreground">
+          {m.antalRum != null && <span>{m.antalRum} rum</span>}
+          {m.boarea != null && <span>{m.boarea} kvm</span>}
+          <span className="font-medium text-foreground">{fmtKr(sellerPris)}{m.onskatPris == null && m.vardering != null ? " (värdering)" : ""}</span>
+          {m.saljTidpunkt && <span>· Vill sälja: {m.saljTidpunkt}</span>}
+        </div>
+        {k && (
+          <div className="mt-1.5 text-[12px]">
+            <Link to="/kunder/$id" params={{ id: k.id }} className="text-primary hover:underline">
+              {k.fornamn} {k.efternamn}
+            </Link>
+            {k.telefon && <span className="text-muted-foreground"> · {k.telefon}</span>}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function LeadsPage() {
   const [q, setQ] = useState("");
   const [reloadKey, setReloadKey] = useState(0);
@@ -31,7 +71,7 @@ function LeadsPage() {
   const [testCount, setTestCount] = useState(0);
   useEffect(() => { setTestCount(countTestdata()); }, [reloadKey]);
 
-  const { parsed, matches } = useMemo(() => searchLeads(moten, q), [moten, q]);
+  const { parsed, matches, area } = useMemo(() => searchLeads(moten, q), [moten, q]);
   const hasQuery = q.trim().length > 0;
 
   // Antal med säljlead-data (önskat pris eller värdering)
@@ -85,44 +125,32 @@ function LeadsPage() {
           <div className="rounded-xl border border-dashed border-border py-16 text-center text-sm text-muted-foreground">
             Inga säljleads matchar "{q}".
           </div>
-        ) : (
-          <div className="space-y-2">
-            <div className="text-xs text-muted-foreground">{matches.length} träff{matches.length === 1 ? "" : "ar"}</div>
-            {matches.map(({ mote: m, color, priceDiff }) => {
-              const k = getKontakt(m.kontaktId);
-              const cs = COLOR_STYLE[color];
-              const sellerPris = m.onskatPris ?? m.vardering;
+        ) : area ? (
+          // Närhetssökning: gruppera efter avstånd till sökt område
+          <div className="space-y-6">
+            <div className="text-xs text-muted-foreground">
+              {matches.length} träff{matches.length === 1 ? "" : "ar"} i och runt <span className="capitalize text-foreground">{area}</span>
+            </div>
+            {(["iomradet", "narliggande", "lite_langre", "langre"] as NarhetBucket[]).map((bucket) => {
+              const rows = matches.filter((m) => narhetBucket(m.distanceKm) === bucket);
+              if (rows.length === 0) return null;
               return (
-                <div key={m.id} className="flex items-start gap-3 rounded-xl border border-border bg-card/60 p-4 transition-colors hover:border-white/[0.14]">
-                  <span className={`mt-1.5 h-2.5 w-2.5 flex-shrink-0 rounded-full ${cs.dot}`} />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-medium text-foreground" style={serif}>{m.adress}</span>
-                      {m.ort && <span className="text-xs text-muted-foreground">{m.ort}</span>}
-                      {color !== "none" && (
-                        <span className={`rounded-full border px-2 py-0.5 text-[10px] font-medium ${cs.badge}`}>
-                          {cs.label}{priceDiff != null && priceDiff > 0 ? ` (+${Math.round(priceDiff * 100)}%)` : ""}
-                        </span>
-                      )}
-                    </div>
-                    <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[12px] text-muted-foreground">
-                      {m.antalRum != null && <span>{m.antalRum} rum</span>}
-                      {m.boarea != null && <span>{m.boarea} kvm</span>}
-                      <span className="font-medium text-foreground">{fmtKr(sellerPris)}{m.onskatPris == null && m.vardering != null ? " (värdering)" : ""}</span>
-                      {m.saljTidpunkt && <span>· Vill sälja: {m.saljTidpunkt}</span>}
-                    </div>
-                    {k && (
-                      <div className="mt-1.5 text-[12px]">
-                        <Link to="/kunder/$id" params={{ id: k.id }} className="text-primary hover:underline">
-                          {k.fornamn} {k.efternamn}
-                        </Link>
-                        {k.telefon && <span className="text-muted-foreground"> · {k.telefon}</span>}
-                      </div>
-                    )}
+                <div key={bucket}>
+                  <div className="mb-2 flex items-center gap-2">
+                    <h3 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary/70">{NARHET_LABEL[bucket]}</h3>
+                    <span className="text-[11px] text-muted-foreground/50">{rows.length}</span>
+                  </div>
+                  <div className="space-y-2">
+                    {rows.map((m) => <LeadRow key={m.mote.id} match={m} showDistance />)}
                   </div>
                 </div>
               );
             })}
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <div className="text-xs text-muted-foreground">{matches.length} träff{matches.length === 1 ? "" : "ar"}</div>
+            {matches.map((m) => <LeadRow key={m.mote.id} match={m} />)}
           </div>
         )}
 
