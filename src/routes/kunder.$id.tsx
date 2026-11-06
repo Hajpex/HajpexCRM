@@ -8,8 +8,8 @@ import type { Kontakt, Aktivitet, AktivitetTyp, NastaSteg, NastaStegTyp } from "
 import { fmtSweNum, handleNumberInput } from "../lib/formatters";
 import {
   listIntagsmotenForKontakt, saveIntagsmote, updateIntagsmote, deleteIntagsmote,
-  exportToICS, KALLOR, SALJTIDPUNKTER, INTAG_SYFTEN,
-  type Intagsmote, type IntagsmoteStatus, type SaljTidpunkt, type IntagSyfte,
+  exportToICS, KALLOR, SALJTIDPUNKTER, INTAG_SYFTEN, BOSTAD_SKICK,
+  type Intagsmote, type IntagsmoteStatus, type SaljTidpunkt, type IntagSyfte, type BostadSkick,
 } from "../lib/intagsmoteStore";
 import { saveObjekt } from "../lib/objektStore";
 import type { Typ } from "../data/objekt";
@@ -1053,6 +1053,7 @@ function IntagsmotenTab({ kontakt }: { kontakt: Kontakt }) {
                       <div className="space-y-2">
                         {/* Efter mötet — värdering + säljarens önskade pris */}
                         <EfterMotetBox mote={m} onSaved={reload} />
+                        <SkickBox mote={m} onSaved={reload} />
                         {obj ? (
                           <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3">
                             <div className="mb-1 text-[10px] uppercase tracking-widest text-emerald-400/70">Kopplat objekt</div>
@@ -1240,6 +1241,92 @@ function EfterMotetBox({ mote, onSaved }: { mote: Intagsmote; onSaved: () => voi
         className="mt-2.5 w-full rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-opacity disabled:opacity-40"
       >
         {saved ? "✓ Sparat" : "Spara"}
+      </button>
+    </div>
+  );
+}
+
+/* ─── Skick & beskrivning (redigerbart, efter mötet) ─── */
+function SkickBox({ mote, onSaved }: { mote: Intagsmote; onSaved: () => void }) {
+  const [beskrivning, setBeskrivning] = useState(mote.beskrivning ?? "");
+  const [skick, setSkick] = useState<BostadSkick | "">(mote.skick ?? "");
+  const [sovrum, setSovrum] = useState(mote.antalSovrum != null ? String(mote.antalSovrum) : "");
+  const [badrum, setBadrum] = useState(mote.antalBadrum != null ? String(mote.antalBadrum) : "");
+  const [kok, setKok] = useState(!!mote.kokRenoverat);
+  const [bad, setBad] = useState(!!mote.badrumRenoverat);
+  const [tvatt, setTvatt] = useState(!!mote.egenTvattstuga);
+  const [tak, setTak] = useState(!!mote.takRenoverat);
+  const [saved, setSaved] = useState(false);
+
+  function save() {
+    updateIntagsmote(mote.id, {
+      beskrivning: beskrivning.trim() || null,
+      skick: skick || null,
+      antalSovrum: sovrum ? Number(sovrum.replace(/\D/g, "")) : null,
+      antalBadrum: badrum ? Number(badrum.replace(/\D/g, "")) : null,
+      kokRenoverat: kok,
+      badrumRenoverat: bad,
+      egenTvattstuga: tvatt,
+      takRenoverat: tak,
+    });
+    setSaved(true);
+    setTimeout(() => setSaved(false), 1500);
+    onSaved();
+  }
+
+  const chk = "flex items-center gap-2 rounded-md border px-2.5 py-1.5 text-[12px] cursor-pointer transition-colors";
+
+  return (
+    <div className="mt-2 rounded-lg border border-border bg-card/40 p-3">
+      <div className="mb-2 text-[10px] uppercase tracking-widest text-muted-foreground">Skick &amp; beskrivning</div>
+
+      <textarea
+        value={beskrivning}
+        onChange={(e) => setBeskrivning(e.target.value)}
+        rows={3}
+        placeholder="Mäklarens beskrivning, t.ex. ljus och fin 2:a, köket renoverat 2021, söderläge, lugnt läge…"
+        className="w-full resize-none rounded-md border border-input bg-background px-2.5 py-1.5 text-sm placeholder:text-muted-foreground/40 focus:border-primary focus:outline-none"
+      />
+
+      <div className="mt-2 grid grid-cols-3 gap-2">
+        <div>
+          <label className="mb-1 block text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Skick</label>
+          <select value={skick} onChange={(e) => setSkick(e.target.value as BostadSkick | "")}
+            className="w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm focus:border-primary focus:outline-none">
+            <option value="">—</option>
+            {BOSTAD_SKICK.map((s) => <option key={s} value={s}>{s}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="mb-1 block text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Sovrum</label>
+          <input type="text" inputMode="numeric" value={sovrum} onChange={(e) => setSovrum(e.target.value.replace(/\D/g, ""))}
+            placeholder="t.ex. 2" className="w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm focus:border-primary focus:outline-none" />
+        </div>
+        <div>
+          <label className="mb-1 block text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Badrum</label>
+          <input type="text" inputMode="numeric" value={badrum} onChange={(e) => setBadrum(e.target.value.replace(/\D/g, ""))}
+            placeholder="t.ex. 1" className="w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm focus:border-primary focus:outline-none" />
+        </div>
+      </div>
+
+      <div className="mt-2 grid grid-cols-2 gap-2">
+        <label className={`${chk} ${kok ? "border-primary/50 bg-primary/10 text-primary" : "border-border text-muted-foreground"}`}>
+          <input type="checkbox" checked={kok} onChange={(e) => setKok(e.target.checked)} className="accent-primary" /> Kök renoverat
+        </label>
+        <label className={`${chk} ${bad ? "border-primary/50 bg-primary/10 text-primary" : "border-border text-muted-foreground"}`}>
+          <input type="checkbox" checked={bad} onChange={(e) => setBad(e.target.checked)} className="accent-primary" /> Badrum renoverat
+        </label>
+        <label className={`${chk} ${tvatt ? "border-primary/50 bg-primary/10 text-primary" : "border-border text-muted-foreground"}`}>
+          <input type="checkbox" checked={tvatt} onChange={(e) => setTvatt(e.target.checked)} className="accent-primary" /> Egen tvättstuga
+        </label>
+        <label className={`${chk} ${tak ? "border-primary/50 bg-primary/10 text-primary" : "border-border text-muted-foreground"}`}>
+          <input type="checkbox" checked={tak} onChange={(e) => setTak(e.target.checked)} className="accent-primary" /> Tak renoverat
+        </label>
+      </div>
+
+      <button onClick={save}
+        className="mt-2.5 w-full rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-opacity">
+        {saved ? "✓ Sparat" : "Spara skick"}
       </button>
     </div>
   );

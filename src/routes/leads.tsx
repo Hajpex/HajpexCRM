@@ -26,40 +26,78 @@ function fmtKr(n: number | null | undefined): string {
 
 function LeadRow({ match, showDistance }: { match: LeadMatch; showDistance?: boolean }) {
   const { mote: m, color, priceDiff, distanceKm } = match;
+  const [open, setOpen] = useState(false);
   const k = getKontakt(m.kontaktId);
   const cs = COLOR_STYLE[color];
   const sellerPris = m.onskatPris ?? m.vardering;
+
+  const features: string[] = [];
+  if (m.skick) features.push(m.skick);
+  if (m.kokRenoverat) features.push("Kök renoverat");
+  if (m.badrumRenoverat) features.push("Badrum renoverat");
+  if (m.egenTvattstuga) features.push("Egen tvättstuga");
+  if (m.takRenoverat) features.push("Tak renoverat");
+  const hasDetail = !!m.beskrivning || features.length > 0 || m.antalSovrum != null || m.antalBadrum != null;
+
   return (
-    <div className="flex items-start gap-3 rounded-xl border border-border bg-card/60 p-4 transition-colors hover:border-white/[0.14]">
-      <span className={`mt-1.5 h-2.5 w-2.5 flex-shrink-0 rounded-full ${cs.dot}`} />
-      <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="font-medium text-foreground" style={serif}>{m.adress}</span>
-          {m.ort && <span className="text-xs text-muted-foreground">{m.ort}</span>}
-          {showDistance && distanceKm != null && distanceKm > 0.2 && (
-            <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">~{distanceKm.toFixed(1)} km</span>
-          )}
-          {color !== "none" && (
-            <span className={`rounded-full border px-2 py-0.5 text-[10px] font-medium ${cs.badge}`}>
-              {cs.label}{priceDiff != null && priceDiff > 0 ? ` (+${Math.round(priceDiff * 100)}%)` : ""}
-            </span>
-          )}
-        </div>
-        <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[12px] text-muted-foreground">
-          {m.antalRum != null && <span>{m.antalRum} rum</span>}
-          {m.boarea != null && <span>{m.boarea} kvm</span>}
-          <span className="font-medium text-foreground">{fmtKr(sellerPris)}{m.onskatPris == null && m.vardering != null ? " (värdering)" : ""}</span>
-          {m.saljTidpunkt && <span>· Vill sälja: {m.saljTidpunkt}</span>}
-        </div>
-        {k && (
-          <div className="mt-1.5 text-[12px]">
-            <Link to="/kunder/$id" params={{ id: k.id }} className="text-primary hover:underline">
-              {k.fornamn} {k.efternamn}
-            </Link>
-            {k.telefon && <span className="text-muted-foreground"> · {k.telefon}</span>}
+    <div className="rounded-xl border border-border bg-card/60 transition-colors hover:border-white/[0.14]">
+      <button
+        onClick={() => hasDetail && setOpen((v) => !v)}
+        className={`flex w-full items-start gap-3 p-4 text-left ${hasDetail ? "cursor-pointer" : "cursor-default"}`}
+      >
+        <span className={`mt-1.5 h-2.5 w-2.5 flex-shrink-0 rounded-full ${cs.dot}`} />
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-medium text-foreground" style={serif}>{m.adress}</span>
+            {m.ort && <span className="text-xs text-muted-foreground">{m.ort}</span>}
+            {showDistance && distanceKm != null && distanceKm > 0.2 && (
+              <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">~{distanceKm.toFixed(1)} km</span>
+            )}
+            {color !== "none" && (
+              <span className={`rounded-full border px-2 py-0.5 text-[10px] font-medium ${cs.badge}`}>
+                {cs.label}{priceDiff != null && priceDiff > 0 ? ` (+${Math.round(priceDiff * 100)}%)` : ""}
+              </span>
+            )}
           </div>
-        )}
-      </div>
+          <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[12px] text-muted-foreground">
+            {m.antalRum != null && <span>{m.antalRum} rum</span>}
+            {m.boarea != null && <span>{m.boarea} kvm</span>}
+            <span className="font-medium text-foreground">{fmtKr(sellerPris)}{m.onskatPris == null && m.vardering != null ? " (värdering)" : ""}</span>
+            {m.saljTidpunkt && <span>· Vill sälja: {m.saljTidpunkt}</span>}
+          </div>
+          {/* Skick-badges alltid synliga (kompakt) */}
+          {features.length > 0 && (
+            <div className="mt-1.5 flex flex-wrap gap-1">
+              {features.map((f) => (
+                <span key={f} className="rounded bg-primary/8 px-1.5 py-0.5 text-[10px] text-primary/80">{f}</span>
+              ))}
+            </div>
+          )}
+          {k && (
+            <div className="mt-1.5 text-[12px]">
+              <Link to="/kunder/$id" params={{ id: k.id }} className="text-primary hover:underline" onClick={(e) => e.stopPropagation()}>
+                {k.fornamn} {k.efternamn}
+              </Link>
+              {k.telefon && <span className="text-muted-foreground"> · {k.telefon}</span>}
+            </div>
+          )}
+        </div>
+        {hasDetail && <span className="mt-1 text-muted-foreground/40">{open ? "▲" : "▼"}</span>}
+      </button>
+
+      {open && hasDetail && (
+        <div className="border-t border-border/50 px-4 py-3 pl-10">
+          {m.beskrivning && <p className="text-sm text-foreground/90">{m.beskrivning}</p>}
+          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[12px] text-muted-foreground">
+            {m.antalSovrum != null && <span>{m.antalSovrum} sovrum</span>}
+            {m.antalBadrum != null && <span>{m.antalBadrum} badrum</span>}
+            {m.inkopsPris != null && <span>Köpt för {fmtKr(m.inkopsPris)}</span>}
+            {m.boddSedan && <span>Bott sedan {m.boddSedan}</span>}
+            {m.vaning && <span>Våning {m.vaning}</span>}
+          </div>
+          {m.saljVillkor && <p className="mt-2 text-[12px] text-amber-600">⚑ {m.saljVillkor}</p>}
+        </div>
+      )}
     </div>
   );
 }
@@ -71,8 +109,30 @@ function LeadsPage() {
   const [testCount, setTestCount] = useState(0);
   useEffect(() => { setTestCount(countTestdata()); }, [reloadKey]);
 
-  const { parsed, matches, area } = useMemo(() => searchLeads(moten, q), [moten, q]);
+  const { parsed, matches: rawMatches, area } = useMemo(() => searchLeads(moten, q), [moten, q]);
   const hasQuery = q.trim().length > 0;
+
+  // Skick-/renoveringsfilter
+  const [filters, setFilters] = useState<Set<string>>(new Set());
+  const toggleFilter = (k: string) =>
+    setFilters((prev) => {
+      const next = new Set(prev);
+      next.has(k) ? next.delete(k) : next.add(k);
+      return next;
+    });
+  const matches = useMemo(() => {
+    if (filters.size === 0) return rawMatches;
+    return rawMatches.filter(({ mote: m }) =>
+      [...filters].every((f) => {
+        if (f === "kok") return !!m.kokRenoverat;
+        if (f === "bad") return !!m.badrumRenoverat;
+        if (f === "tvatt") return !!m.egenTvattstuga;
+        if (f === "tak") return !!m.takRenoverat;
+        if (f === "nyskick") return m.skick === "Nyskick";
+        return true;
+      })
+    );
+  }, [rawMatches, filters]);
 
   // Antal med säljlead-data (önskat pris eller värdering)
   const medData = moten.filter((m) => m.onskatPris != null || m.vardering != null).length;
@@ -111,6 +171,34 @@ function LeadsPage() {
             {parsed.pris != null && <span className="rounded-full border border-border bg-card px-2.5 py-1 text-foreground">≈ {fmtKr(parsed.pris)}</span>}
           </div>
         )}
+
+        {/* Skick-/renoveringsfilter */}
+        <div className="mb-5 flex flex-wrap items-center gap-1.5">
+          {([
+            ["nyskick", "Nyskick"],
+            ["kok", "Kök renoverat"],
+            ["bad", "Badrum renoverat"],
+            ["tvatt", "Egen tvättstuga"],
+            ["tak", "Tak renoverat"],
+          ] as [string, string][]).map(([key, label]) => {
+            const on = filters.has(key);
+            return (
+              <button
+                key={key}
+                onClick={() => toggleFilter(key)}
+                className={[
+                  "rounded-full border px-3 py-1 text-[12px] transition-colors",
+                  on ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:border-primary/40 hover:text-foreground",
+                ].join(" ")}
+              >
+                {on ? "✓ " : ""}{label}
+              </button>
+            );
+          })}
+          {filters.size > 0 && (
+            <button onClick={() => setFilters(new Set())} className="px-2 text-[12px] text-muted-foreground hover:text-foreground">Rensa filter</button>
+          )}
+        </div>
 
         {/* Resultat */}
         {!hasQuery ? (

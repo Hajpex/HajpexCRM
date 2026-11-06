@@ -27,10 +27,32 @@ export type Intagsmote = {
   onskatPris?: number | null;    // vad säljaren vill ha (fylls i EFTER mötet)
   saljTidpunkt?: SaljTidpunkt | null;  // när de vill sälja (fylls i EFTER mötet)
   saljVillkor?: string | null;   // t.ex. "säljer vid 2 200 000" (EFTER mötet)
+  // Skick & beskrivning (fylls i EFTER mötet)
+  beskrivning?: string | null;   // mäklarens fria text, t.ex. "ljus 2:a, köket renoverat, söderläge"
+  skick?: BostadSkick | null;
+  antalSovrum?: number | null;
+  antalBadrum?: number | null;
+  kokRenoverat?: boolean;
+  badrumRenoverat?: boolean;
+  egenTvattstuga?: boolean;
+  takRenoverat?: boolean;
   objektSlug: string | null;  // fylls i när bostad skapas
   objektTyp: string | null;   // "Bostadsrätt" | "Villa" | etc, sätts vid skapande av bostad
   skapad: number;
 };
+
+export type BostadSkick =
+  | "Nyskick"
+  | "Bra skick"
+  | "Normalt"
+  | "Renoveringsbehov";
+
+export const BOSTAD_SKICK: BostadSkick[] = [
+  "Nyskick",
+  "Bra skick",
+  "Normalt",
+  "Renoveringsbehov",
+];
 
 export type IntagSyfte =
   | "Sälja nu"

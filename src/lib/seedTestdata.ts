@@ -1,5 +1,5 @@
 import { saveKontakt, deleteKontakt } from "./kontaktStore";
-import { saveIntagsmote, deleteIntagsmote, type IntagSyfte, type SaljTidpunkt } from "./intagsmoteStore";
+import { saveIntagsmote, deleteIntagsmote, type IntagSyfte, type SaljTidpunkt, type BostadSkick } from "./intagsmoteStore";
 
 /**
  * Genererar fejkade intagsmöten (med tillhörande kontakter) för att kunna
@@ -66,6 +66,15 @@ const EFTERNAMN = [
 const SYFTEN: IntagSyfte[] = ["Sälja nu", "Värdering (t.ex. till banken)", "Endast intresserad av värdet"];
 const TIDPUNKTER: SaljTidpunkt[] = ["Nu", "Inom 3 månader", "Inom 6 månader", "Inom 1 år", "Längre fram", "Osäker"];
 const STATUSAR = ["Genomfört", "Vunnen", "Planerat"] as const;
+const SKICK: BostadSkick[] = ["Nyskick", "Bra skick", "Normalt", "Renoveringsbehov"];
+const BESKRIVNINGAR = [
+  "Ljus och fräsch bostad med bra planlösning och genomgående kvalitetskänsla.",
+  "Charmigt boende i lugnt läge, nära kommunikationer och grönområden.",
+  "Rymligt och välplanerat med fina sällskapsytor och gott om förvaring.",
+  "Trevlig bostad med renoverat kök och fräscht badrum, inflyttningsklart.",
+  "Högt i tak och stora fönster ger ett ljust intryck. Söderläge på balkongen.",
+  "Välskött bostad med nyare ytskikt, nära skola, service och natur.",
+];
 
 function pick<T>(arr: readonly T[]): T { return arr[Math.floor(Math.random() * arr.length)]; }
 function randInt(min: number, max: number) { return Math.floor(Math.random() * (max - min + 1)) + min; }
@@ -129,6 +138,14 @@ export function seedFakeIntag(n = 100): number {
       onskatPris,
       saljTidpunkt: syfte === "Sälja nu" ? pick(TIDPUNKTER.slice(0, 3)) : pick(TIDPUNKTER),
       saljVillkor: onskatPris ? `Säljer vid ${onskatPris.toLocaleString("sv-SE")} kr` : null,
+      beskrivning: pick(BESKRIVNINGAR),
+      skick: pick(SKICK),
+      antalSovrum: Math.max(1, rum - 1),
+      antalBadrum: boarea > 90 ? randInt(1, 2) : 1,
+      kokRenoverat: Math.random() < 0.5,
+      badrumRenoverat: Math.random() < 0.5,
+      egenTvattstuga: boarea > 70 && Math.random() < 0.5,
+      takRenoverat: Math.random() < 0.3,
       objektSlug: null,
       objektTyp: null,
     });
