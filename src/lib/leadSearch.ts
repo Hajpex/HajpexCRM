@@ -20,19 +20,22 @@ const ROOM_WORDS: Record<string, number> = {
 
 /** Tolka ett pristoken som "2mil", "2,5 mkr", "2500000", "850k". */
 function parsePris(tokens: string[]): number | null {
-  const joined = tokens.join(" ");
-  // t.ex. "2 mil", "2,5mil", "2.5 miljoner", "2 mkr", "3m"
-  const milj = joined.match(/(\d+(?:[.,]\d+)?)\s*(?:mil|milj|miljoner|mkr|mnkr|m)\b/i);
-  if (milj) return Math.round(parseFloat(milj[1].replace(",", ".")) * 1_000_000);
-  // t.ex. "850k", "850 tkr"
-  const tusen = joined.match(/(\d+(?:[.,]\d+)?)\s*(?:k|tkr)\b/i);
-  if (tusen) return Math.round(parseFloat(tusen[1].replace(",", ".")) * 1_000);
-  // Rena stora tal: "2500000", "2 500 000"
-  const spaced = joined.match(/\b(\d[\d\s]{5,})\b/);
-  if (spaced) {
-    const n = Number(spaced[1].replace(/\s/g, ""));
-    if (n >= 100_000) return n;
-  }
+  const joined = tokens.join(" ").toLowerCase();
+  // Miljonsuffix: "2 mil", "1,8mil", "2,5 miljoner", "2 mkr", "1,8 msek", "3m"
+  let m = joined.match(/(\d+(?:[.,]\d+)?)\s*(?:msek|mnkr|mkr|miljoner|miljon|milj|mil|m)\b/);
+  if (m) return Math.round(parseFloat(m[1].replace(",", ".")) * 1_000_000);
+  // Tusensuffix: "850k", "850 tkr"
+  m = joined.match(/(\d+(?:[.,]\d+)?)\s*(?:tkr|k)\b/);
+  if (m) return Math.round(parseFloat(m[1].replace(",", ".")) * 1_000);
+  // Grupperade tusental: "1,800,000", "1 800 000" (ev. "kr"/"sek")
+  m = joined.match(/\b(\d{1,3}(?:[ ,]\d{3})+)\s*(?:kr|sek|kronor)?\b/);
+  if (m) { const n = Number(m[1].replace(/[ ,]/g, "")); if (n >= 100_000) return n; }
+  // Rena stora tal: "1800000", "1800000 kr"
+  m = joined.match(/\b(\d{6,})\s*(?:kr|sek|kronor)?\b/);
+  if (m) return Number(m[1]);
+  // Ensamt decimaltal tolkas som miljoner: "1,8", "2.5"
+  m = joined.match(/(?:^|\s)(\d{1,2}[.,]\d{1,2})(?:\s|$)/);
+  if (m) return Math.round(parseFloat(m[1].replace(",", ".")) * 1_000_000);
   return null;
 }
 
@@ -70,14 +73,12 @@ export function parseLeadQuery(raw: string): ParsedLeadQuery {
     "någon", "nagon", "rum", "rok", "rok,",
   ]);
 
-  // Ord som varken är pris- eller rumstermer → ort/adress
+  // Ord som varken är pris-, rums- eller enhetsord → ort/adress
   const ord = tokens.filter((t) => {
     if (STOPP.has(t)) return false;
     if (ROOM_WORDS[t]) return false;
-    if (/^(\d)(?::?a|or|rum|rok|r)$/.test(t)) return false;
-    if (/^\d+(?:[.,]\d+)?(?:mil|milj|miljoner|mkr|mnkr|m|k|tkr)$/i.test(t)) return false;
-    if (/^(rum|rok|mil|mkr|miljoner|milj)$/i.test(t)) return false;
-    if (/^\d[\d\s]*$/.test(t)) return false; // rena siffror (pris)
+    if (/\d/.test(t)) return false; // allt med siffror = rum/pris, inte ort
+    if (/^(kr|sek|kronor|mil|milj|miljon|miljoner|mkr|mnkr|msek|tkr|k|m)$/i.test(t)) return false;
     return true;
   });
 
